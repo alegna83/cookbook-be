@@ -26,8 +26,8 @@ export class AccountsService {
     }
 
     // Gerar o hash da senha
-    //const hashedPassword = await bcrypt.hash(password, 10);
-    const hashedPassword = password;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    //const hashedPassword = password;
 
     // Criar o novo usuário
     const newAccount = this.accountsRepository.create({
@@ -41,7 +41,11 @@ export class AccountsService {
   }
 
   async findByEmail(email: string): Promise<Account | null> { 
-    return await this.accountsRepository.findOne({ where: { email } });
+    //return await this.accountsRepository.findOne({ where: { email } });
+    return this.accountsRepository.findOne({
+      where: { email },
+      select: ['id', 'email', 'name', 'pilgrim_reason', 'password'], // password precisa de estar para fazer o compare
+    });
   }
 
   // Função para autenticar o usuário
