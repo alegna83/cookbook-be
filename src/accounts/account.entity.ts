@@ -13,4 +13,7 @@ export class Account {
 
   @Column({ type: 'varchar', length: 255 })
   pilgrim_reason: string;
+
+  @Column({ type: 'varchar', length: 255 })
+  name: string;
 }
