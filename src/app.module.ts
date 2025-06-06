@@ -16,6 +16,7 @@ import { Stage } from './stages/entities/stage.entity';
 import { Place } from './places/entities/place.entity';
 import { PlaceCategory } from './place-categories/entities/place-category.entity';
 import { GalleryPhoto } from './gallery/entities/gallery-photo.entity';
+import { PlacePrice } from './place-prices/entities/place-price.entity';
 
 @Module({
   imports: [
@@ -30,7 +31,15 @@ import { GalleryPhoto } from './gallery/entities/gallery-photo.entity';
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME,
-      entities: [Account, Camino, Stage, Place, PlaceCategory, GalleryPhoto],
+      entities: [
+        Account,
+        Camino,
+        Stage,
+        Place,
+        PlaceCategory,
+        GalleryPhoto,
+        PlacePrice,
+      ],
       synchronize: true,
     }),
     AuthModule,
@@ -41,7 +50,7 @@ import { GalleryPhoto } from './gallery/entities/gallery-photo.entity';
     PlaceCategoriesModule,
     CaminosModule,
     StagesModule,
-    HttpModule
+    HttpModule,
   ],
 })
 export class AppModule {}

@@ -10,7 +10,7 @@ export class CaminosService {
     private caminoRepository: Repository<Camino>,
   ) {}
 
-  findAll() {
+  async findAll(): Promise<Camino[]> {
     return this.caminoRepository.find();
   }
 }

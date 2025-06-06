@@ -33,14 +33,14 @@ export class AccountsService {
     const newAccount = this.accountsRepository.create({
       email,
       password: hashedPassword,
-      pilgrim_reason
+      pilgrim_reason,
     });
 
     // Salvar no banco de dados
     return this.accountsRepository.save(newAccount);
   }
 
-  async findByEmail(email: string): Promise<Account | null> { 
+  async findByEmail(email: string): Promise<Account | null> {
     //return await this.accountsRepository.findOne({ where: { email } });
     return this.accountsRepository.findOne({
       where: { email },
@@ -50,13 +50,12 @@ export class AccountsService {
 
   // Função para autenticar o usuário
   async login(email: string, password: string): Promise<Account> {
-    console.log("login no accounts");
+    console.log('login no accounts');
     const account = await this.accountsRepository.findOne({ where: { email } });
     if (!account) {
       throw new Error('Account not found.');
     }
 
-    
     const isPasswordValid = password === account.password; //await bcrypt.compare(password, account.password);
     if (!isPasswordValid) {
       throw new Error('Wrong password.');
