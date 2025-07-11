@@ -11,6 +11,11 @@ export class CaminosService {
   ) {}
 
   async findAll(): Promise<Camino[]> {
-    return this.caminoRepository.find();
+    return this.caminoRepository.find({
+      order: {
+        ranking: 'ASC',
+        name: 'ASC',
+      },
+    });
   }
 }
