@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TodoModule } from './todo/todo.module';
 import { Account } from './accounts/account.entity';
@@ -17,30 +17,36 @@ import { Place } from './places/entities/place.entity';
 import { PlaceCategory } from './place-categories/entities/place-category.entity';
 import { GalleryPhoto } from './gallery/entities/gallery-photo.entity';
 import { PlacePrice } from './place-prices/entities/place-price.entity';
-
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT ? parseInt(process.env.DB_PORT) : 5432,
-      username: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      entities: [
-        Account,
-        Camino,
-        Stage,
-        Place,
-        PlaceCategory,
-        GalleryPhoto,
-        PlacePrice,
-      ],
-      synchronize: true,
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres',
+        host: configService.get<string>('DB_HOST'),
+        port: configService.get<number>('DB_PORT'),
+        username: configService.get<string>('DB_USERNAME'),
+        password: configService.get<string>('DB_PASSWORD'),
+        database: configService.get<string>('DB_NAME'),
+        entities: [
+          Account,
+          Camino,
+          Stage,
+          Place,
+          PlaceCategory,
+          GalleryPhoto,
+          PlacePrice,
+        ],
+        synchronize: true,
+        ssl: {
+          rejectUnauthorized: false,
+        },
+      }),
+      inject: [ConfigService],
     }),
     AuthModule,
     TodoModule,
