@@ -4,14 +4,19 @@ import { Place } from './entities/place.entity';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { PlaceDto } from './dto/place.dto';
+import { CreatePlaceDto } from './dto/create-place.dto';
+import { PlaceCategory } from 'src/place-categories/entities/place-category.entity';
 @Injectable()
 export class PlacesService {
   constructor(
     @InjectRepository(Place)
     private readonly placeRepository: Repository<Place>,
+    @InjectRepository(PlaceCategory)
+    private readonly categoryRepo: Repository<PlaceCategory>,
   ) {}
 
   async findAll(page: number = 1, limit: number = 10): Promise<PlaceDto[]> {
+    console.time('DB_FIND_PLACES');
     const places = await this.placeRepository.find({
       relations: [
         'camino',
@@ -23,6 +28,8 @@ export class PlacesService {
       skip: (page - 1) * limit,
       take: limit,
     });
+
+    console.timeEnd('DB_FIND_PLACES');
 
     return plainToInstance(PlaceDto, places, { excludeExtraneousValues: true });
   }
@@ -44,10 +51,43 @@ export class PlacesService {
     return plainToInstance(PlaceDto, place, { excludeExtraneousValues: true });
   }
 
-  async create(data: Partial<Place>): Promise<Place> {
-    const novo = this.placeRepository.create(data);
+  /*async create(data: Partial<Place>): Promise<Place> {
+    const new = this.placeRepository.create(data);
     return this.placeRepository.save(novo);
+  }*/
+
+  async create(data: CreatePlaceDto): Promise<PlaceDto> {
+    let category: PlaceCategory | undefined;
+
+    if (data.place_category) {
+      const found = await this.categoryRepo.findOne({
+        where: { id: data.place_category },
+      });
+
+      if (!found) {
+        throw new Error(
+          `Categoria com id ${data.place_category} não encontrada`,
+        );
+      }
+
+      category = found; // nunca será null aqui
+    }
+
+    const novo = this.placeRepository.create({
+      ...data,
+      place_category: category,
+    });
+
+    const saved: Place = await this.placeRepository.save(novo);
+
+    return plainToInstance(PlaceDto, saved, { excludeExtraneousValues: true });
   }
+
+  /* async create(data: CreatePlaceDto): Promise<PlaceDto> {
+    const novo = this.placeRepository.create(data);
+    const saved = await this.placeRepository.save(novo);
+    return plainToInstance(PlaceDto, saved, { excludeExtraneousValues: true });
+  }*/
 
   async findByCamino(caminoName: string): Promise<Place[]> {
     return this.placeRepository.find({

@@ -20,17 +20,19 @@ export class Place {
   @Column({ nullable: true })
   place_name: string;
 
-  @ManyToOne(() => Camino, camino => camino.places, { eager: true })
+  @ManyToOne(() => Camino, (camino) => camino.places, { eager: true })
   @JoinColumn({ name: 'camino_id' })
   camino: Camino;
 
-  @ManyToOne(() => Stage, stage => stage.places, { eager: true })
+  @ManyToOne(() => Stage, (stage) => stage.places, { eager: true })
   @JoinColumn({ name: 'stage_id' })
   stage: Stage;
 
   @ManyToOne(() => PlaceCategory, { eager: true })
   @JoinColumn({ name: 'place_category_id' })
   place_category: PlaceCategory;
+  /*@Column({ nullable: true })
+  place_category: string;*/
 
   @Column({ nullable: true })
   address: string;
@@ -103,4 +105,10 @@ export class Place {
 
   @OneToMany(() => PlacePrice, (price) => price.place)
   prices: PlacePrice[];
+
+  @Column('simple-json', { nullable: true })
+  services: string[];
+
+  @Column('simple-json', { nullable: true })
+  nearbyActivities: string[];
 }
