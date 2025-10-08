@@ -100,7 +100,10 @@ export class Place {
   @Column('decimal', { nullable: true })
   longitude: number;
 
-  @OneToMany(() => GalleryPhoto, (photo) => photo.place, { cascade: true })
+  /*@OneToMany(() => GalleryPhoto, (photo) => photo.place, { cascade: true })
+  gallery_photos: GalleryPhoto[];*/
+
+  @OneToMany(() => GalleryPhoto, (photo) => photo.place)
   gallery_photos: GalleryPhoto[];
 
   @OneToMany(() => PlacePrice, (price) => price.place)

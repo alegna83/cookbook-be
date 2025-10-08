@@ -27,12 +27,15 @@ import { PlacePrice } from './place-prices/entities/place-price.entity';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         type: 'postgres',
-        host: configService.get<string>('DB_HOST'),
+        url: configService.get<string>('DATABASE_URL'),
+        autoLoadEntities: true,
+        synchronize: true,
+        /*host: configService.get<string>('DB_HOST'),
         port: configService.get<number>('DB_PORT'),
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
-        database: configService.get<string>('DB_NAME'),
-        entities: [
+        database: configService.get<string>('DB_NAME'),*/
+        /*entities: [
           Account,
           Camino,
           Stage,
@@ -40,9 +43,9 @@ import { PlacePrice } from './place-prices/entities/place-price.entity';
           PlaceCategory,
           GalleryPhoto,
           PlacePrice,
-        ],
-        synchronize: true,
+        ],*/
         ssl: {
+          require: true,
           rejectUnauthorized: false,
         },
       }),

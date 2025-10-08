@@ -15,7 +15,11 @@ export class GalleryPhoto {
   @Column({ nullable: true })
   url: string;
 
-  @ManyToOne(() => Place, (place) => place.gallery_photos)
-  //@JoinColumn({ name: 'place_id' })
+  /*@ManyToOne(() => Place, (place) => place.gallery_photos)
+  place: Place;*/
+
+  @ManyToOne(() => Place, (place) => place.gallery_photos, {
+    onDelete: 'CASCADE',
+  })
   place: Place;
 }
