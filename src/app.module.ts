@@ -17,6 +17,8 @@ import { Place } from './places/entities/place.entity';
 import { PlaceCategory } from './place-categories/entities/place-category.entity';
 import { GalleryPhoto } from './gallery/entities/gallery-photo.entity';
 import { PlacePrice } from './place-prices/entities/place-price.entity';
+import { StatisticsCaminos } from './statistics-caminos/entities/statistics-caminos.entity';
+import { StatisticsCaminosModule } from './statistics-caminos/statistics-caminos.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -59,6 +61,7 @@ import { PlacePrice } from './place-prices/entities/place-price.entity';
     PlaceCategoriesModule,
     CaminosModule,
     StagesModule,
+    StatisticsCaminosModule,
     HttpModule,
   ],
 })
