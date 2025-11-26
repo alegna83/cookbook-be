@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { TodoModule } from './todo/todo.module';
-import { Account } from './accounts/account.entity';
 import { AccountsModule } from './accounts/accounts.module';
 import { AuthModule } from './auth/auth.module';
 import { SuggestionModule } from './suggestions/suggestion.module';
@@ -11,14 +10,8 @@ import { PlacesModule } from './places/places.module';
 import { PlaceCategoriesModule } from './place-categories/place-categories.module';
 import { CaminosModule } from './caminos/caminos.module';
 import { StagesModule } from './stages/stages.module';
-import { Camino } from './caminos/entities/camino.entity';
-import { Stage } from './stages/entities/stage.entity';
-import { Place } from './places/entities/place.entity';
-import { PlaceCategory } from './place-categories/entities/place-category.entity';
-import { GalleryPhoto } from './gallery/entities/gallery-photo.entity';
-import { PlacePrice } from './place-prices/entities/place-price.entity';
-import { StatisticsCaminos } from './statistics-caminos/entities/statistics-caminos.entity';
 import { StatisticsCaminosModule } from './statistics-caminos/statistics-caminos.module';
+import { FavoritesModule } from './favorites/favorites.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -63,6 +56,7 @@ import { StatisticsCaminosModule } from './statistics-caminos/statistics-caminos
     StagesModule,
     StatisticsCaminosModule,
     HttpModule,
+    FavoritesModule,
   ],
 })
 export class AppModule {}
