@@ -4,6 +4,7 @@ import {
   Body,
   BadRequestException,
   HttpCode,
+  NotFoundException,
 } from '@nestjs/common';
 import { PlacesService } from './places.service';
 import { HandlePlaceDto } from './dto/handle-place.dto';
@@ -48,6 +49,13 @@ export class PlacesController {
             throw new BadRequestException('Coordenadas em falta.');
           }
           return this.placesService.getByBounds(data.payload.bounds);
+        case 'getByPlaceId':
+          if (!data.payload?.placeId) {
+            throw new BadRequestException('placeId é obrigatório.');
+          }
+          return this.placesService.findAccommodationByPlaceId(
+            Number(data.payload.placeId),
+          );
         default:
           throw new BadRequestException('Ação desconhecida.');
       }

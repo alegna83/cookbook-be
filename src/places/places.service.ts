@@ -106,4 +106,22 @@ export class PlacesService {
       .andWhere('place.longitude BETWEEN :west AND :east', { west, east })
       .getMany();
   }
+
+  async findAccommodationByPlaceId(placeId: number): Promise<any> {
+    const result = await this.placeRepository
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.place_category', 'pc')
+      .leftJoinAndSelect('p.gallery_photos', 'photos')
+      .leftJoinAndSelect('p.prices', 'prices')
+      .leftJoinAndSelect('p.camino', 'camino')
+      .leftJoinAndSelect('p.stage', 'stage')
+      .where('p.id = :placeId', { placeId })
+      .getOne();
+
+    if (!result) {
+      throw new NotFoundException(`Place com ID ${placeId} não encontrado.`);
+    }
+
+    return result;
+  }
 }
