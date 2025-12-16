@@ -12,6 +12,7 @@ import { CaminosModule } from './caminos/caminos.module';
 import { StagesModule } from './stages/stages.module';
 import { StatisticsCaminosModule } from './statistics-caminos/statistics-caminos.module';
 import { FavoritesModule } from './favorites/favorites.module';
+import { CommentsModule } from './comments/comments.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -57,6 +58,7 @@ import { FavoritesModule } from './favorites/favorites.module';
     StatisticsCaminosModule,
     HttpModule,
     FavoritesModule,
+    CommentsModule,
   ],
 })
 export class AppModule {}
