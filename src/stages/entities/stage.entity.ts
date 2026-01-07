@@ -7,7 +7,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Camino } from 'src/caminos/entities/camino.entity';
-import { Place } from 'src/places/entities/place.entity';
+import { Accommodation } from 'src/accommodations/entities/accommodation.entity';
 
 @Entity('stages')
 export class Stage {
@@ -21,6 +21,6 @@ export class Stage {
   @JoinColumn({ name: 'camino_id' })
   camino: Camino;
 
-  @OneToMany(() => Place, (place) => place.stage)
-  places: Place[];
+  @OneToMany(() => Accommodation, (place) => place.stage)
+  places: Accommodation[];
 }

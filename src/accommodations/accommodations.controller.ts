@@ -6,56 +6,55 @@ import {
   HttpCode,
   NotFoundException,
 } from '@nestjs/common';
-import { PlacesService } from './places.service';
-import { HandlePlaceDto } from './dto/handle-place.dto';
-import { CreatePlaceDto } from './dto/create-place.dto';
+import { AccommodationsService } from './accommodations.service';
+import { HandleAccommodationDto } from './dto/handle-accommodation.dto';
+import { CreateAccommodationDto } from './dto/create-accommodation.dto';
 
-@Controller('places')
-export class PlacesController {
-  constructor(private readonly placesService: PlacesService) {}
+@Controller('accommodations')
+export class AccommodationsController {
+  constructor(private readonly accommodationsService: AccommodationsService) {}
 
   @Post('handle')
   @HttpCode(200)
-  async handle(@Body() data: HandlePlaceDto): Promise<any> {
+  async handle(@Body() data: HandleAccommodationDto): Promise<any> {
     console.time(`HANDLE_${data.action?.toUpperCase() || 'UNKNOWN'}`);
     try {
       switch (data.action) {
         case 'getAll':
-          return this.placesService.findAll(data.page, data.limit);
+          return this.accommodationsService.findAll(data.page, data.limit);
 
         case 'getOne':
           if (!data.payload || !data.payload?.id) {
-            throw new BadRequestException('ID do place é obrigatório.');
+            throw new BadRequestException('ID do accommodation é obrigatório.');
           }
-          return this.placesService.findOne(Number(data.payload.id));
-        /*case 'create':
-          if (!data.payload) {
-            throw new BadRequestException('Dados para criação em falta.');
-          }
-          return this.placesService.create(data.payload as any);*/
+          return this.accommodationsService.findOne(Number(data.payload.id));
+
         case 'create':
           if (!data.payload) {
             throw new BadRequestException('Dados para criação em falta.');
           }
-          return this.placesService.create(data.payload as CreatePlaceDto);
+          return this.accommodationsService.create(data.payload as CreateAccommodationDto);
 
         case 'getByCamino':
           if (!data.payload?.byCamino) {
             throw new BadRequestException('Nome do caminho em falta.');
           }
-          return this.placesService.findByCamino(data.payload.byCamino);
+          return this.accommodationsService.findByCamino(data.payload.byCamino);
+
         case 'getByBounds':
           if (!data.payload?.bounds) {
             throw new BadRequestException('Coordenadas em falta.');
           }
-          return this.placesService.getByBounds(data.payload.bounds);
+          return this.accommodationsService.getByBounds(data.payload.bounds);
+
         case 'getByPlaceId':
           if (!data.payload?.placeId) {
             throw new BadRequestException('placeId é obrigatório.');
           }
-          return this.placesService.findAccommodationByPlaceId(
+          return this.accommodationsService.findAccommodationByPlaceId(
             Number(data.payload.placeId),
           );
+
         default:
           throw new BadRequestException('Ação desconhecida.');
       }

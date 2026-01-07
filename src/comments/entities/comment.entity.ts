@@ -7,7 +7,7 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { Place } from '../../places/entities/place.entity';
+import { Accommodation } from '../../accommodations/entities/accommodation.entity';
 
 @Entity('comments')
 export class Comment {
@@ -26,9 +26,9 @@ export class Comment {
   @Column({ type: 'text', nullable: true })
   comment: string;
 
-  @ManyToOne(() => Place, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Accommodation, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'place_id' })
-  place?: Place;
+  place?: Accommodation;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

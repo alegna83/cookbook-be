@@ -9,11 +9,11 @@ import {
 import { Camino } from '../../caminos/entities/camino.entity';
 import { Stage } from '../../stages/entities/stage.entity';
 import { GalleryPhoto } from '../../gallery/entities/gallery-photo.entity';
-import { PlaceCategory } from '../../place-categories/entities/place-category.entity';
-import { PlacePrice } from 'src/place-prices/entities/place-price.entity';
+import { AccommodationCategory } from '../../accommodation-categories/entities/accommodation-category.entity';
+import { AccommodationPrice } from 'src/place-prices/entities/place-price.entity';
 
 @Entity('places')
-export class Place {
+export class Accommodation {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -28,11 +28,9 @@ export class Place {
   @JoinColumn({ name: 'stage_id' })
   stage: Stage;
 
-  @ManyToOne(() => PlaceCategory, { eager: true })
+  @ManyToOne(() => AccommodationCategory, { eager: true })
   @JoinColumn({ name: 'place_category_id' })
-  place_category: PlaceCategory;
-  /*@Column({ nullable: true })
-  place_category: string;*/
+  place_category: AccommodationCategory;
 
   @Column({ nullable: true })
   address: string;
@@ -100,14 +98,11 @@ export class Place {
   @Column('decimal', { nullable: true })
   longitude: number;
 
-  /*@OneToMany(() => GalleryPhoto, (photo) => photo.place, { cascade: true })
-  gallery_photos: GalleryPhoto[];*/
-
   @OneToMany(() => GalleryPhoto, (photo) => photo.place)
   gallery_photos: GalleryPhoto[];
 
-  @OneToMany(() => PlacePrice, (price) => price.place)
-  prices: PlacePrice[];
+  @OneToMany(() => AccommodationPrice, (price) => price.place)
+  prices: AccommodationPrice[];
 
   @Column('simple-json', { nullable: true })
   services: string[];

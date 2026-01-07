@@ -1,8 +1,8 @@
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { Place } from 'src/places/entities/place.entity';
+import { Accommodation } from 'src/accommodations/entities/accommodation.entity';
 
 @Entity('place_categories')
-export class PlaceCategory {
+export class AccommodationCategory {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -10,6 +10,6 @@ export class PlaceCategory {
   name: string;
 
   // Relação inversa: uma categoria pode ter muitos places
-  @OneToMany(() => Place, (place) => place.place_category)
-  places: Place[];
+  @OneToMany(() => Accommodation, (place) => place.place_category)
+  places: Accommodation[];
 }

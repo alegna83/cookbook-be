@@ -3,10 +3,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Comment } from './entities/comment.entity';
 import { CommentsService } from './comments.service';
 import { CommentsController } from './comments.controller';
-import { Place } from '../places/entities/place.entity';
+import { Accommodation } from '../accommodations/entities/accommodation.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Comment, Place])],
+  imports: [TypeOrmModule.forFeature([Comment, Accommodation])],
   providers: [CommentsService],
   controllers: [CommentsController],
   exports: [CommentsService],

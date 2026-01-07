@@ -1,5 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn } from 'typeorm';
-import { Place } from '../../places/entities/place.entity'; // ajuste o caminho se necessário
+import { Accommodation } from '../../accommodations/entities/accommodation.entity';
 
 @Entity('favorites')
 export class Favorite {
@@ -12,9 +12,9 @@ export class Favorite {
   @Column({ name: 'account_id' })
   accountId: number;
 
-  @ManyToOne(() => Place, { onDelete: 'CASCADE', eager: true })
+  @ManyToOne(() => Accommodation, { onDelete: 'CASCADE', eager: true })
   @JoinColumn({ name: 'place_id' })
-  place?: Place;
+  place?: Accommodation;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

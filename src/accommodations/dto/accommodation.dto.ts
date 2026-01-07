@@ -1,8 +1,8 @@
 import { Expose, Type } from 'class-transformer';
 import { GalleryPhotoDto } from 'src/gallery/dto/gallery-photo.dto';
-import { PlacePriceDto } from 'src/place-prices/dto/place-price.dto';
+import { AccommodationPriceDto } from 'src/place-prices/dto/place-price.dto';
 
-export class PlaceDto {
+export class AccommodationDto {
   @Expose()
   id: string;
 
@@ -80,6 +80,6 @@ export class PlaceDto {
   gallery_photos: GalleryPhotoDto[];
 
   @Expose()
-  @Type(() => PlacePriceDto)
-  prices: PlacePriceDto[];
+  @Type(() => AccommodationPriceDto)
+  prices: AccommodationPriceDto[];
 }

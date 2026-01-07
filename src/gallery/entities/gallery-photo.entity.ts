@@ -5,7 +5,7 @@ import {
   ManyToOne,
   //JoinColumn,
 } from 'typeorm';
-import { Place } from 'src/places/entities/place.entity';
+import { Accommodation } from 'src/accommodations/entities/accommodation.entity';
 
 @Entity('gallery_photos')
 export class GalleryPhoto {
@@ -15,11 +15,8 @@ export class GalleryPhoto {
   @Column({ nullable: true })
   url: string;
 
-  /*@ManyToOne(() => Place, (place) => place.gallery_photos)
-  place: Place;*/
-
-  @ManyToOne(() => Place, (place) => place.gallery_photos, {
+  @ManyToOne(() => Accommodation, (place) => place.gallery_photos, {
     onDelete: 'CASCADE',
   })
-  place: Place;
+  place: Accommodation;
 }

@@ -38,7 +38,19 @@ export class AuthService {
     const payload = { id: account.id, email: account.email };
     const access_token = this.jwtService.sign(payload, { expiresIn: '1h' });
 
-    return { access_token, user: account };
+    // Retorna o nome do usuário, ou a primeira parte do email se não tiver nome
+    let userName = account.name;
+    if (!userName || userName.trim() === '') {
+      userName = account.email.split('@')[0];
+    }
+
+    return { 
+      access_token, 
+      user: {
+        ...account,
+        name: userName
+      }
+    };
   }
 
   async validateToken(req: Request) {

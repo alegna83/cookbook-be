@@ -1,7 +1,7 @@
-// src/places/dto/create-place.dto.ts
+// src/accommodations/dto/create-place.dto.ts
 import { IsOptional, IsString, IsNumber } from 'class-validator';
 
-export class CreatePlaceDto {
+export class CreateAccommodationDto {
   @IsString()
   place_name: string;
 
@@ -53,15 +53,10 @@ export class CreatePlaceDto {
   @IsNumber()
   longitude?: number;
 
-  /*@IsOptional()
-  @IsString()
-  place_category_id?: string;*/
-
   @IsOptional()
   @IsString()
   camino_id?: string;
 
-  // podes adicionar os outros campos que aparecem nos steps do frontend
   @IsOptional()
   services?: string[];
 

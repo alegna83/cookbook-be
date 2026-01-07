@@ -1,6 +1,6 @@
 import { Expose } from 'class-transformer';
 
-export class PlacePriceDto {
+export class AccommodationPriceDto {
   @Expose()
   id: number;
 

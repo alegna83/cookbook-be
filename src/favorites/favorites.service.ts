@@ -7,15 +7,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Favorite } from './entities/favorite.entity';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
-import { Place } from '../places/entities/place.entity';
+import { Accommodation } from '../accommodations/entities/accommodation.entity';
 
 @Injectable()
 export class FavoritesService {
   constructor(
     @InjectRepository(Favorite)
     private favRepo: Repository<Favorite>,
-    @InjectRepository(Place)
-    private placeRepo: Repository<Place>,
+    @InjectRepository(Accommodation)
+    private placeRepo: Repository<Accommodation>,
   ) {}
 
   async add(dto: CreateFavoriteDto): Promise<Favorite> {

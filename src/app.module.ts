@@ -6,8 +6,8 @@ import { AccountsModule } from './accounts/accounts.module';
 import { AuthModule } from './auth/auth.module';
 import { SuggestionModule } from './suggestions/suggestion.module';
 import { HttpModule } from '@nestjs/axios';
-import { PlacesModule } from './places/places.module';
-import { PlaceCategoriesModule } from './place-categories/place-categories.module';
+import { AccommodationsModule } from './accommodations/accommodations.module';
+import { AccommodationCategoriesModule } from './accommodation-categories/accmmodation-categories.module';
 import { CaminosModule } from './caminos/caminos.module';
 import { StagesModule } from './stages/stages.module';
 import { StatisticsCaminosModule } from './statistics-caminos/statistics-caminos.module';
@@ -51,8 +51,8 @@ import { CommentsModule } from './comments/comments.module';
     TodoModule,
     AccountsModule,
     SuggestionModule,
-    PlacesModule,
-    PlaceCategoriesModule,
+    AccommodationsModule,
+    AccommodationCategoriesModule,
     CaminosModule,
     StagesModule,
     StatisticsCaminosModule,

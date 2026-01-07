@@ -1,5 +1,5 @@
-export class HandlePlaceDto {
-  action: string;//'getAll' | 'getOne' | 'create';
+export class HandleAccommodationDto {
+  action: string;
   payload?: {
     id?: string;
     bounds?: {
@@ -9,6 +9,7 @@ export class HandlePlaceDto {
       east: number;
     };
     byCamino?: string;
+    placeId?: number;
     [key: string]: any;
   };
   page?: number;

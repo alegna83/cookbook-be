@@ -1,8 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
-import { Place } from '../../places/entities/place.entity';
+import { Accommodation } from '../../accommodations/entities/accommodation.entity';
 
 @Entity('place_prices')
-export class PlacePrice {
+export class AccommodationPrice {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -12,6 +12,6 @@ export class PlacePrice {
   @Column('decimal', { precision: 10, scale: 2, nullable: true })
   price: number;
 
-  @ManyToOne(() => Place, (place) => place.prices, { onDelete: 'CASCADE' })
-  place: Place;
+  @ManyToOne(() => Accommodation, (place) => place.prices, { onDelete: 'CASCADE' })
+  place: Accommodation;
 }

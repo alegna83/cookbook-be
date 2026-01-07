@@ -6,7 +6,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { Place } from 'src/places/entities/place.entity';
+import { Accommodation } from 'src/accommodations/entities/accommodation.entity';
 import { StatisticsCaminos } from 'src/statistics-caminos/entities/statistics-caminos.entity';
 
 @Entity('caminos')
@@ -33,8 +33,8 @@ export class Camino {
   @OneToMany(() => Camino, (camino) => camino.parent_camino)
   children: Camino[];
 
-  @OneToMany(() => Place, (place) => place.camino)
-  places: Place[];
+  @OneToMany(() => Accommodation, (place) => place.camino)
+  places: Accommodation[];
 
   @OneToMany(() => StatisticsCaminos, (stat) => stat.camino)
   statistics: StatisticsCaminos[];

@@ -1,22 +1,26 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Place } from './entities/place.entity';
+import { Accommodation } from './entities/accommodation.entity';
 import { Repository } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
-import { PlaceDto } from './dto/place.dto';
-import { CreatePlaceDto } from './dto/create-place.dto';
-import { PlaceCategory } from 'src/place-categories/entities/place-category.entity';
+import { AccommodationDto } from './dto/accommodation.dto';
+import { CreateAccommodationDto } from './dto/create-accommodation.dto';
+import { AccommodationCategory } from 'src/accommodation-categories/entities/accommodation-category.entity';
+
 @Injectable()
-export class PlacesService {
+export class AccommodationsService {
   constructor(
-    @InjectRepository(Place)
-    private readonly placeRepository: Repository<Place>,
-    @InjectRepository(PlaceCategory)
-    private readonly categoryRepo: Repository<PlaceCategory>,
+    @InjectRepository(Accommodation)
+    private readonly placeRepository: Repository<Accommodation>,
+    @InjectRepository(AccommodationCategory)
+    private readonly categoryRepo: Repository<AccommodationCategory>,
   ) {}
 
-  async findAll(page: number = 1, limit: number = 10): Promise<PlaceDto[]> {
-    console.time('DB_FIND_PLACES');
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<AccommodationDto[]> {
+    console.time('DB_FIND_ACCOMMODATIONS');
     const places = await this.placeRepository.find({
       relations: [
         'camino',
@@ -29,12 +33,12 @@ export class PlacesService {
       take: limit,
     });
 
-    console.timeEnd('DB_FIND_PLACES');
+    console.timeEnd('DB_FIND_ACCOMMODATIONS');
 
-    return plainToInstance(PlaceDto, places, { excludeExtraneousValues: true });
+    return plainToInstance(AccommodationDto, places, { excludeExtraneousValues: true });
   }
 
-  async findOne(id: number): Promise<PlaceDto> {
+  async findOne(id: number): Promise<AccommodationDto> {
     const place = await this.placeRepository.findOne({
       where: { id },
       relations: [
@@ -46,18 +50,15 @@ export class PlacesService {
       ],
     });
     if (!place) {
-      throw new NotFoundException(`Place com id ${id} não encontrado`);
+      throw new NotFoundException(`Accommodation com id ${id} não encontrado`);
     }
-    return plainToInstance(PlaceDto, place, { excludeExtraneousValues: true });
+    return plainToInstance(AccommodationDto, place, {
+      excludeExtraneousValues: true,
+    });
   }
 
-  /*async create(data: Partial<Place>): Promise<Place> {
-    const new = this.placeRepository.create(data);
-    return this.placeRepository.save(novo);
-  }*/
-
-  async create(data: CreatePlaceDto): Promise<PlaceDto> {
-    let category: PlaceCategory | undefined;
+  async create(data: CreateAccommodationDto): Promise<AccommodationDto> {
+    let category: AccommodationCategory | undefined;
 
     if (data.place_category) {
       const found = await this.categoryRepo.findOne({
@@ -70,7 +71,7 @@ export class PlacesService {
         );
       }
 
-      category = found; // nunca será null aqui
+      category = found;
     }
 
     const novo = this.placeRepository.create({
@@ -78,18 +79,14 @@ export class PlacesService {
       place_category: category,
     });
 
-    const saved: Place = await this.placeRepository.save(novo);
+    const saved: Accommodation = await this.placeRepository.save(novo);
 
-    return plainToInstance(PlaceDto, saved, { excludeExtraneousValues: true });
+    return plainToInstance(AccommodationDto, saved, {
+      excludeExtraneousValues: true,
+    });
   }
 
-  /* async create(data: CreatePlaceDto): Promise<PlaceDto> {
-    const novo = this.placeRepository.create(data);
-    const saved = await this.placeRepository.save(novo);
-    return plainToInstance(PlaceDto, saved, { excludeExtraneousValues: true });
-  }*/
-
-  async findByCamino(caminoName: string): Promise<Place[]> {
+  async findByCamino(caminoName: string): Promise<Accommodation[]> {
     return this.placeRepository.find({
       where: { camino: { name: caminoName } },
       relations: ['camino'],
@@ -119,7 +116,7 @@ export class PlacesService {
       .getOne();
 
     if (!result) {
-      throw new NotFoundException(`Place com ID ${placeId} não encontrado.`);
+      throw new NotFoundException(`Accommodation com ID ${placeId} não encontrado.`);
     }
 
     return result;
