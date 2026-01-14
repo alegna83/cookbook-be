@@ -1,14 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AccountsService } from '../accounts/accounts.service';
+import { AccommodationsService } from '../accommodations/accommodations.service';
+import { CommentsService } from '../comments/comments.service';
 import { JwtService } from '@nestjs/jwt';
 import * as jwt from 'jsonwebtoken';
 import { Request } from 'express';
+import { HandleAdminDto } from './dto/handle-admin.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
     private accountsService: AccountsService,
+    private accommodationsService: AccommodationsService,
+    private commentsService: CommentsService,
     private jwtService: JwtService,
   ) {}
 
@@ -85,5 +90,51 @@ export class AuthService {
 
   isTokenBlacklisted(token: string): boolean {
     return this.tokenBlacklist.has(token);
+  }
+
+  // 🔐 Admin actions handler
+  async handleAdminAction(data: HandleAdminDto): Promise<any> {
+    switch (data.action) {
+      case 'getPendingAccommodations':
+        return this.accommodationsService.getPendingAccommodations();
+
+      case 'getPendingComments':
+        return this.commentsService.getPendingComments();
+
+      case 'approveAccommodation':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.accommodationsService.approveAccommodation(
+          data.payload.id,
+        );
+
+      case 'rejectAccommodation':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.accommodationsService.approveAccommodation(
+          data.payload.id,
+          data.payload.rejectionReason,
+        );
+
+      case 'approveComment':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.commentsService.approveComment(data.payload.id);
+
+      case 'rejectComment':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.commentsService.approveComment(
+          data.payload.id,
+          data.payload.rejectionReason,
+        );
+
+      default:
+        throw new BadRequestException('Ação desconhecida.');
+    }
   }
 }

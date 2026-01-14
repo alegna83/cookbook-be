@@ -121,4 +121,37 @@ export class AccommodationsService {
 
     return result;
   }
+
+  // ✅ Admin approval methods
+  async getPendingAccommodations(): Promise<Accommodation[]> {
+    return this.placeRepository.find({
+      where: { status: 'pending' },
+      relations: ['camino', 'stage', 'gallery_photos', 'place_category'],
+    });
+  }
+
+  async approveAccommodation(
+    id: number,
+    rejectionReason?: string,
+  ): Promise<Accommodation> {
+    const accommodation = await this.placeRepository.findOne({
+      where: { id },
+    });
+
+    if (!accommodation) {
+      throw new NotFoundException(
+        `Accommodation com id ${id} não encontrado`,
+      );
+    }
+
+    if (rejectionReason) {
+      accommodation.status = 'rejected';
+      accommodation.rejectionReason = rejectionReason;
+    } else {
+      accommodation.status = 'approved';
+      accommodation.approvedAt = new Date();
+    }
+
+    return this.placeRepository.save(accommodation);
+  }
 }

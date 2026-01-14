@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { AccountsModule } from '../accounts/accounts.module'; // Importe o AccountsModule
+import { AccountsModule } from '../accounts/accounts.module';
+import { AccommodationsModule } from '../accommodations/accommodations.module';
+import { CommentsModule } from '../comments/comments.module';
 import { JwtStrategy } from './guards/jwt.strategy';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
@@ -17,7 +19,9 @@ import { JwtModule } from '@nestjs/jwt';
       }),
     }),
     AccountsModule,
-  ], // Importando o módulo que contém o AccountsService
+    AccommodationsModule,
+    CommentsModule,
+  ],
   providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
 })

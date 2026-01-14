@@ -22,5 +22,6 @@ import { AccommodationPrice } from 'src/place-prices/entities/place-price.entity
   ],
   controllers: [AccommodationsController],
   providers: [AccommodationsService],
+  exports: [AccommodationsService],
 })
 export class AccommodationsModule {}

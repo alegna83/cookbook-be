@@ -45,13 +45,22 @@ export class CommentsService {
     await this.commentRepo.remove(comment);
   }
 
-  async listByPlace(placeId: number, page: number = 1, limit: number = 10): Promise<Comment[]> {
-    return this.commentRepo.find({
-      where: { placeId },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  async listByPlace(placeId: number, page: number = 1, limit: number = 10): Promise<any[]> {
+    const comments = await this.commentRepo
+      .createQueryBuilder('comment')
+      .leftJoinAndSelect('comment.account', 'account')
+      .where('comment.placeId = :placeId', { placeId })
+      .orderBy('comment.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    // Mapear para incluir accountName
+    return comments.map(comment => ({
+      ...comment,
+      accountName: comment.account?.name || null,
+      account: undefined, // Remove o objeto account completo
+    }));
   }
 
   async listByAccount(accountId: number): Promise<Comment[]> {
@@ -78,5 +87,47 @@ export class CommentsService {
       average: result?.average ? parseFloat(result.average) : 0,
       count: result?.count ? parseInt(result.count) : 0,
     };
+  }
+
+  // ✅ Admin approval methods
+  async getPendingComments(): Promise<any[]> {
+    const comments = await this.commentRepo
+      .createQueryBuilder('comment')
+      .leftJoinAndSelect('comment.place', 'place')
+      .leftJoinAndSelect('comment.account', 'account')
+      .where('comment.status = :status', { status: 'pending' })
+      .orderBy('comment.createdAt', 'ASC')
+      .getMany();
+
+    // Mapear para incluir placeName e dados do user no nível do comentário
+    return comments.map(comment => ({
+      ...comment,
+      placeName: comment.place?.place_name || null,
+      accountName: comment.account?.name || null,
+      accountEmail: comment.account?.email || null,
+      place: undefined, // Remove o objeto place completo
+      account: undefined, // Remove o objeto account completo
+    }));
+  }
+
+  async approveComment(
+    id: number,
+    rejectionReason?: string,
+  ): Promise<Comment> {
+    const comment = await this.commentRepo.findOne({ where: { id } });
+
+    if (!comment) {
+      throw new NotFoundException('Comentário não encontrado');
+    }
+
+    if (rejectionReason) {
+      comment.status = 'rejected';
+      comment.rejectionReason = rejectionReason;
+    } else {
+      comment.status = 'approved';
+      comment.approvedAt = new Date();
+    }
+
+    return this.commentRepo.save(comment);
   }
 }

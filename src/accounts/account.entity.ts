@@ -16,4 +16,12 @@ export class Account {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   name: string;
+
+  @Column({
+    type: 'varchar',
+    length: 50,
+    default: 'normal',
+    comment: 'normal ou admin',
+  })
+  userType: 'normal' | 'admin';
 }

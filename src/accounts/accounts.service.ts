@@ -41,10 +41,9 @@ export class AccountsService {
   }
 
   async findByEmail(email: string): Promise<Account | null> {
-    //return await this.accountsRepository.findOne({ where: { email } });
     return this.accountsRepository.findOne({
       where: { email },
-      select: ['id', 'email', 'name', 'pilgrim_reason', 'password'], // password precisa de estar para fazer o compare
+      select: ['id', 'email', 'name', 'pilgrim_reason', 'password', 'userType'],
     });
   }
 

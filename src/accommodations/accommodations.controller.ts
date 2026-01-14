@@ -4,7 +4,6 @@ import {
   Body,
   BadRequestException,
   HttpCode,
-  NotFoundException,
 } from '@nestjs/common';
 import { AccommodationsService } from './accommodations.service';
 import { HandleAccommodationDto } from './dto/handle-accommodation.dto';

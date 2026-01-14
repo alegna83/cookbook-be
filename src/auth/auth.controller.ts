@@ -6,9 +6,11 @@ import {
   UseGuards,
   Req,
   Res,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto'; // Criar o DTO para o login
+import { LoginDto } from './dto/login.dto';
+import { HandleAdminDto } from './dto/handle-admin.dto';
 import { Response, Request } from 'express';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -42,5 +44,12 @@ export class AuthController {
     // Expirar o token no cliente (removendo o cookie, se usado)
     res.clearCookie('jwt');
     return res.status(200).json({ message: 'Logout successful' });
+  }
+
+  // 🔐 Admin endpoint encapsulado
+  @Post('admin/handle')
+  @HttpCode(200)
+  async handleAdmin(@Body() data: HandleAdminDto): Promise<any> {
+    return this.authService.handleAdminAction(data);
   }
 }
