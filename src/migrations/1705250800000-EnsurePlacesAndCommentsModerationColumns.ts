@@ -1,15 +1,13 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddAccountUserTypeAndPlacesColumns1705250400000
+export class EnsurePlacesAndCommentsModerationColumns1705250800000
   implements MigrationInterface
 {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // Add userType to account table
     await queryRunner.query(
       `ALTER TABLE "account" ADD COLUMN IF NOT EXISTS "userType" varchar(50) DEFAULT 'normal'`,
     );
 
-    // Add status, approvedAt, rejectionReason, account_id to places table
     await queryRunner.query(
       `ALTER TABLE "places" ADD COLUMN IF NOT EXISTS "status" varchar(50) DEFAULT 'pending'`,
     );
@@ -23,7 +21,6 @@ export class AddAccountUserTypeAndPlacesColumns1705250400000
       `ALTER TABLE "places" ADD COLUMN IF NOT EXISTS "account_id" int NULL`,
     );
 
-    // Add status, approvedAt, rejectionReason to comments table
     await queryRunner.query(
       `ALTER TABLE "comments" ADD COLUMN IF NOT EXISTS "status" varchar(50) DEFAULT 'pending'`,
     );
@@ -36,34 +33,29 @@ export class AddAccountUserTypeAndPlacesColumns1705250400000
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    // Remove userType from account
     await queryRunner.query(
-      `ALTER TABLE "account" DROP COLUMN IF EXISTS "userType"`,
-    );
-
-    // Remove columns from places
-    await queryRunner.query(
-      `ALTER TABLE "places" DROP COLUMN IF EXISTS "status"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "places" DROP COLUMN IF EXISTS "approvedAt"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "places" DROP COLUMN IF EXISTS "rejectionReason"`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "places" DROP COLUMN IF EXISTS "account_id"`,
-    );
-
-    // Remove columns from comments
-    await queryRunner.query(
-      `ALTER TABLE "comments" DROP COLUMN IF EXISTS "status"`,
+      `ALTER TABLE "comments" DROP COLUMN IF EXISTS "rejectionReason"`,
     );
     await queryRunner.query(
       `ALTER TABLE "comments" DROP COLUMN IF EXISTS "approvedAt"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "comments" DROP COLUMN IF EXISTS "rejectionReason"`,
+      `ALTER TABLE "comments" DROP COLUMN IF EXISTS "status"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "places" DROP COLUMN IF EXISTS "account_id"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "places" DROP COLUMN IF EXISTS "rejectionReason"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "places" DROP COLUMN IF EXISTS "approvedAt"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "places" DROP COLUMN IF EXISTS "status"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "account" DROP COLUMN IF EXISTS "userType"`,
     );
   }
 }
