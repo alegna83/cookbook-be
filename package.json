@@ -21,6 +21,7 @@
     "migration:generate": "typeorm migration:generate",
     "migration:create": "typeorm migration:create",
     "migration:run": "npm run build && npx typeorm migration:run -d typeorm.config.js",
+    "migration:run:prod": "npx typeorm migration:run -d typeorm.config.js",
     "migration:revert": "npm run build && npx typeorm migration:revert -d typeorm.config.js",
     "migration:show": "npm run build && npx typeorm migration:show -d typeorm.config.js"
   },

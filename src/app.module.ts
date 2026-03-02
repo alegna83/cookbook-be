@@ -21,13 +21,25 @@ import { CommentsModule } from './comments/comments.module';
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        url: configService.get<string>('DATABASE_URL'),
-        autoLoadEntities: true,
-        // ⚠️ IMPORTANTE: Nunca usar synchronize: true em produção!
-        // Use migrações: npm run migration:run
-        synchronize: false,
+      useFactory: (configService: ConfigService) => {
+        const sslEnabled = configService.get<string>('DB_SSL') !== 'false';
+        const sslStrict = configService.get<string>('DB_SSL_STRICT') === 'true';
+        const requestedSynchronize =
+          configService.get<string>('DB_SYNCHRONIZE') === 'true';
+
+        if (requestedSynchronize) {
+          console.warn(
+            '[DB] DB_SYNCHRONIZE=true foi ignorado. O backend força synchronize=false e usa apenas migrations.',
+          );
+        }
+
+        return {
+          type: 'postgres',
+          url: configService.get<string>('DATABASE_URL'),
+          autoLoadEntities: true,
+          // ⚠️ IMPORTANTE: Nunca usar synchronize: true em produção!
+          // Use migrações: npm run migration:run
+          synchronize: false,
         /*host: configService.get<string>('DB_HOST'),
         port: configService.get<number>('DB_PORT'),
         username: configService.get<string>('DB_USERNAME'),
@@ -42,11 +54,9 @@ import { CommentsModule } from './comments/comments.module';
           GalleryPhoto,
           PlacePrice,
         ],*/
-        ssl: {
-          require: true,
-          rejectUnauthorized: false,
-        },
-      }),
+        ssl: sslEnabled ? { rejectUnauthorized: sslStrict } : false,
+        };
+      },
       inject: [ConfigService],
     }),
     AuthModule,
