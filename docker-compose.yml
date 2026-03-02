@@ -15,7 +15,7 @@ services:
     build: .
     restart: unless-stopped
     env_file:
-      - .env.docker
+      - .env.docker.local
     ports:
       - '3000:3000'
     depends_on:
@@ -27,7 +27,7 @@ services:
       context: ../camino_places_app
     restart: unless-stopped
     env_file:
-      - .env.docker
+      - .env.docker.local
     ports:
       - '8000:80'
     depends_on:
