@@ -22,6 +22,7 @@ export class AccommodationsService {
   ): Promise<AccommodationDto[]> {
     console.time('DB_FIND_ACCOMMODATIONS');
     const places = await this.placeRepository.find({
+      where: { status: 'approved' },
       relations: [
         'camino',
         'stage',
@@ -87,10 +88,27 @@ export class AccommodationsService {
   }
 
   async findByCamino(caminoName: string): Promise<Accommodation[]> {
-    return this.placeRepository.find({
-      where: { camino: { name: caminoName } },
-      relations: ['camino'],
-    });
+    const normalized = caminoName?.trim();
+
+    if (!normalized) {
+      return [];
+    }
+
+    const maybeCaminoId = Number(normalized);
+
+    return this.placeRepository
+      .createQueryBuilder('place')
+      .leftJoinAndSelect('place.camino', 'camino')
+      .where(
+        Number.isFinite(maybeCaminoId)
+          ? 'camino.id = :caminoId OR LOWER(BTRIM(camino.name)) = LOWER(BTRIM(:caminoName))'
+          : 'LOWER(BTRIM(camino.name)) = LOWER(BTRIM(:caminoName))',
+        Number.isFinite(maybeCaminoId)
+          ? { caminoId: maybeCaminoId, caminoName: normalized }
+          : { caminoName: normalized },
+      )
+      .andWhere('place.status = :status', { status: 'approved' })
+      .getMany();
   }
 
   getByBounds(bounds: any) {
@@ -101,6 +119,7 @@ export class AccommodationsService {
       .leftJoinAndSelect('place.gallery_photos', 'gallery_photos')
       .where('place.latitude BETWEEN :south AND :north', { south, north })
       .andWhere('place.longitude BETWEEN :west AND :east', { west, east })
+      .andWhere('place.status = :status', { status: 'approved' })
       .getMany();
   }
 
@@ -113,6 +132,7 @@ export class AccommodationsService {
       .leftJoinAndSelect('p.camino', 'camino')
       .leftJoinAndSelect('p.stage', 'stage')
       .where('p.id = :placeId', { placeId })
+      .andWhere('p.status = :status', { status: 'approved' })
       .getOne();
 
     if (!result) {
