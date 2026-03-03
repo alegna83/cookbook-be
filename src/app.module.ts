@@ -13,6 +13,7 @@ import { StagesModule } from './stages/stages.module';
 import { StatisticsCaminosModule } from './statistics-caminos/statistics-caminos.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { CommentsModule } from './comments/comments.module';
+import { join } from 'path';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -37,6 +38,8 @@ import { CommentsModule } from './comments/comments.module';
           type: 'postgres',
           url: configService.get<string>('DATABASE_URL'),
           autoLoadEntities: true,
+          migrations: [join(__dirname, 'migrations/*{.ts,.js}')],
+          migrationsRun: true,
           // ⚠️ IMPORTANTE: Nunca usar synchronize: true em produção!
           // Use migrações: npm run migration:run
           synchronize: false,
