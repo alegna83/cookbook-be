@@ -9,10 +9,11 @@ export class AccountsController {
   @Post('register')
   async register(
     @Body('email') email: string,
+    @Body('name') name: string,
     @Body('password') password: string,
     @Body('pilgrim_reason') pilgrim_reason: string,
   ) {
-    return this.accountsService.register(email, password, pilgrim_reason);
+    return this.accountsService.register(email, name, password, pilgrim_reason);
   }
 
   @Post('login')

@@ -14,6 +14,7 @@ export class AccountsService {
   // Função para registrar um novo usuário
   async register(
     email: string,
+    name: string,
     password: string,
     pilgrim_reason: string,
   ): Promise<Account> {
@@ -32,6 +33,7 @@ export class AccountsService {
     // Criar o novo usuário
     const newAccount = this.accountsRepository.create({
       email,
+      name,
       password: hashedPassword,
       pilgrim_reason,
     });
