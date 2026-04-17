@@ -6,8 +6,7 @@ export class CreateAccommodationDto {
   place_name: string;
 
   @IsOptional()
-  @IsNumber()
-  place_category?: number;
+  place_category?: number | string;
 
   @IsOptional()
   @IsString()

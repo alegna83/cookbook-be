@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Accommodation } from './entities/accommodation.entity';
 import { Repository } from 'typeorm';
@@ -61,14 +61,44 @@ export class AccommodationsService {
   async create(data: CreateAccommodationDto): Promise<AccommodationDto> {
     let category: AccommodationCategory | undefined;
 
-    if (data.place_category) {
-      const found = await this.categoryRepo.findOne({
-        where: { id: data.place_category },
-      });
+    if (data.place_category !== undefined && data.place_category !== null) {
+      const rawCategory = data.place_category as unknown;
+      let found: AccommodationCategory | null = null;
+
+      if (typeof rawCategory === 'number') {
+        found = await this.categoryRepo.findOne({
+          where: { id: rawCategory },
+        });
+      } else if (typeof rawCategory === 'string') {
+        const normalized = rawCategory.trim();
+
+        if (!normalized) {
+          throw new BadRequestException('place_category inválido.');
+        }
+
+        const maybeId = Number(normalized);
+
+        if (Number.isInteger(maybeId)) {
+          found = await this.categoryRepo.findOne({
+            where: { id: maybeId },
+          });
+        } else {
+          found = await this.categoryRepo
+            .createQueryBuilder('category')
+            .where('LOWER(BTRIM(category.name)) = LOWER(BTRIM(:name))', {
+              name: normalized,
+            })
+            .getOne();
+        }
+      } else {
+        throw new BadRequestException(
+          'place_category deve ser um id numérico ou nome da categoria.',
+        );
+      }
 
       if (!found) {
-        throw new Error(
-          `Categoria com id ${data.place_category} não encontrada`,
+        throw new NotFoundException(
+          `Categoria ${String(rawCategory)} não encontrada`,
         );
       }
 
