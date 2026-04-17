@@ -2,12 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import { AccommodationsService } from '../accommodations/accommodations.service';
 
 @Injectable()
 export class SuggestionService {
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly accommodationsService: AccommodationsService,
   ) {}
 
   async sugerirLugares(prompt: string): Promise<string> {
@@ -92,5 +94,49 @@ export class SuggestionService {
       );
       throw new Error('Erro ao obter dados do modelo OpenRouter');
     }
+  }
+
+  /**
+   * Sugere o melhor albergue próximo das coordenadas fornecidas.
+   * Critérios: categoria "Albergue", status aprovado, mais alta avaliação (ou outro critério disponível).
+   */
+  async sugerirMelhorAlbergue(
+    lat: number,
+    lon: number,
+    raioKm: number = 10,
+  ): Promise<any> {
+    // Definir limites de latitude/longitude para o raio
+    const delta = raioKm / 111; // Aproximação: 1 grau ~ 111km
+    const bounds = {
+      south: lat - delta,
+      north: lat + delta,
+      west: lon - delta,
+      east: lon + delta,
+    };
+    // Buscar acomodações dentro do raio
+    const acoms = await this.accommodationsService.getByBounds(bounds);
+    if (!acoms.length) {
+      return { message: 'No accommodations found in the area.' };
+    }
+    // Montar lista de nomes e endereços para enviar à IA
+    const placesList = acoms
+      .map((a) => `${a.place_name}${a.address ? ', ' + a.address : ''}`)
+      .join('\n');
+
+    // Prompt para IA cruzar dados e sugerir o melhor
+    const prompt = `Given the following list of hostels/accommodations registered in the system (with name and address):\n${placesList}\nBased on up-to-date information from the internet (reviews, reputation, etc.), which is the best hostel/accommodation for a traveler? Reply ONLY with the name (and address if possible) of the best one from the list above. Do not suggest any place that is not in the list.`;
+
+    // Chamar IA para obter sugestão
+    const iaResponse = await this.sugerirLugares(prompt);
+
+    // Procurar o local sugerido na lista original para devolver o objeto completo
+    const match = acoms.find((a) =>
+      iaResponse.toLowerCase().includes(a.place_name?.toLowerCase() || '')
+    );
+    if (match) {
+      return match;
+    }
+    // Se não encontrar correspondência exata, retorna resposta da IA
+    return { iaSuggestion: iaResponse, message: 'No exact match found in database.' };
   }
 }
