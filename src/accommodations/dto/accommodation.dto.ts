@@ -82,4 +82,10 @@ export class AccommodationDto {
   @Expose()
   @Type(() => AccommodationPriceDto)
   prices: AccommodationPriceDto[];
+
+  @Expose()
+  services: string[];
+
+  @Expose()
+  nearbyActivities: string[];
 }
