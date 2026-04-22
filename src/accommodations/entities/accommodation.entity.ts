@@ -20,15 +20,15 @@ export class Accommodation {
   @Column({ nullable: true })
   place_name: string;
 
-  @ManyToOne(() => Camino, (camino) => camino.places, { eager: true })
+  @ManyToOne(() => Camino, (camino) => camino.places)
   @JoinColumn({ name: 'camino_id' })
   camino: Camino;
 
-  @ManyToOne(() => Stage, (stage) => stage.places, { eager: true })
+  @ManyToOne(() => Stage, (stage) => stage.places)
   @JoinColumn({ name: 'stage_id' })
   stage: Stage;
 
-  @ManyToOne(() => AccommodationCategory, { eager: true })
+  @ManyToOne(() => AccommodationCategory)
   @JoinColumn({ name: 'place_category_id' })
   place_category: AccommodationCategory;
 
