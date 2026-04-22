@@ -16,10 +16,58 @@ export class AccommodationsService {
     private readonly categoryRepo: Repository<AccommodationCategory>,
   ) {}
 
+  private async attachServices(
+    places: Accommodation[] | AccommodationDto[],
+  ): Promise<void> {
+    if (!places?.length) {
+      return;
+    }
+
+    const placeIds = places
+      .map((place) => Number((place as Accommodation).id))
+      .filter((id) => Number.isInteger(id));
+
+    if (!placeIds.length) {
+      return;
+    }
+
+    const rows = await this.placeRepository.manager
+      .createQueryBuilder()
+      .from('place_services', 'ps')
+      .innerJoin('services', 's', 's.id = ps.service_id')
+      .select('ps.place_id', 'placeId')
+      .addSelect('s.name', 'serviceName')
+      .where('ps.place_id IN (:...placeIds)', { placeIds })
+      .getRawMany<{ placeId: string | number; serviceName: string }>();
+
+    const serviceMap = new Map<number, string[]>();
+
+    for (const row of rows) {
+      const placeId = Number(row.placeId);
+
+      if (!serviceMap.has(placeId)) {
+        serviceMap.set(placeId, []);
+      }
+
+      serviceMap.get(placeId)!.push(row.serviceName);
+    }
+
+    for (const place of places) {
+      const placeId = Number((place as Accommodation).id);
+      (place as Accommodation).services = serviceMap.get(placeId) ?? [];
+    }
+  }
+
   async findAll(
     page: number = 1,
     limit: number = 10,
   ): Promise<AccommodationDto[]> {
+    const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+    const safeLimit =
+      Number.isFinite(limit) && limit > 0
+        ? Math.min(Math.floor(limit), 50)
+        : 10;
+
     console.time('DB_FIND_ACCOMMODATIONS');
     const places = await this.placeRepository.find({
       where: { status: 'approved' },
@@ -30,13 +78,18 @@ export class AccommodationsService {
         'place_category',
         'prices',
       ],
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
     });
 
     console.timeEnd('DB_FIND_ACCOMMODATIONS');
 
-    return plainToInstance(AccommodationDto, places, { excludeExtraneousValues: true });
+    const dtoList = plainToInstance(AccommodationDto, places, {
+      excludeExtraneousValues: true,
+    });
+    await this.attachServices(dtoList);
+
+    return dtoList;
   }
 
   async findOne(id: number): Promise<AccommodationDto> {
@@ -53,9 +106,12 @@ export class AccommodationsService {
     if (!place) {
       throw new NotFoundException(`Accommodation com id ${id} não encontrado`);
     }
-    return plainToInstance(AccommodationDto, place, {
+    const dto = plainToInstance(AccommodationDto, place, {
       excludeExtraneousValues: true,
     });
+    await this.attachServices([dto]);
+
+    return dto;
   }
 
   async create(data: CreateAccommodationDto): Promise<AccommodationDto> {
@@ -112,9 +168,12 @@ export class AccommodationsService {
 
     const saved: Accommodation = await this.placeRepository.save(novo);
 
-    return plainToInstance(AccommodationDto, saved, {
+    const dto = plainToInstance(AccommodationDto, saved, {
       excludeExtraneousValues: true,
     });
+    await this.attachServices([dto]);
+
+    return dto;
   }
 
   async findByCamino(caminoName: string): Promise<Accommodation[]> {
@@ -126,24 +185,31 @@ export class AccommodationsService {
 
     const maybeCaminoId = Number(normalized);
 
-    return this.placeRepository
+    const query = this.placeRepository
       .createQueryBuilder('place')
       .leftJoinAndSelect('place.camino', 'camino')
-      .where(
-        Number.isFinite(maybeCaminoId)
-          ? 'camino.id = :caminoId OR LOWER(BTRIM(camino.name)) = LOWER(BTRIM(:caminoName))'
-          : 'LOWER(BTRIM(camino.name)) = LOWER(BTRIM(:caminoName))',
-        Number.isFinite(maybeCaminoId)
-          ? { caminoId: maybeCaminoId, caminoName: normalized }
-          : { caminoName: normalized },
-      )
-      .andWhere('place.status = :status', { status: 'approved' })
-      .getMany();
+      .leftJoinAndSelect('place.stage', 'stage')
+      .leftJoinAndSelect('place.place_category', 'place_category');
+
+    if (Number.isInteger(maybeCaminoId)) {
+      query.where('camino.id = :caminoId', { caminoId: maybeCaminoId });
+    } else {
+      query.where('LOWER(BTRIM(camino.name)) = LOWER(BTRIM(:caminoName))', {
+        caminoName: normalized,
+      });
+    }
+
+    query.andWhere('place.status = :status', { status: 'approved' });
+
+    const places = await query.getMany();
+    await this.attachServices(places);
+
+    return places;
   }
 
-  getByBounds(bounds: any) {
+  async getByBounds(bounds: any) {
     const { south, west, north, east } = bounds;
-    return this.placeRepository
+    const places = await this.placeRepository
       .createQueryBuilder('place')
       .leftJoinAndSelect('place.place_category', 'place_category')
       .leftJoinAndSelect('place.gallery_photos', 'gallery_photos')
@@ -151,6 +217,10 @@ export class AccommodationsService {
       .andWhere('place.longitude BETWEEN :west AND :east', { west, east })
       .andWhere('place.status = :status', { status: 'approved' })
       .getMany();
+
+    await this.attachServices(places);
+
+    return places;
   }
 
   async findAccommodationByPlaceId(placeId: number): Promise<any> {
@@ -169,15 +239,21 @@ export class AccommodationsService {
       throw new NotFoundException(`Accommodation com ID ${placeId} não encontrado.`);
     }
 
+    await this.attachServices([result]);
+
     return result;
   }
 
   // ✅ Admin approval methods
   async getPendingAccommodations(): Promise<Accommodation[]> {
-    return this.placeRepository.find({
+    const places = await this.placeRepository.find({
       where: { status: 'pending' },
       relations: ['camino', 'stage', 'gallery_photos', 'place_category'],
     });
+
+    await this.attachServices(places);
+
+    return places;
   }
 
   async approveAccommodation(
