@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+} from 'typeorm';
 import { Accommodation } from '../../accommodations/entities/accommodation.entity';
 
 @Entity('place_prices')
@@ -13,5 +19,6 @@ export class AccommodationPrice {
   price: number;
 
   @ManyToOne(() => Accommodation, (place) => place.prices, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'place_id' })
   place: Accommodation;
 }
