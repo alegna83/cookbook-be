@@ -164,6 +164,7 @@ export class AccommodationsService {
     const novo = this.placeRepository.create({
       ...data,
       place_category: category,
+      gallery_photos: undefined,
     });
 
     const saved: Accommodation = await this.placeRepository.save(novo);
