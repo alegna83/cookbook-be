@@ -13,6 +13,7 @@ import { StagesModule } from './stages/stages.module';
 import { StatisticsCaminosModule } from './statistics-caminos/statistics-caminos.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { CommentsModule } from './comments/comments.module';
+import { UploadModule } from './upload/upload.module';
 import { join } from 'path';
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { join } from 'path';
     HttpModule,
     FavoritesModule,
     CommentsModule,
+    UploadModule,
   ],
 })
 export class AppModule {}
