@@ -45,6 +45,9 @@ export class CreateAccommodationDto {
   main_photo?: string;
 
   @IsOptional()
+  gallery_photos?: string[];
+
+  @IsOptional()
   @IsNumber()
   latitude?: number;
 
