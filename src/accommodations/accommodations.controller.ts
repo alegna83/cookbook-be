@@ -11,12 +11,19 @@ import { CreateAccommodationDto } from './dto/create-accommodation.dto';
 
 @Controller('accommodations')
 export class AccommodationsController {
+  private readonly shouldLogTiming = process.env.LOG_REQUEST_TIMINGS === 'true';
+
   constructor(private readonly accommodationsService: AccommodationsService) {}
 
   @Post('handle')
   @HttpCode(200)
   async handle(@Body() data: HandleAccommodationDto): Promise<any> {
-    console.time(`HANDLE_${data.action?.toUpperCase() || 'UNKNOWN'}`);
+    const timerLabel = `HANDLE_${data.action?.toUpperCase() || 'UNKNOWN'}`;
+
+    if (this.shouldLogTiming) {
+      console.time(timerLabel);
+    }
+
     try {
       switch (data.action) {
         case 'getAll':
@@ -58,7 +65,9 @@ export class AccommodationsController {
           throw new BadRequestException('Ação desconhecida.');
       }
     } finally {
-      console.timeEnd(`HANDLE_${data.action?.toUpperCase() || 'UNKNOWN'}`);
+      if (this.shouldLogTiming) {
+        console.timeEnd(timerLabel);
+      }
     }
   }
 }

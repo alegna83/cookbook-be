@@ -1,8 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import compression from 'compression';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const shouldLogRequests =
+    process.env.HTTP_REQUEST_LOGS === 'true' || !isProduction;
 
   //app.enableCors();
 
@@ -12,10 +16,15 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type,Authorization',
   });*/
 
-  app.use((req, res, next) => {
-    console.log(`📥 Recebido pedido: ${req.method} ${req.url}`);
-    next();
-  });
+  // Compress JSON payloads to reduce transfer time in production networks.
+  app.use(compression());
+
+  if (shouldLogRequests) {
+    app.use((req, res, next) => {
+      console.log(`📥 Recebido pedido: ${req.method} ${req.url}`);
+      next();
+    });
+  }
 
   /*app.enableCors({
     origin: [
@@ -28,8 +37,10 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Authorization',
     credentials: true,
   });*/
-  console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
-  console.log('Allowed origins:', process.env.FRONTEND_URL?.split(','));
+  if (shouldLogRequests) {
+    console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+    console.log('Allowed origins:', process.env.FRONTEND_URL?.split(','));
+  }
 
   const allowedOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map((origin) => origin.trim())

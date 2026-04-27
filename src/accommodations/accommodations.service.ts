@@ -10,6 +10,16 @@ import { GalleryPhoto } from 'src/gallery/entities/gallery-photo.entity';
 
 @Injectable()
 export class AccommodationsService {
+  private readonly readCache = new Map<
+    string,
+    { expiresAt: number; value: unknown }
+  >();
+
+  private readonly cacheTtlMs = (() => {
+    const parsed = Number(process.env.ACCOMMODATIONS_CACHE_TTL_MS ?? 30000);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 30000;
+  })();
+
   constructor(
     @InjectRepository(Accommodation)
     private readonly placeRepository: Repository<Accommodation>,
@@ -18,6 +28,34 @@ export class AccommodationsService {
     @InjectRepository(GalleryPhoto)
     private readonly galleryPhotoRepo: Repository<GalleryPhoto>,
   ) {}
+
+  private getCachedValue<T>(key: string): T | undefined {
+    const cached = this.readCache.get(key);
+
+    if (!cached) {
+      return undefined;
+    }
+
+    if (cached.expiresAt <= Date.now()) {
+      this.readCache.delete(key);
+      return undefined;
+    }
+
+    return cached.value as T;
+  }
+
+  private setCachedValue<T>(key: string, value: T): T {
+    this.readCache.set(key, {
+      value,
+      expiresAt: Date.now() + this.cacheTtlMs,
+    });
+
+    return value;
+  }
+
+  private invalidateReadCache(): void {
+    this.readCache.clear();
+  }
 
   private toPublicImageUrl(rawUrl?: string | null): string {
     if (!rawUrl) {
@@ -92,6 +130,13 @@ export class AccommodationsService {
         ? Math.min(Math.floor(limit), 50)
         : 10;
 
+    const cacheKey = `findAll:${safePage}:${safeLimit}`;
+    const cached = this.getCachedValue<AccommodationDto[]>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
     console.time('DB_FIND_ACCOMMODATIONS');
     const places = await this.placeRepository.find({
       where: { status: 'approved' },
@@ -113,10 +158,17 @@ export class AccommodationsService {
     });
     await this.attachServices(dtoList);
 
-    return dtoList;
+    return this.setCachedValue(cacheKey, dtoList);
   }
 
   async findOne(id: number): Promise<AccommodationDto> {
+    const cacheKey = `findOne:${id}`;
+    const cached = this.getCachedValue<AccommodationDto>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
     const place = await this.placeRepository.findOne({
       where: { id },
       relations: [
@@ -135,7 +187,7 @@ export class AccommodationsService {
     });
     await this.attachServices([dto]);
 
-    return dto;
+    return this.setCachedValue(cacheKey, dto);
   }
 
   async create(data: CreateAccommodationDto): Promise<AccommodationDto> {
@@ -229,6 +281,7 @@ export class AccommodationsService {
     });
     await this.attachServices([dto]);
 
+    this.invalidateReadCache();
     return dto;
   }
 
@@ -240,6 +293,12 @@ export class AccommodationsService {
     }
 
     const maybeCaminoId = Number(normalized);
+    const cacheKey = `findByCamino:${Number.isInteger(maybeCaminoId) ? maybeCaminoId : normalized.toLowerCase()}`;
+    const cached = this.getCachedValue<Accommodation[]>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
 
     const query = this.placeRepository
       .createQueryBuilder('place')
@@ -260,11 +319,18 @@ export class AccommodationsService {
     const places = await query.getMany();
     await this.attachServices(places);
 
-    return places;
+    return this.setCachedValue(cacheKey, places);
   }
 
   async getByBounds(bounds: any) {
     const { south, west, north, east } = bounds;
+    const cacheKey = `getByBounds:${south}:${west}:${north}:${east}`;
+    const cached = this.getCachedValue<Accommodation[]>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
     const places = await this.placeRepository
       .createQueryBuilder('place')
       .leftJoinAndSelect('place.place_category', 'place_category')
@@ -276,10 +342,17 @@ export class AccommodationsService {
 
     await this.attachServices(places);
 
-    return places;
+    return this.setCachedValue(cacheKey, places);
   }
 
   async findAccommodationByPlaceId(placeId: number): Promise<any> {
+    const cacheKey = `findAccommodationByPlaceId:${placeId}`;
+    const cached = this.getCachedValue<Accommodation>(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+
     const result = await this.placeRepository
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.place_category', 'pc')
@@ -297,7 +370,7 @@ export class AccommodationsService {
 
     await this.attachServices([result]);
 
-    return result;
+    return this.setCachedValue(cacheKey, result);
   }
 
   // ✅ Admin approval methods
@@ -340,6 +413,8 @@ export class AccommodationsService {
       accommodation.approvedAt = new Date();
     }
 
-    return this.placeRepository.save(accommodation);
+    const saved = await this.placeRepository.save(accommodation);
+    this.invalidateReadCache();
+    return saved;
   }
 }
