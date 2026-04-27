@@ -4,5 +4,5 @@ export class UploadResponseDto {
 }
 
 export class UploadMultipleResponseDto {
-  files: UploadResponseDto[];
+  urls: string[];
 }

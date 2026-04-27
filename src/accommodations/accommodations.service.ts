@@ -6,6 +6,7 @@ import { plainToInstance } from 'class-transformer';
 import { AccommodationDto } from './dto/accommodation.dto';
 import { CreateAccommodationDto } from './dto/create-accommodation.dto';
 import { AccommodationCategory } from 'src/accommodation-categories/entities/accommodation-category.entity';
+import { GalleryPhoto } from 'src/gallery/entities/gallery-photo.entity';
 
 @Injectable()
 export class AccommodationsService {
@@ -14,7 +15,30 @@ export class AccommodationsService {
     private readonly placeRepository: Repository<Accommodation>,
     @InjectRepository(AccommodationCategory)
     private readonly categoryRepo: Repository<AccommodationCategory>,
+    @InjectRepository(GalleryPhoto)
+    private readonly galleryPhotoRepo: Repository<GalleryPhoto>,
   ) {}
+
+  private toPublicImageUrl(rawUrl?: string | null): string {
+    if (!rawUrl) {
+      return '';
+    }
+
+    const value = rawUrl.trim();
+    if (!value) {
+      return '';
+    }
+
+    if (/^https?:\/\//i.test(value)) {
+      return value;
+    }
+
+    const base = (process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 3000}`)
+      .trim()
+      .replace(/\/$/, '');
+
+    return `${base}/${value.replace(/^\/+/, '')}`;
+  }
 
   private async attachServices(
     places: Accommodation[] | AccommodationDto[],
@@ -115,6 +139,12 @@ export class AccommodationsService {
   }
 
   async create(data: CreateAccommodationDto): Promise<AccommodationDto> {
+    const galleryPhotoUrls = (data.gallery_photos ?? [])
+      .filter((value): value is string => typeof value === 'string')
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0)
+      .map((url) => this.toPublicImageUrl(url));
+
     let category: AccommodationCategory | undefined;
 
     if (data.place_category !== undefined && data.place_category !== null) {
@@ -161,15 +191,40 @@ export class AccommodationsService {
       category = found;
     }
 
+    const { gallery_photos: _ignoredGalleryPhotos, ...placePayload } = data;
+
     const novo = this.placeRepository.create({
-      ...data,
+      ...placePayload,
+      main_photo: this.toPublicImageUrl(data.main_photo),
       place_category: category,
       gallery_photos: undefined,
     });
 
     const saved: Accommodation = await this.placeRepository.save(novo);
 
-    const dto = plainToInstance(AccommodationDto, saved, {
+    if (galleryPhotoUrls.length > 0) {
+      const galleryEntities = galleryPhotoUrls.map((url) =>
+        this.galleryPhotoRepo.create({
+          url,
+          place: saved,
+        }),
+      );
+
+      await this.galleryPhotoRepo.save(galleryEntities);
+    }
+
+    const savedWithRelations = await this.placeRepository.findOne({
+      where: { id: saved.id },
+      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage'],
+    });
+
+    if (!savedWithRelations) {
+      throw new NotFoundException(
+        `Accommodation com id ${saved.id} não encontrado após criação`,
+      );
+    }
+
+    const dto = plainToInstance(AccommodationDto, savedWithRelations, {
       excludeExtraneousValues: true,
     });
     await this.attachServices([dto]);
@@ -246,7 +301,7 @@ export class AccommodationsService {
   }
 
   // ✅ Admin approval methods
-  async getPendingAccommodations(): Promise<Accommodation[]> {
+  async getPendingAccommodations(): Promise<any[]> {
     const places = await this.placeRepository.find({
       where: { status: 'pending' },
       relations: ['camino', 'stage', 'gallery_photos', 'place_category'],
@@ -254,7 +309,13 @@ export class AccommodationsService {
 
     await this.attachServices(places);
 
-    return places;
+    return places.map((place) => ({
+      ...place,
+      main_photo: this.toPublicImageUrl(place.main_photo),
+      gallery_photos: (place.gallery_photos ?? []).map((photo) =>
+        this.toPublicImageUrl(photo.url),
+      ),
+    }));
   }
 
   async approveAccommodation(

@@ -1,5 +1,8 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
+import { UploadMultipleResponseDto, UploadResponseDto } from './dto/upload-response.dto';
+
+export type UploadType = 'main-photo' | 'gallery-photos';
 
 @Injectable()
 export class UploadService {
@@ -14,7 +17,7 @@ export class UploadService {
   async uploadImage(
     file: any,
     folder: string = 'accommodations',
-  ): Promise<{ url: string; publicId: string }> {
+  ): Promise<UploadResponseDto> {
     if (!file) {
       throw new BadRequestException('Ficheiro não fornecido.');
     }
@@ -62,7 +65,7 @@ export class UploadService {
   async uploadMultipleImages(
     files: any[],
     folder: string = 'accommodations/gallery',
-  ): Promise<Array<{ url: string; publicId: string }>> {
+  ): Promise<UploadResponseDto[]> {
     if (!files || files.length === 0) {
       throw new BadRequestException('Nenhum ficheiro fornecido.');
     }
@@ -79,5 +82,30 @@ export class UploadService {
     );
 
     return Promise.all(uploadPromises);
+  }
+
+  async uploadMedia(
+    files: any[],
+    type: UploadType,
+  ): Promise<UploadResponseDto | UploadMultipleResponseDto> {
+    if (type === 'main-photo') {
+      if (files.length !== 1) {
+        throw new BadRequestException('Envie exatamente um ficheiro para a foto principal.');
+      }
+
+      const [file] = files;
+      return this.uploadImage(file, 'accommodations/main');
+    }
+
+    if (files.length > 10) {
+      throw new BadRequestException('Máximo de 10 ficheiros permitido.');
+    }
+
+    const uploadedFiles = await this.uploadMultipleImages(
+      files,
+      'accommodations/gallery',
+    );
+
+    return { urls: uploadedFiles.map((file) => file.url) };
   }
 }
