@@ -1,5 +1,17 @@
 export class HandleAccommodationDto {
-  action: string;
+  action:
+    | 'getAll'
+    | 'getOne'
+    | 'create'
+    | 'getByCamino'
+    | 'getByOwner'
+    | 'getByBounds'
+    | 'getByPlaceId'
+    | 'edit'
+    | 'requestRemoval'
+    | 'requestDelete'
+    | 'deleteRequest'
+    | 'removeRequest';
   payload?: {
     id?: string;
     bounds?: {
@@ -10,6 +22,8 @@ export class HandleAccommodationDto {
     };
     byCamino?: string;
     placeId?: number;
+    accountId?: number;
+    reason?: string;
     [key: string]: any;
   };
   page?: number;

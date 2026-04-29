@@ -8,21 +8,36 @@ import {
 import { AccommodationsService } from './accommodations.service';
 import { HandleAccommodationDto } from './dto/handle-accommodation.dto';
 import { CreateAccommodationDto } from './dto/create-accommodation.dto';
+import { UpdateAccommodationDto } from './dto/update-accommodation.dto';
+import { CreateRemovalRequestDto } from './dto/create-removal-request.dto';
 
 @Controller('accommodations')
 export class AccommodationsController {
+  private readonly shouldLogTiming = process.env.LOG_REQUEST_TIMINGS === 'true';
+
   constructor(private readonly accommodationsService: AccommodationsService) {}
 
   @Post('handle')
   @HttpCode(200)
   async handle(@Body() data: HandleAccommodationDto): Promise<any> {
-    console.time(`HANDLE_${data.action?.toUpperCase() || 'UNKNOWN'}`);
+    const normalizedAction = (data.action ?? '')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[-_\s]/g, '');
+
+    const timerLabel = `HANDLE_${normalizedAction.toUpperCase() || 'UNKNOWN'}`;
+
+    if (this.shouldLogTiming) {
+      console.time(timerLabel);
+    }
+
     try {
-      switch (data.action) {
-        case 'getAll':
+      switch (normalizedAction) {
+        case 'getall':
           return this.accommodationsService.findAll(data.page, data.limit);
 
-        case 'getOne':
+        case 'getone':
           if (!data.payload || !data.payload?.id) {
             throw new BadRequestException('ID do accommodation é obrigatório.');
           }
@@ -34,19 +49,25 @@ export class AccommodationsController {
           }
           return this.accommodationsService.create(data.payload as CreateAccommodationDto);
 
-        case 'getByCamino':
+        case 'getbycamino':
           if (!data.payload?.byCamino) {
             throw new BadRequestException('Nome do caminho em falta.');
           }
           return this.accommodationsService.findByCamino(data.payload.byCamino);
 
-        case 'getByBounds':
+        case 'getbyowner':
+          if (!data.payload?.ownerId) {
+            throw new BadRequestException('ownerId é obrigatório.');
+          }
+          return this.accommodationsService.findByAccount(Number(data.payload.ownerId));
+
+        case 'getbybounds':
           if (!data.payload?.bounds) {
             throw new BadRequestException('Coordenadas em falta.');
           }
           return this.accommodationsService.getByBounds(data.payload.bounds);
 
-        case 'getByPlaceId':
+        case 'getbyplaceid':
           if (!data.payload?.placeId) {
             throw new BadRequestException('placeId é obrigatório.');
           }
@@ -54,11 +75,49 @@ export class AccommodationsController {
             Number(data.payload.placeId),
           );
 
+        case 'edit':
+          if (!data.payload?.id) {
+            throw new BadRequestException('ID da acomodação é obrigatório.');
+          }
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          return this.accommodationsService.update(
+            Number(data.payload.id),
+            Number(data.payload.accountId),
+            data.payload.data as UpdateAccommodationDto,
+          );
+
+        case 'requestremoval':
+        case 'requestdelete':
+        case 'deleterequest':
+        case 'removerequest':
+          if (!data.payload?.placeId) {
+            throw new BadRequestException('placeId é obrigatório.');
+          }
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          return this.accommodationsService.requestRemoval(
+            data.payload as CreateRemovalRequestDto,
+          );
+
+        case 'getmyremovalrequests':
+        case 'getremovalrequestsbyaccount':
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          return this.accommodationsService.getRemovalRequestsByAccount(
+            Number(data.payload.accountId),
+          );
+
         default:
           throw new BadRequestException('Ação desconhecida.');
       }
     } finally {
-      console.timeEnd(`HANDLE_${data.action?.toUpperCase() || 'UNKNOWN'}`);
+      if (this.shouldLogTiming) {
+        console.timeEnd(timerLabel);
+      }
     }
   }
 }

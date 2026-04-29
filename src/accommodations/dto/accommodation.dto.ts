@@ -88,4 +88,13 @@ export class AccommodationDto {
 
   @Expose()
   nearbyActivities: string[];
+
+  @Expose()
+  status: 'pending' | 'approved' | 'rejected';
+
+  @Expose()
+  ownerId?: number;
+
+  @Expose()
+  ownerName?: string;
 }
