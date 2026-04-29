@@ -694,6 +694,25 @@ export class AccommodationsService {
     return requests.map((request) => this.formatRemovalRequest(request));
   }
 
+  async getRemovalRequestsByAccount(accountId: number): Promise<Record<string, unknown>[]> {
+    const normalized = Number(accountId);
+
+    if (!Number.isInteger(normalized)) {
+      return [];
+    }
+
+    const requests = await this.removalRequestRepo
+      .createQueryBuilder('request')
+      .leftJoinAndSelect('request.place', 'place')
+      .leftJoinAndSelect('request.account', 'account')
+      .where('request.account_id = :accountId', { accountId: normalized })
+      .andWhere('request.status = :status', { status: 'pending' })
+      .orderBy('request.createdAt', 'ASC')
+      .getMany();
+
+    return requests.map((request) => this.formatRemovalRequest(request));
+  }
+
   async approveRemovalRequest(id: number): Promise<Record<string, unknown>> {
     const request = await this.removalRequestRepo.findOne({
       where: { id },
@@ -707,7 +726,18 @@ export class AccommodationsService {
     if (request.placeId) {
       const place = await this.placeRepository.findOne({ where: { id: request.placeId } });
       if (place) {
-        await this.placeRepository.remove(place);
+        try {
+          await this.placeRepository.remove(place);
+        } catch (e) {
+          // If physical delete fails (FK constraints, DB issues), fallback to soft-marking
+          try {
+            (place as any).status = 'deleted';
+            await this.placeRepository.save(place);
+          } catch (err) {
+            // If even the fallback fails, rethrow original error for visibility
+            throw e;
+          }
+        }
       }
     }
 

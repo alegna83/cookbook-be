@@ -3,12 +3,14 @@ export class HandleAdminDto {
     | 'getPendingAccommodations'
     | 'getPendingComments'
     | 'getPendingRemovalRequests'
+    | 'getRemovalRequests'
     | 'approveAccommodation'
     | 'approveComment'
     | 'approveRemovalRequest'
     | 'rejectAccommodation'
     | 'rejectComment'
-    | 'rejectRemovalRequest';
+    | 'rejectRemovalRequest'
+    | 'rejectRemoval';
 
   payload?: {
     id?: number;

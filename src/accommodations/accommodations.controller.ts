@@ -20,18 +20,24 @@ export class AccommodationsController {
   @Post('handle')
   @HttpCode(200)
   async handle(@Body() data: HandleAccommodationDto): Promise<any> {
-    const timerLabel = `HANDLE_${data.action?.toUpperCase() || 'UNKNOWN'}`;
+    const normalizedAction = (data.action ?? '')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[-_\s]/g, '');
+
+    const timerLabel = `HANDLE_${normalizedAction.toUpperCase() || 'UNKNOWN'}`;
 
     if (this.shouldLogTiming) {
       console.time(timerLabel);
     }
 
     try {
-      switch (data.action) {
-        case 'getAll':
+      switch (normalizedAction) {
+        case 'getall':
           return this.accommodationsService.findAll(data.page, data.limit);
 
-        case 'getOne':
+        case 'getone':
           if (!data.payload || !data.payload?.id) {
             throw new BadRequestException('ID do accommodation é obrigatório.');
           }
@@ -43,25 +49,25 @@ export class AccommodationsController {
           }
           return this.accommodationsService.create(data.payload as CreateAccommodationDto);
 
-        case 'getByCamino':
+        case 'getbycamino':
           if (!data.payload?.byCamino) {
             throw new BadRequestException('Nome do caminho em falta.');
           }
           return this.accommodationsService.findByCamino(data.payload.byCamino);
 
-        case 'getByOwner':
+        case 'getbyowner':
           if (!data.payload?.ownerId) {
             throw new BadRequestException('ownerId é obrigatório.');
           }
           return this.accommodationsService.findByAccount(Number(data.payload.ownerId));
 
-        case 'getByBounds':
+        case 'getbybounds':
           if (!data.payload?.bounds) {
             throw new BadRequestException('Coordenadas em falta.');
           }
           return this.accommodationsService.getByBounds(data.payload.bounds);
 
-        case 'getByPlaceId':
+        case 'getbyplaceid':
           if (!data.payload?.placeId) {
             throw new BadRequestException('placeId é obrigatório.');
           }
@@ -82,7 +88,10 @@ export class AccommodationsController {
             data.payload.data as UpdateAccommodationDto,
           );
 
-        case 'requestRemoval':
+        case 'requestremoval':
+        case 'requestdelete':
+        case 'deleterequest':
+        case 'removerequest':
           if (!data.payload?.placeId) {
             throw new BadRequestException('placeId é obrigatório.');
           }
@@ -91,6 +100,15 @@ export class AccommodationsController {
           }
           return this.accommodationsService.requestRemoval(
             data.payload as CreateRemovalRequestDto,
+          );
+
+        case 'getmyremovalrequests':
+        case 'getremovalrequestsbyaccount':
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          return this.accommodationsService.getRemovalRequestsByAccount(
+            Number(data.payload.accountId),
           );
 
         default:

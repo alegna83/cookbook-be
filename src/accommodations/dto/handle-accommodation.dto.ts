@@ -8,7 +8,10 @@ export class HandleAccommodationDto {
     | 'getByBounds'
     | 'getByPlaceId'
     | 'edit'
-    | 'requestRemoval';
+    | 'requestRemoval'
+    | 'requestDelete'
+    | 'deleteRequest'
+    | 'removeRequest';
   payload?: {
     id?: string;
     bounds?: {

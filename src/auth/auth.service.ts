@@ -94,17 +94,24 @@ export class AuthService {
 
   // 🔐 Admin actions handler
   async handleAdminAction(data: HandleAdminDto): Promise<any> {
-    switch (data.action) {
-      case 'getPendingAccommodations':
+    const normalizedAction = (data.action ?? '')
+      .toString()
+      .trim()
+      .toLowerCase()
+      .replace(/[-_\s]/g, '');
+
+    switch (normalizedAction) {
+      case 'getpendingaccommodations':
         return this.accommodationsService.getPendingAccommodations();
 
-      case 'getPendingComments':
+      case 'getpendingcomments':
         return this.commentsService.getPendingComments();
 
-      case 'getPendingRemovalRequests':
+      case 'getpendingremovalrequests':
+      case 'getremovalrequests':
         return this.accommodationsService.getPendingRemovalRequests();
 
-      case 'approveAccommodation':
+      case 'approveaccommodation':
         if (!data.payload?.id) {
           throw new BadRequestException('ID é obrigatório.');
         }
@@ -112,7 +119,7 @@ export class AuthService {
           data.payload.id,
         );
 
-      case 'rejectAccommodation':
+      case 'rejectaccommodation':
         if (!data.payload?.id) {
           throw new BadRequestException('ID é obrigatório.');
         }
@@ -121,13 +128,13 @@ export class AuthService {
           data.payload.rejectionReason,
         );
 
-      case 'approveComment':
+      case 'approvecomment':
         if (!data.payload?.id) {
           throw new BadRequestException('ID é obrigatório.');
         }
         return this.commentsService.approveComment(data.payload.id);
 
-      case 'rejectComment':
+      case 'rejectcomment':
         if (!data.payload?.id) {
           throw new BadRequestException('ID é obrigatório.');
         }
@@ -136,13 +143,19 @@ export class AuthService {
           data.payload.rejectionReason,
         );
 
-      case 'approveRemovalRequest':
+      case 'approveremovalrequest':
         if (!data.payload?.id) {
           throw new BadRequestException('ID é obrigatório.');
         }
-        return this.accommodationsService.approveRemovalRequest(data.payload.id);
+        try {
+          return await this.accommodationsService.approveRemovalRequest(data.payload.id);
+        } catch (e) {
+          console.error('Error approving removal request:', e);
+          throw e;
+        }
 
-      case 'rejectRemovalRequest':
+      case 'rejectremovalrequest':
+      case 'rejectremoval':
         if (!data.payload?.id) {
           throw new BadRequestException('ID é obrigatório.');
         }
