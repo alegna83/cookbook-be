@@ -101,6 +101,9 @@ export class AuthService {
       case 'getPendingComments':
         return this.commentsService.getPendingComments();
 
+      case 'getPendingRemovalRequests':
+        return this.accommodationsService.getPendingRemovalRequests();
+
       case 'approveAccommodation':
         if (!data.payload?.id) {
           throw new BadRequestException('ID é obrigatório.');
@@ -129,6 +132,21 @@ export class AuthService {
           throw new BadRequestException('ID é obrigatório.');
         }
         return this.commentsService.approveComment(
+          data.payload.id,
+          data.payload.rejectionReason,
+        );
+
+      case 'approveRemovalRequest':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.accommodationsService.approveRemovalRequest(data.payload.id);
+
+      case 'rejectRemovalRequest':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.accommodationsService.rejectRemovalRequest(
           data.payload.id,
           data.payload.rejectionReason,
         );

@@ -8,6 +8,8 @@ import { Stage } from '../stages/entities/stage.entity';
 import { AccommodationCategory } from '../accommodation-categories/entities/accommodation-category.entity';
 import { GalleryPhoto } from 'src/gallery/entities/gallery-photo.entity';
 import { AccommodationPrice } from 'src/place-prices/entities/place-price.entity';
+import { Account } from 'src/accounts/account.entity';
+import { PlaceRemovalRequest } from './entities/place-removal-request.entity';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { AccommodationPrice } from 'src/place-prices/entities/place-price.entity
       AccommodationCategory,
       GalleryPhoto,
       AccommodationPrice,
+      Account,
+      PlaceRemovalRequest,
     ]),
   ],
   controllers: [AccommodationsController],

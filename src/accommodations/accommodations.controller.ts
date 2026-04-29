@@ -8,6 +8,8 @@ import {
 import { AccommodationsService } from './accommodations.service';
 import { HandleAccommodationDto } from './dto/handle-accommodation.dto';
 import { CreateAccommodationDto } from './dto/create-accommodation.dto';
+import { UpdateAccommodationDto } from './dto/update-accommodation.dto';
+import { CreateRemovalRequestDto } from './dto/create-removal-request.dto';
 
 @Controller('accommodations')
 export class AccommodationsController {
@@ -47,6 +49,12 @@ export class AccommodationsController {
           }
           return this.accommodationsService.findByCamino(data.payload.byCamino);
 
+        case 'getByOwner':
+          if (!data.payload?.ownerId) {
+            throw new BadRequestException('ownerId é obrigatório.');
+          }
+          return this.accommodationsService.findByAccount(Number(data.payload.ownerId));
+
         case 'getByBounds':
           if (!data.payload?.bounds) {
             throw new BadRequestException('Coordenadas em falta.');
@@ -59,6 +67,30 @@ export class AccommodationsController {
           }
           return this.accommodationsService.findAccommodationByPlaceId(
             Number(data.payload.placeId),
+          );
+
+        case 'edit':
+          if (!data.payload?.id) {
+            throw new BadRequestException('ID da acomodação é obrigatório.');
+          }
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          return this.accommodationsService.update(
+            Number(data.payload.id),
+            Number(data.payload.accountId),
+            data.payload.data as UpdateAccommodationDto,
+          );
+
+        case 'requestRemoval':
+          if (!data.payload?.placeId) {
+            throw new BadRequestException('placeId é obrigatório.');
+          }
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          return this.accommodationsService.requestRemoval(
+            data.payload as CreateRemovalRequestDto,
           );
 
         default:

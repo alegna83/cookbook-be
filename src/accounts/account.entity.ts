@@ -1,4 +1,5 @@
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { Accommodation } from 'src/accommodations/entities/accommodation.entity';
 
 @Entity()
 export class Account {
@@ -24,4 +25,7 @@ export class Account {
     comment: 'normal ou admin',
   })
   userType: 'normal' | 'admin';
+
+  @OneToMany(() => Accommodation, (place) => place.account)
+  places?: Accommodation[];
 }

@@ -11,6 +11,7 @@ import { Stage } from '../../stages/entities/stage.entity';
 import { GalleryPhoto } from '../../gallery/entities/gallery-photo.entity';
 import { AccommodationCategory } from '../../accommodation-categories/entities/accommodation-category.entity';
 import { AccommodationPrice } from 'src/place-prices/entities/place-price.entity';
+import { Account } from 'src/accounts/account.entity';
 
 @Entity('places')
 export class Accommodation {
@@ -118,8 +119,9 @@ export class Accommodation {
   })
   status: 'pending' | 'approved' | 'rejected' = 'pending';
 
-  @Column({ nullable: true })
-  account_id: number;
+  @ManyToOne(() => Account, (account) => account.places, { nullable: true })
+  @JoinColumn({ name: 'account_id' })
+  account?: Account;
 
   @Column({ type: 'timestamp', nullable: true })
   approvedAt: Date;

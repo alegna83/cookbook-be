@@ -1,9 +1,10 @@
-// src/accommodations/dto/create-place.dto.ts
+// src/accommodations/dto/update-accommodation.dto.ts
 import { IsOptional, IsString, IsNumber } from 'class-validator';
 
-export class CreateAccommodationDto {
+export class UpdateAccommodationDto {
+  @IsOptional()
   @IsString()
-  place_name: string;
+  place_name?: string;
 
   @IsOptional()
   place_category?: number | string;
@@ -67,8 +68,4 @@ export class CreateAccommodationDto {
 
   @IsOptional()
   prices?: any[];
-
-  @IsOptional()
-  @IsNumber()
-  account_id?: number;
 }
