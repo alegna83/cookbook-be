@@ -23,4 +23,24 @@ export class SuggestionController {
   async bestHostel(@Query('lat') lat: number, @Query('lon') lon: number) {
     return this.suggestionService.sugerirMelhorAlbergue(Number(lat), Number(lon));
   }
+
+  /**
+   * Enhanced endpoint: Suggest the best accommodation with database ratings and AI analysis.
+   * Combines guest reviews from the database with AI recommendation engine.
+   * Example: GET /suggestions/best-accommodation?lat=40.123&lon=-8.456&category=Hostel
+   */
+  @Get('best-accommodation')
+  async bestAccommodation(
+    @Query('lat') lat: number,
+    @Query('lon') lon: number,
+    @Query('radius') radius?: number,
+    @Query('category') category?: string,
+  ) {
+    return this.suggestionService.suggestBestAccommodation(
+      Number(lat),
+      Number(lon),
+      radius ? Number(radius) : 10,
+      category,
+    );
+  }
 }

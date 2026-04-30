@@ -5,9 +5,10 @@ import { SuggestionService } from './suggestion.service';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
 import { AccommodationsModule } from '../accommodations/accommodations.module';
+import { CommentsModule } from '../comments/comments.module';
 
 @Module({
-  imports: [HttpModule, ConfigModule, AccommodationsModule],
+  imports: [HttpModule, ConfigModule, AccommodationsModule, CommentsModule],
   controllers: [SuggestionController],
   providers: [SuggestionService],
 })
