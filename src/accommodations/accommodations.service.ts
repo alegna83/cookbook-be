@@ -18,9 +18,13 @@ export class AccommodationsService {
     { expiresAt: number; value: unknown }
   >();
 
+  private readonly shouldLogTimings =
+    process.env.LOG_REQUEST_TIMINGS === 'true';
+
   private readonly cacheTtlMs = (() => {
-    const parsed = Number(process.env.ACCOMMODATIONS_CACHE_TTL_MS ?? 30000);
-    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 30000;
+    const defaultTtl = process.env.NODE_ENV === 'production' ? 120000 : 30000;
+    const parsed = Number(process.env.ACCOMMODATIONS_CACHE_TTL_MS ?? defaultTtl);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : defaultTtl;
   })();
 
   constructor(
@@ -60,6 +64,15 @@ export class AccommodationsService {
 
   private invalidateReadCache(): void {
     this.readCache.clear();
+  }
+
+  private logTiming(step: string, startNs: bigint): void {
+    if (!this.shouldLogTimings) {
+      return;
+    }
+
+    const elapsedMs = Number(process.hrtime.bigint() - startNs) / 1_000_000;
+    console.log(`[ACCOMMODATIONS_TIMING] ${step}: ${elapsedMs.toFixed(2)}ms`);
   }
 
   private formatRemovalRequest(request: PlaceRemovalRequest): Record<string, unknown> {
@@ -102,7 +115,10 @@ export class AccommodationsService {
   private async attachServices(
     places: Accommodation[] | AccommodationDto[],
   ): Promise<void> {
+    const startNs = process.hrtime.bigint();
+
     if (!places?.length) {
+      this.logTiming('attachServices.empty', startNs);
       return;
     }
 
@@ -111,6 +127,7 @@ export class AccommodationsService {
       .filter((id) => Number.isInteger(id));
 
     if (!placeIds.length) {
+      this.logTiming('attachServices.noValidIds', startNs);
       return;
     }
 
@@ -139,6 +156,8 @@ export class AccommodationsService {
       const placeId = Number((place as Accommodation).id);
       (place as Accommodation).services = serviceMap.get(placeId) ?? [];
     }
+
+    this.logTiming('attachServices.queryAndMap', startNs);
   }
 
   async findAll(
@@ -158,7 +177,8 @@ export class AccommodationsService {
       return cached;
     }
 
-    console.time('DB_FIND_ACCOMMODATIONS');
+    const totalStartNs = process.hrtime.bigint();
+    const queryStartNs = process.hrtime.bigint();
     const places = await this.placeRepository
       .createQueryBuilder('place')
       .leftJoinAndSelect('place.place_category', 'place_category')
@@ -166,20 +186,19 @@ export class AccommodationsService {
       .skip((safePage - 1) * safeLimit)
       .take(safeLimit)
       .getMany();
+    this.logTiming('findAll.db', queryStartNs);
 
-    console.timeEnd('DB_FIND_ACCOMMODATIONS');
-
+    const dtoStartNs = process.hrtime.bigint();
     const dtoList = plainToInstance(AccommodationDto, places, {
       excludeExtraneousValues: true,
     });
-    await this.attachServices(dtoList);
+    this.logTiming('findAll.dtoTransform', dtoStartNs);
 
-    for (let i = 0; i < dtoList.length; i++) {
-      const dto = dtoList[i] as any;
-      const place = places[i] as any;
-      dto.ownerId = place.account?.id ?? null;
-      dto.ownerName = place.account?.name ?? null;
-    }
+    const servicesStartNs = process.hrtime.bigint();
+    await this.attachServices(dtoList);
+    this.logTiming('findAll.services', servicesStartNs);
+
+    this.logTiming('findAll.total', totalStartNs);
 
     return this.setCachedValue(cacheKey, dtoList);
   }
@@ -399,6 +418,8 @@ export class AccommodationsService {
       return cached;
     }
 
+    const totalStartNs = process.hrtime.bigint();
+    const queryStartNs = process.hrtime.bigint();
     const places = await this.placeRepository
       .createQueryBuilder('place')
       .leftJoinAndSelect('place.place_category', 'place_category')
@@ -407,8 +428,13 @@ export class AccommodationsService {
       .andWhere('place.longitude BETWEEN :west AND :east', { west, east })
       .andWhere('place.status = :status', { status: 'approved' })
       .getMany();
+    this.logTiming('getByBounds.db', queryStartNs);
 
+    const servicesStartNs = process.hrtime.bigint();
     await this.attachServices(places);
+    this.logTiming('getByBounds.services', servicesStartNs);
+
+    this.logTiming('getByBounds.total', totalStartNs);
 
     return this.setCachedValue(cacheKey, places);
   }
