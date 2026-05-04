@@ -159,19 +159,13 @@ export class AccommodationsService {
     }
 
     console.time('DB_FIND_ACCOMMODATIONS');
-    const places = await this.placeRepository.find({
-      where: { status: 'approved' },
-      relations: [
-        'camino',
-        'stage',
-        'gallery_photos',
-        'place_category',
-        'prices',
-        'account',
-      ],
-      skip: (safePage - 1) * safeLimit,
-      take: safeLimit,
-    });
+    const places = await this.placeRepository
+      .createQueryBuilder('place')
+      .leftJoinAndSelect('place.place_category', 'place_category')
+      .where('place.status = :status', { status: 'approved' })
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
+      .getMany();
 
     console.timeEnd('DB_FIND_ACCOMMODATIONS');
 
