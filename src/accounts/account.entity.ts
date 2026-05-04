@@ -13,7 +13,10 @@ export class Account {
   password: string;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
-  pilgrim_reason: string;
+  pilgrim_reason: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  pilgrim_reason_other: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   name: string;
