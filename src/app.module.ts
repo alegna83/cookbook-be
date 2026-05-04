@@ -5,7 +5,6 @@ import { TodoModule } from './todo/todo.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { AuthModule } from './auth/auth.module';
 import { SuggestionModule } from './suggestions/suggestion.module';
-import { HttpModule } from '@nestjs/axios';
 import { AccommodationsModule } from './accommodations/accommodations.module';
 import { AccommodationCategoriesModule } from './accommodation-categories/accmmodation-categories.module';
 import { CaminosModule } from './caminos/caminos.module';
@@ -28,10 +27,18 @@ import { join } from 'path';
         const sslStrict = configService.get<string>('DB_SSL_STRICT') === 'true';
         const requestedSynchronize =
           configService.get<string>('DB_SYNCHRONIZE') === 'true';
+        const runMigrationsOnBoot =
+          configService.get<string>('DB_RUN_MIGRATIONS_ON_BOOT') === 'true';
 
         if (requestedSynchronize) {
           console.warn(
             '[DB] DB_SYNCHRONIZE=true foi ignorado. O backend força synchronize=false e usa apenas migrations.',
+          );
+        }
+
+        if (runMigrationsOnBoot) {
+          console.warn(
+            '[DB] DB_RUN_MIGRATIONS_ON_BOOT=true: migrations will run during application startup.',
           );
         }
 
@@ -40,7 +47,7 @@ import { join } from 'path';
           url: configService.get<string>('DATABASE_URL'),
           autoLoadEntities: true,
           migrations: [join(__dirname, 'migrations/*{.ts,.js}')],
-          migrationsRun: true,
+          migrationsRun: runMigrationsOnBoot,
           // ⚠️ IMPORTANTE: Nunca usar synchronize: true em produção!
           // Use migrações: npm run migration:run
           synchronize: false,
@@ -72,7 +79,6 @@ import { join } from 'path';
     CaminosModule,
     StagesModule,
     StatisticsCaminosModule,
-    HttpModule,
     FavoritesModule,
     CommentsModule,
     UploadModule,
