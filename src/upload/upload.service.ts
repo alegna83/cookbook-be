@@ -2,7 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { UploadMultipleResponseDto, UploadResponseDto } from './dto/upload-response.dto';
 
-export type UploadType = 'main-photo' | 'gallery-photos';
+export type UploadType = 'main-photo' | 'gallery-photos' | 'avatar';
 
 @Injectable()
 export class UploadService {
@@ -95,6 +95,15 @@ export class UploadService {
 
       const [file] = files;
       return this.uploadImage(file, 'accommodations/main');
+    }
+
+    if (type === 'avatar') {
+      if (files.length !== 1) {
+        throw new BadRequestException('Envie exatamente um ficheiro para o avatar.');
+      }
+
+      const [file] = files;
+      return this.uploadImage(file, 'accounts/avatars');
     }
 
     if (files.length > 10) {

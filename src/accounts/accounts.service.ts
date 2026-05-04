@@ -45,8 +45,21 @@ export class AccountsService {
   async findByEmail(email: string): Promise<Account | null> {
     return this.accountsRepository.findOne({
       where: { email },
-      select: ['id', 'email', 'name', 'pilgrim_reason', 'password', 'userType'],
+      select: ['id', 'email', 'name', 'pilgrim_reason', 'password', 'userType', 'avatar'],
     });
+  }
+
+  async updateAccount(accountId: number, data: Partial<Account>): Promise<Account> {
+    const account = await this.accountsRepository.findOne({ where: { id: accountId } });
+    if (!account) {
+      throw new Error('Account not found.');
+    }
+
+    if (data.name !== undefined) account.name = data.name as any;
+    if (data.pilgrim_reason !== undefined) account.pilgrim_reason = data.pilgrim_reason as any;
+    if ((data as any).avatar !== undefined) account.avatar = (data as any).avatar;
+
+    return this.accountsRepository.save(account);
   }
 
   // Função para autenticar o usuário

@@ -16,6 +16,20 @@ export class AccountsController {
     return this.accountsService.register(email, name, password, pilgrim_reason);
   }
 
+  @Post('update')
+  async update(
+    @Body('accountId') accountId: number,
+    @Body('name') name: string,
+    @Body('pilgrim_reason') pilgrim_reason: string,
+    @Body('avatar') avatar: string,
+  ) {
+    return this.accountsService.updateAccount(accountId, {
+      name,
+      pilgrim_reason,
+      avatar,
+    } as any);
+  }
+
   @Post('login')
   async login(
     @Body('email') email: string,

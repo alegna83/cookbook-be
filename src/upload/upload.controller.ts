@@ -19,7 +19,7 @@ export class UploadController {
   @HttpCode(200)
   @UseInterceptors(AnyFilesInterceptor())
   async uploadMedia(
-    @Body('type') type: 'main-photo' | 'gallery-photos',
+    @Body('type') type: 'main-photo' | 'gallery-photos' | 'avatar',
     @UploadedFiles() files: any[],
   ): Promise<UploadResponseDto | UploadMultipleResponseDto> {
     if (!type) {

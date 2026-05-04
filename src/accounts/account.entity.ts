@@ -26,6 +26,9 @@ export class Account {
   })
   userType: 'normal' | 'admin';
 
+  @Column({ type: 'varchar', length: 1024, nullable: true })
+  avatar: string | null;
+
   @OneToMany(() => Accommodation, (place) => place.account)
   places?: Accommodation[];
 }
