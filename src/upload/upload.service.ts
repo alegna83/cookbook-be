@@ -6,11 +6,22 @@ export type UploadType = 'main-photo' | 'gallery-photos' | 'avatar';
 
 @Injectable()
 export class UploadService {
+  private readonly cloudinaryConfigured: boolean;
+
   constructor() {
-    cloudinary.config(this.resolveCloudinaryConfig());
+    const config = this.getCloudinaryConfigOrNull();
+    this.cloudinaryConfigured = config !== null;
+
+    if (config) {
+      cloudinary.config(config);
+    } else {
+      console.warn(
+        '[UploadService] Cloudinary is not configured yet. Uploads will fail until CLOUDINARY_* env vars or CLOUDINARY_URL are provided.',
+      );
+    }
   }
 
-  private resolveCloudinaryConfig() {
+  private getCloudinaryConfigOrNull() {
     const cloudinaryUrl = process.env.CLOUDINARY_URL;
     if (cloudinaryUrl) {
       const parsed = this.parseCloudinaryUrl(cloudinaryUrl);
@@ -24,9 +35,7 @@ export class UploadService {
     const apiSecret = process.env.CLOUDINARY_API_SECRET?.replace(/^"|"$/g, '');
 
     if (!cloudName || !apiKey || !apiSecret) {
-      throw new InternalServerErrorException(
-        'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET, or provide CLOUDINARY_URL.',
-      );
+      return null;
     }
 
     return {
@@ -34,6 +43,16 @@ export class UploadService {
       api_key: apiKey,
       api_secret: apiSecret,
     };
+  }
+
+  private ensureCloudinaryConfigured() {
+    if (this.cloudinaryConfigured) {
+      return;
+    }
+
+    throw new InternalServerErrorException(
+      'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET, or provide CLOUDINARY_URL.',
+    );
   }
 
   private parseCloudinaryUrl(url: string) {
@@ -56,6 +75,8 @@ export class UploadService {
     file: any,
     folder: string = 'accommodations',
   ): Promise<UploadResponseDto> {
+    this.ensureCloudinaryConfigured();
+
     if (!file) {
       throw new BadRequestException('Ficheiro não fornecido.');
     }
