@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { UploadMultipleResponseDto, UploadResponseDto } from './dto/upload-response.dto';
 
@@ -7,11 +7,49 @@ export type UploadType = 'main-photo' | 'gallery-photos' | 'avatar';
 @Injectable()
 export class UploadService {
   constructor() {
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
-    });
+    cloudinary.config(this.resolveCloudinaryConfig());
+  }
+
+  private resolveCloudinaryConfig() {
+    const cloudinaryUrl = process.env.CLOUDINARY_URL;
+    if (cloudinaryUrl) {
+      const parsed = this.parseCloudinaryUrl(cloudinaryUrl);
+      if (parsed) {
+        return parsed;
+      }
+    }
+
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME?.replace(/^"|"$/g, '');
+    const apiKey = process.env.CLOUDINARY_API_KEY?.replace(/^"|"$/g, '');
+    const apiSecret = process.env.CLOUDINARY_API_SECRET?.replace(/^"|"$/g, '');
+
+    if (!cloudName || !apiKey || !apiSecret) {
+      throw new InternalServerErrorException(
+        'Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET, or provide CLOUDINARY_URL.',
+      );
+    }
+
+    return {
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+    };
+  }
+
+  private parseCloudinaryUrl(url: string) {
+    const match = url.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
+
+    if (!match) {
+      return null;
+    }
+
+    const [, apiKey, apiSecret, cloudName] = match;
+
+    return {
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+    };
   }
 
   async uploadImage(

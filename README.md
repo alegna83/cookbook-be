@@ -64,6 +64,24 @@ When you're ready to deploy your NestJS application to production, there are som
 
 If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
 
+### Cloudinary uploads
+
+The avatar and image upload endpoints require Cloudinary credentials at runtime. Set either the individual variables below:
+
+```bash
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+```
+
+Or a single Cloudinary URL in the format:
+
+```bash
+CLOUDINARY_URL=cloudinary://api_key:api_secret@cloud_name
+```
+
+If these values are missing in production, the upload service now fails early with a clear configuration error instead of a Cloudinary runtime exception.
+
 ```bash
 $ npm install -g mau
 $ mau deploy
