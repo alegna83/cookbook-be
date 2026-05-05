@@ -31,12 +31,28 @@ export class AccountsController {
     @Body('pilgrim_reason_other') pilgrim_reason_other: string,
     @Body('avatar') avatar: string,
   ) {
-    return this.accountsService.updateAccount(accountId, {
+    console.log('[ACCOUNTS] update() called with:', {
+      accountId,
+      name: name !== undefined ? 'provided' : 'undefined',
+      pilgrim_reason: pilgrim_reason !== undefined ? 'provided' : 'undefined',
+      pilgrim_reason_other: pilgrim_reason_other !== undefined ? 'provided' : 'undefined',
+      avatar: avatar !== undefined ? 'provided (length: ' + avatar?.length + ')' : 'undefined',
+    });
+
+    const result = await this.accountsService.updateAccount(accountId, {
       name,
       pilgrim_reason,
       pilgrim_reason_other,
       avatar,
     } as any);
+
+    console.log('[ACCOUNTS] update() returning:', {
+      id: result.id,
+      name: result.name,
+      avatar: result.avatar ? 'exists (length: ' + result.avatar.length + ')' : 'null',
+    });
+
+    return result;
   }
 
   @Post('login')

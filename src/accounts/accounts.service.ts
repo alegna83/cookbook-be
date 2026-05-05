@@ -80,23 +80,53 @@ export class AccountsService {
   }
 
   async updateAccount(accountId: number, data: Partial<Account>): Promise<Account> {
+    console.log(`[SERVICE] updateAccount() called for accountId=${accountId}`);
+    console.log('[SERVICE] Update data keys:', Object.keys(data).filter(k => data[k] !== undefined));
+
     const account = await this.accountsRepository.findOne({ where: { id: accountId } });
     if (!account) {
       throw new Error('Account not found.');
     }
 
-    if (data.name !== undefined) account.name = data.name as any;
+    console.log('[SERVICE] Before update:', {
+      id: account.id,
+      name: account.name,
+      avatar: account.avatar ? 'exists (length: ' + account.avatar.length + ')' : 'null',
+    });
+
+    if (data.name !== undefined) {
+      console.log('[SERVICE] Updating name from', account.name, 'to', data.name);
+      account.name = data.name as any;
+    }
     if (data.pilgrim_reason !== undefined || (data as any).pilgrim_reason_other !== undefined) {
       const normalizedReason = this.normalizePilgrimReason(
         data.pilgrim_reason,
         (data as any).pilgrim_reason_other,
       );
+      console.log('[SERVICE] Updating pilgrim reason to', normalizedReason);
       account.pilgrim_reason = normalizedReason.pilgrim_reason;
       account.pilgrim_reason_other = normalizedReason.pilgrim_reason_other;
     }
-    if ((data as any).avatar !== undefined) account.avatar = (data as any).avatar;
+    if ((data as any).avatar !== undefined) {
+      console.log('[SERVICE] Updating avatar from', account.avatar ? 'exists' : 'null', 'to', (data as any).avatar ? 'exists (length: ' + (data as any).avatar.length + ')' : 'null');
+      account.avatar = (data as any).avatar;
+    }
 
-    return this.accountsRepository.save(account);
+    console.log('[SERVICE] After update (before save):', {
+      id: account.id,
+      name: account.name,
+      avatar: account.avatar ? 'exists' : 'null',
+    });
+
+    const saved = await this.accountsRepository.save(account);
+    
+    console.log('[SERVICE] After save:', {
+      id: saved.id,
+      name: saved.name,
+      avatar: saved.avatar ? 'exists (length: ' + saved.avatar.length + ')' : 'null',
+    });
+
+    return saved;
   }
 
   private normalizePilgrimReason(

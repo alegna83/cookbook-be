@@ -22,6 +22,9 @@ export class UploadController {
     @Body('type') type: 'main-photo' | 'gallery-photos' | 'avatar',
     @UploadedFiles() files: any[],
   ): Promise<UploadResponseDto | UploadMultipleResponseDto> {
+    console.log('[UPLOAD-CONTROLLER] uploadMedia() called with type:', type);
+    console.log('[UPLOAD-CONTROLLER] Files count:', files ? files.length : 0);
+
     if (!type) {
       throw new BadRequestException('Tipo de upload não fornecido.');
     }
@@ -30,6 +33,8 @@ export class UploadController {
       throw new BadRequestException('Nenhum ficheiro fornecido.');
     }
 
-    return this.uploadService.uploadMedia(files, type);
+    const result = await this.uploadService.uploadMedia(files, type);
+    console.log('[UPLOAD-CONTROLLER] Upload result:', result);
+    return result;
   }
 }

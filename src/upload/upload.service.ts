@@ -75,6 +75,7 @@ export class UploadService {
     file: any,
     folder: string = 'accommodations',
   ): Promise<UploadResponseDto> {
+    console.log(`[UPLOAD] uploadImage() called for folder: ${folder}`);
     this.ensureCloudinaryConfigured();
 
     if (!file) {
@@ -101,12 +102,15 @@ export class UploadService {
         },
         (error: any, result: any) => {
           if (error) {
+            console.error('[UPLOAD] Upload error:', error.message);
             reject(
               new BadRequestException(
                 `Erro no upload: ${error.message}`,
               ),
             );
           } else if (result) {
+            console.log('[UPLOAD] Upload success, public_id:', result.public_id);
+            console.log('[UPLOAD] Returning URL:', result.secure_url);
             resolve({
               url: result.secure_url,
               publicId: result.public_id,
