@@ -39,8 +39,8 @@ export class GalleryPhoto {
   status: 'pending' | 'approved' | 'rejected' = 'pending';
 
   @Column({ type: 'timestamp', nullable: true })
-  approvedAt: Date;
+  approvedAt: Date | null = null;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
-  rejectionReason: string;
+  rejectionReason: string | null = null;
 }
