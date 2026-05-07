@@ -88,6 +88,22 @@ export class AccommodationsController {
             data.payload.data as UpdateAccommodationDto,
           );
 
+        case 'addphotos':
+          if (!data.payload?.placeId) {
+            throw new BadRequestException('placeId é obrigatório.');
+          }
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          if (!Array.isArray(data.payload?.photoUrls)) {
+            throw new BadRequestException('photoUrls é obrigatório.');
+          }
+          return this.accommodationsService.addGalleryPhotos(
+            Number(data.payload.placeId),
+            Number(data.payload.accountId),
+            data.payload.photoUrls,
+          );
+
         case 'requestremoval':
         case 'requestdelete':
         case 'deleterequest':

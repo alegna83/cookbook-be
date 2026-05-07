@@ -4,8 +4,10 @@ import {
   Column,
   ManyToOne,
   JoinColumn,
+  CreateDateColumn,
 } from 'typeorm';
 import { Accommodation } from 'src/accommodations/entities/accommodation.entity';
+import { Account } from 'src/accounts/account.entity';
 
 @Entity('gallery_photos')
 export class GalleryPhoto {
@@ -20,4 +22,11 @@ export class GalleryPhoto {
   })
   @JoinColumn({ name: 'place_id' })
   place: Accommodation;
+
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'account_id' })
+  account?: Account;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
 }

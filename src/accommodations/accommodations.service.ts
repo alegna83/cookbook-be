@@ -9,6 +9,7 @@ import { UpdateAccommodationDto } from './dto/update-accommodation.dto';
 import { CreateRemovalRequestDto } from './dto/create-removal-request.dto';
 import { AccommodationCategory } from 'src/accommodation-categories/entities/accommodation-category.entity';
 import { GalleryPhoto } from 'src/gallery/entities/gallery-photo.entity';
+import { Account } from 'src/accounts/account.entity';
 import { PlaceRemovalRequest } from './entities/place-removal-request.entity';
 
 @Injectable()
@@ -34,6 +35,8 @@ export class AccommodationsService {
     private readonly categoryRepo: Repository<AccommodationCategory>,
     @InjectRepository(GalleryPhoto)
     private readonly galleryPhotoRepo: Repository<GalleryPhoto>,
+    @InjectRepository(Account)
+    private readonly accountRepo: Repository<Account>,
     @InjectRepository(PlaceRemovalRequest)
     private readonly removalRequestRepo: Repository<PlaceRemovalRequest>,
   ) {}
@@ -587,6 +590,86 @@ export class AccommodationsService {
     if (!updatedAccommodation) {
       throw new NotFoundException(
         `Accommodation com id ${saved.id} não encontrado após atualização`,
+      );
+    }
+
+    const dto = plainToInstance(AccommodationDto, updatedAccommodation, {
+      excludeExtraneousValues: true,
+    });
+    await this.attachServices([dto]);
+
+    (dto as any).ownerId = updatedAccommodation.account?.id ?? null;
+    (dto as any).ownerName = updatedAccommodation.account?.name ?? null;
+
+    this.invalidateReadCache();
+    return dto;
+  }
+
+  async addGalleryPhotos(
+    placeId: number,
+    accountId: number,
+    photoUrls: string[],
+  ): Promise<AccommodationDto> {
+    const normalizedPlaceId = Number(placeId);
+    const normalizedAccountId = Number(accountId);
+
+    if (!Number.isInteger(normalizedPlaceId)) {
+      throw new BadRequestException('placeId inválido.');
+    }
+
+    if (!Number.isInteger(normalizedAccountId)) {
+      throw new BadRequestException('accountId inválido.');
+    }
+
+    const place = await this.placeRepository.findOne({
+      where: { id: normalizedPlaceId },
+      relations: ['account'],
+    });
+
+    if (!place) {
+      throw new NotFoundException(`Accommodation com id ${normalizedPlaceId} não encontrado`);
+    }
+
+    const account = await this.accountRepo.findOne({
+      where: { id: normalizedAccountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Account com id ${normalizedAccountId} não encontrado`);
+    }
+
+    const urls = (photoUrls ?? [])
+      .filter((value): value is string => typeof value === 'string')
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0)
+      .map((url) => this.toPublicImageUrl(url));
+
+    if (urls.length === 0) {
+      throw new BadRequestException('Pelo menos uma foto é obrigatória.');
+    }
+
+    if (urls.length > 10) {
+      throw new BadRequestException('Máximo de 10 fotos permitido.');
+    }
+
+    const galleryEntities = urls.map((url) =>
+      this.galleryPhotoRepo.create({
+        url,
+        place,
+        account,
+      }),
+    );
+
+    await this.galleryPhotoRepo.save(galleryEntities);
+
+    const updatedAccommodation = await this.placeRepository.findOne({
+      where: { id: place.id },
+      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
+    });
+
+    if (!updatedAccommodation) {
+      throw new NotFoundException(
+        `Accommodation com id ${place.id} não encontrado após adicionar fotos`,
       );
     }
 
