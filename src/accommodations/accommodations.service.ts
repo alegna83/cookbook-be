@@ -801,6 +801,49 @@ export class AccommodationsService {
     return dto;
   }
 
+  async getPendingPhotosForAccommodation(
+    placeId: number,
+  ): Promise<AccommodationDto> {
+    const normalizedPlaceId = Number(placeId);
+
+    if (!Number.isInteger(normalizedPlaceId)) {
+      throw new BadRequestException('placeId inválido.');
+    }
+
+    const place = await this.placeRepository.findOne({
+      where: { id: normalizedPlaceId },
+      relations: [
+        'camino',
+        'stage',
+        'gallery_photos',
+        'place_category',
+        'prices',
+        'account',
+      ],
+    });
+
+    if (!place) {
+      throw new NotFoundException(`Accommodation com id ${normalizedPlaceId} não encontrado`);
+    }
+
+    // Filter to only show pending photos
+    if (place.gallery_photos && Array.isArray(place.gallery_photos)) {
+      place.gallery_photos = place.gallery_photos.filter(
+        (photo: any) => photo.status === 'pending',
+      );
+    }
+
+    const dto = plainToInstance(AccommodationDto, place, {
+      excludeExtraneousValues: true,
+    });
+    await this.attachServices([dto]);
+
+    (dto as any).ownerId = place.account?.id ?? null;
+    (dto as any).ownerName = place.account?.name ?? null;
+
+    return dto;
+  }
+
   async requestRemoval(
     data: CreateRemovalRequestDto,
   ): Promise<Record<string, unknown>> {

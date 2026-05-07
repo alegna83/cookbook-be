@@ -142,6 +142,14 @@ export class AccommodationsController {
             data.payload?.rejectionReason || undefined,
           );
 
+        case 'getpendingphotos':
+          if (!data.payload?.placeId) {
+            throw new BadRequestException('placeId é obrigatório.');
+          }
+          return this.accommodationsService.getPendingPhotosForAccommodation(
+            Number(data.payload.placeId),
+          );
+
         default:
           throw new BadRequestException('Ação desconhecida.');
       }
