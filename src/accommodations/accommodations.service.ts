@@ -163,6 +163,21 @@ export class AccommodationsService {
     this.logTiming('attachServices.queryAndMap', startNs);
   }
 
+  private filterApprovedPhotos(
+    places: Accommodation[] | AccommodationDto[],
+  ): void {
+    for (const place of places) {
+      if (
+        place.gallery_photos &&
+        Array.isArray(place.gallery_photos)
+      ) {
+        place.gallery_photos = (place.gallery_photos as any[]).filter(
+          (photo: any) => photo.status === 'approved' || !photo.status,
+        );
+      }
+    }
+  }
+
   async findAll(
     page: number = 1,
     limit: number = 10,
@@ -231,6 +246,7 @@ export class AccommodationsService {
     const dto = plainToInstance(AccommodationDto, place, {
       excludeExtraneousValues: true,
     });
+    this.filterApprovedPhotos([dto]);
     await this.attachServices([dto]);
 
     (dto as any).ownerId = place.account?.id ?? null;
@@ -426,7 +442,12 @@ export class AccommodationsService {
     const places = await this.placeRepository
       .createQueryBuilder('place')
       .leftJoinAndSelect('place.place_category', 'place_category')
-      .leftJoinAndSelect('place.gallery_photos', 'gallery_photos')
+      .leftJoinAndSelect(
+        'place.gallery_photos',
+        'gallery_photos',
+        'gallery_photos.status = :photoStatus',
+        { photoStatus: 'approved' },
+      )
       .where('place.latitude BETWEEN :south AND :north', { south, north })
       .andWhere('place.longitude BETWEEN :west AND :east', { west, east })
       .andWhere('place.status = :status', { status: 'approved' })
@@ -453,7 +474,12 @@ export class AccommodationsService {
     const result = await this.placeRepository
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.place_category', 'pc')
-      .leftJoinAndSelect('p.gallery_photos', 'photos')
+      .leftJoinAndSelect(
+        'p.gallery_photos',
+        'photos',
+        'photos.status = :photoStatus',
+        { photoStatus: 'approved' },
+      )
       .leftJoinAndSelect('p.prices', 'prices')
       .leftJoinAndSelect('p.camino', 'camino')
       .leftJoinAndSelect('p.stage', 'stage')
@@ -657,6 +683,7 @@ export class AccommodationsService {
         url,
         place,
         account,
+        status: 'pending',
       }),
     );
 
@@ -680,6 +707,95 @@ export class AccommodationsService {
 
     (dto as any).ownerId = updatedAccommodation.account?.id ?? null;
     (dto as any).ownerName = updatedAccommodation.account?.name ?? null;
+
+    this.invalidateReadCache();
+    return dto;
+  }
+
+  async approvePhoto(photoId: number): Promise<AccommodationDto> {
+    const normalizedPhotoId = Number(photoId);
+
+    if (!Number.isInteger(normalizedPhotoId)) {
+      throw new BadRequestException('photoId inválido.');
+    }
+
+    const photo = await this.galleryPhotoRepo.findOne({
+      where: { id: normalizedPhotoId },
+      relations: ['place', 'account'],
+    });
+
+    if (!photo) {
+      throw new NotFoundException(`Photo com id ${normalizedPhotoId} não encontrada`);
+    }
+
+    photo.status = 'approved';
+    photo.approvedAt = new Date();
+    photo.rejectionReason = null;
+
+    await this.galleryPhotoRepo.save(photo);
+
+    const accommodation = await this.placeRepository.findOne({
+      where: { id: photo.place.id },
+      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
+    });
+
+    if (!accommodation) {
+      throw new NotFoundException(`Accommodation com id ${photo.place.id} não encontrado`);
+    }
+
+    const dto = plainToInstance(AccommodationDto, accommodation, {
+      excludeExtraneousValues: true,
+    });
+    await this.attachServices([dto]);
+
+    (dto as any).ownerId = accommodation.account?.id ?? null;
+    (dto as any).ownerName = accommodation.account?.name ?? null;
+
+    this.invalidateReadCache();
+    return dto;
+  }
+
+  async rejectPhoto(
+    photoId: number,
+    rejectionReason?: string,
+  ): Promise<AccommodationDto> {
+    const normalizedPhotoId = Number(photoId);
+
+    if (!Number.isInteger(normalizedPhotoId)) {
+      throw new BadRequestException('photoId inválido.');
+    }
+
+    const photo = await this.galleryPhotoRepo.findOne({
+      where: { id: normalizedPhotoId },
+      relations: ['place', 'account'],
+    });
+
+    if (!photo) {
+      throw new NotFoundException(`Photo com id ${normalizedPhotoId} não encontrada`);
+    }
+
+    photo.status = 'rejected';
+    photo.rejectionReason = rejectionReason || null;
+    photo.approvedAt = null;
+
+    await this.galleryPhotoRepo.save(photo);
+
+    const accommodation = await this.placeRepository.findOne({
+      where: { id: photo.place.id },
+      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
+    });
+
+    if (!accommodation) {
+      throw new NotFoundException(`Accommodation com id ${photo.place.id} não encontrado`);
+    }
+
+    const dto = plainToInstance(AccommodationDto, accommodation, {
+      excludeExtraneousValues: true,
+    });
+    await this.attachServices([dto]);
+
+    (dto as any).ownerId = accommodation.account?.id ?? null;
+    (dto as any).ownerName = accommodation.account?.name ?? null;
 
     this.invalidateReadCache();
     return dto;

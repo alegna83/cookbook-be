@@ -29,4 +29,18 @@ export class GalleryPhoto {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+  @Column({
+    type: 'varchar',
+    length: 50,
+    default: 'pending',
+    comment: 'pending, approved, rejected',
+  })
+  status: 'pending' | 'approved' | 'rejected' = 'pending';
+
+  @Column({ type: 'timestamp', nullable: true })
+  approvedAt: Date;
+
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  rejectionReason: string;
 }

@@ -127,6 +127,21 @@ export class AccommodationsController {
             Number(data.payload.accountId),
           );
 
+        case 'approvephotos':
+          if (!data.payload?.photoId) {
+            throw new BadRequestException('photoId é obrigatório.');
+          }
+          return this.accommodationsService.approvePhoto(Number(data.payload.photoId));
+
+        case 'rejectphotos':
+          if (!data.payload?.photoId) {
+            throw new BadRequestException('photoId é obrigatório.');
+          }
+          return this.accommodationsService.rejectPhoto(
+            Number(data.payload.photoId),
+            data.payload?.rejectionReason || undefined,
+          );
+
         default:
           throw new BadRequestException('Ação desconhecida.');
       }
