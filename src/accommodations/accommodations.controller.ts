@@ -41,7 +41,8 @@ export class AccommodationsController {
           if (!data.payload || !data.payload?.id) {
             throw new BadRequestException('ID do accommodation é obrigatório.');
           }
-          return this.accommodationsService.findOne(Number(data.payload.id));
+          const accountId = data.payload?.accountId ? Number(data.payload.accountId) : undefined;
+          return this.accommodationsService.findOne(Number(data.payload.id), accountId);
 
         case 'create':
           if (!data.payload) {

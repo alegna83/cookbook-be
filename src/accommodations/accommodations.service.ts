@@ -165,15 +165,22 @@ export class AccommodationsService {
 
   private filterApprovedPhotos(
     places: Accommodation[] | AccommodationDto[],
+    currentAccountId?: number,
   ): void {
     for (const place of places) {
       if (
         place.gallery_photos &&
         Array.isArray(place.gallery_photos)
       ) {
-        place.gallery_photos = (place.gallery_photos as any[]).filter(
-          (photo: any) => photo.status === 'approved' || !photo.status,
-        );
+        // If viewer is the owner, show all photos including pending
+        // Otherwise, only show approved photos
+        const isOwner = currentAccountId && place.account?.id === currentAccountId;
+        
+        if (!isOwner) {
+          place.gallery_photos = (place.gallery_photos as any[]).filter(
+            (photo: any) => photo.status === 'approved' || !photo.status,
+          );
+        }
       }
     }
   }
@@ -221,8 +228,8 @@ export class AccommodationsService {
     return this.setCachedValue(cacheKey, dtoList);
   }
 
-  async findOne(id: number): Promise<AccommodationDto> {
-    const cacheKey = `findOne:${id}`;
+  async findOne(id: number, currentAccountId?: number): Promise<AccommodationDto> {
+    const cacheKey = `findOne:${id}:${currentAccountId ?? 'guest'}`;
     const cached = this.getCachedValue<AccommodationDto>(cacheKey);
 
     if (cached) {
@@ -246,7 +253,7 @@ export class AccommodationsService {
     const dto = plainToInstance(AccommodationDto, place, {
       excludeExtraneousValues: true,
     });
-    this.filterApprovedPhotos([dto]);
+    this.filterApprovedPhotos([dto], currentAccountId);
     await this.attachServices([dto]);
 
     (dto as any).ownerId = place.account?.id ?? null;
