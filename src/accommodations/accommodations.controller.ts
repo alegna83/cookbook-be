@@ -150,6 +150,9 @@ export class AccommodationsController {
             Number(data.payload.placeId),
           );
 
+        case 'getpendingphotosadmin':
+          return this.accommodationsService.getPendingPhotosAdmin();
+
         default:
           throw new BadRequestException('Ação desconhecida.');
       }

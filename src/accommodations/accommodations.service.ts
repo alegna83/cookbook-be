@@ -844,6 +844,36 @@ export class AccommodationsService {
     return dto;
   }
 
+  async getPendingPhotosAdmin(): Promise<AccommodationDto[]> {
+    try {
+      // Get all accommodations with pending gallery photos
+      const accommodations = await this.placeRepository
+        .createQueryBuilder('place')
+        .leftJoinAndSelect('place.gallery_photos', 'photos')
+        .leftJoinAndSelect('place.place_category', 'place_category')
+        .leftJoinAndSelect('place.account', 'account')
+        .where('photos.status = :status', { status: 'pending' })
+        .andWhere('place.status = :placeStatus', { placeStatus: 'approved' })
+        .distinct(true)
+        .getMany();
+
+      const dtos = plainToInstance(AccommodationDto, accommodations, {
+        excludeExtraneousValues: true,
+      });
+      await this.attachServices(dtos);
+
+      // Set owner info for each accommodation
+      accommodations.forEach((place, index) => {
+        (dtos[index] as any).ownerId = place.account?.id ?? null;
+        (dtos[index] as any).ownerName = place.account?.name ?? null;
+      });
+
+      return dtos;
+    } catch (e) {
+      throw new BadRequestException(`Error fetching pending photos: ${e.message}`);
+    }
+  }
+
   async requestRemoval(
     data: CreateRemovalRequestDto,
   ): Promise<Record<string, unknown>> {
