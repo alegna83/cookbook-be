@@ -174,8 +174,11 @@ export class AccommodationsService {
       ) {
         // If viewer is the owner, show all photos including pending
         // Otherwise, only show approved photos
-        const isOwner = currentAccountId && place.account?.id === currentAccountId;
-        
+        const acct = (place as any).account;
+        const ownerIdFromDto = (place as any).ownerId ?? (place as any).owner_id ?? null;
+        const ownerId = acct?.id ?? ownerIdFromDto;
+        const isOwner = currentAccountId != null && ownerId != null && Number(ownerId) === Number(currentAccountId);
+
         if (!isOwner) {
           place.gallery_photos = (place.gallery_photos as any[]).filter(
             (photo: any) => photo.status === 'approved' || !photo.status,
