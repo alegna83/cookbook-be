@@ -9,6 +9,7 @@ import { UpdateAccommodationDto } from './dto/update-accommodation.dto';
 import { CreateRemovalRequestDto } from './dto/create-removal-request.dto';
 import { AccommodationCategory } from 'src/accommodation-categories/entities/accommodation-category.entity';
 import { GalleryPhoto } from 'src/gallery/entities/gallery-photo.entity';
+import { Account } from 'src/accounts/account.entity';
 import { PlaceRemovalRequest } from './entities/place-removal-request.entity';
 
 @Injectable()
@@ -34,6 +35,8 @@ export class AccommodationsService {
     private readonly categoryRepo: Repository<AccommodationCategory>,
     @InjectRepository(GalleryPhoto)
     private readonly galleryPhotoRepo: Repository<GalleryPhoto>,
+    @InjectRepository(Account)
+    private readonly accountRepo: Repository<Account>,
     @InjectRepository(PlaceRemovalRequest)
     private readonly removalRequestRepo: Repository<PlaceRemovalRequest>,
   ) {}
@@ -160,6 +163,41 @@ export class AccommodationsService {
     this.logTiming('attachServices.queryAndMap', startNs);
   }
 
+  private filterApprovedPhotos(
+    places: Accommodation[] | AccommodationDto[],
+    currentAccountId?: number,
+    viewerIsAdmin = false,
+  ): void {
+    if (viewerIsAdmin) {
+      console.log(`[PHOTO_FILTER] Admin viewer - returning ALL photos`);
+      return;
+    }
+
+    for (const place of places) {
+      if (
+        place.gallery_photos &&
+        Array.isArray(place.gallery_photos)
+      ) {
+        const beforeCount = place.gallery_photos.length;
+        place.gallery_photos = (place.gallery_photos as any[]).filter((photo: any) => {
+          const photoStatus = photo.status || 'approved';
+          const uploaderId = photo.account?.id ?? photo.uploaderId ?? photo.account_id ?? null;
+          const isOwnPendingPhoto =
+            currentAccountId != null &&
+            photoStatus === 'pending' &&
+            uploaderId != null &&
+            Number(uploaderId) === Number(currentAccountId);
+
+          const shouldInclude = photoStatus === 'approved' || isOwnPendingPhoto;
+          console.log(`[PHOTO_FILTER] Photo ID ${photo.id}: status=${photoStatus}, uploaderId=${uploaderId}, currentAccountId=${currentAccountId}, isOwn=${isOwnPendingPhoto}, include=${shouldInclude}`);
+          return shouldInclude;
+        });
+        const afterCount = place.gallery_photos.length;
+        console.log(`[PHOTO_FILTER] Place ${place.id}: filtered from ${beforeCount} to ${afterCount} photos`);
+      }
+    }
+  }
+
   async findAll(
     page: number = 1,
     limit: number = 10,
@@ -203,8 +241,8 @@ export class AccommodationsService {
     return this.setCachedValue(cacheKey, dtoList);
   }
 
-  async findOne(id: number): Promise<AccommodationDto> {
-    const cacheKey = `findOne:${id}`;
+  async findOne(id: number, currentAccountId?: number): Promise<AccommodationDto> {
+    const cacheKey = `findOne:${id}:${currentAccountId ?? 'guest'}`;
     const cached = this.getCachedValue<AccommodationDto>(cacheKey);
 
     if (cached) {
@@ -217,6 +255,7 @@ export class AccommodationsService {
         'camino',
         'stage',
         'gallery_photos',
+        'gallery_photos.account',
         'place_category',
         'prices',
         'account',
@@ -225,9 +264,16 @@ export class AccommodationsService {
     if (!place) {
       throw new NotFoundException(`Accommodation com id ${id} não encontrado`);
     }
+
+    const currentAccount = currentAccountId
+      ? await this.accountRepo.findOne({ where: { id: currentAccountId } })
+      : null;
+    const viewerIsAdmin = currentAccount?.userType === 'admin';
+
     const dto = plainToInstance(AccommodationDto, place, {
       excludeExtraneousValues: true,
     });
+    this.filterApprovedPhotos([dto], currentAccountId, viewerIsAdmin);
     await this.attachServices([dto]);
 
     (dto as any).ownerId = place.account?.id ?? null;
@@ -423,7 +469,12 @@ export class AccommodationsService {
     const places = await this.placeRepository
       .createQueryBuilder('place')
       .leftJoinAndSelect('place.place_category', 'place_category')
-      .leftJoinAndSelect('place.gallery_photos', 'gallery_photos')
+      .leftJoinAndSelect(
+        'place.gallery_photos',
+        'gallery_photos',
+        'gallery_photos.status = :photoStatus',
+        { photoStatus: 'approved' },
+      )
       .where('place.latitude BETWEEN :south AND :north', { south, north })
       .andWhere('place.longitude BETWEEN :west AND :east', { west, east })
       .andWhere('place.status = :status', { status: 'approved' })
@@ -450,7 +501,12 @@ export class AccommodationsService {
     const result = await this.placeRepository
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.place_category', 'pc')
-      .leftJoinAndSelect('p.gallery_photos', 'photos')
+      .leftJoinAndSelect(
+        'p.gallery_photos',
+        'photos',
+        'photos.status = :photoStatus',
+        { photoStatus: 'approved' },
+      )
       .leftJoinAndSelect('p.prices', 'prices')
       .leftJoinAndSelect('p.camino', 'camino')
       .leftJoinAndSelect('p.stage', 'stage')
@@ -581,7 +637,7 @@ export class AccommodationsService {
     // Fetch updated accommodation with all relations
     const updatedAccommodation = await this.placeRepository.findOne({
       where: { id: saved.id },
-      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
+      relations: ['gallery_photos', 'gallery_photos.account', 'place_category', 'prices', 'camino', 'stage', 'account'],
     });
 
     if (!updatedAccommodation) {
@@ -600,6 +656,250 @@ export class AccommodationsService {
 
     this.invalidateReadCache();
     return dto;
+  }
+
+  async addGalleryPhotos(
+    placeId: number,
+    accountId: number,
+    photoUrls: string[],
+  ): Promise<AccommodationDto> {
+    const normalizedPlaceId = Number(placeId);
+    const normalizedAccountId = Number(accountId);
+
+    if (!Number.isInteger(normalizedPlaceId)) {
+      throw new BadRequestException('placeId inválido.');
+    }
+
+    if (!Number.isInteger(normalizedAccountId)) {
+      throw new BadRequestException('accountId inválido.');
+    }
+
+    const place = await this.placeRepository.findOne({
+      where: { id: normalizedPlaceId },
+      relations: ['account'],
+    });
+
+    if (!place) {
+      throw new NotFoundException(`Accommodation com id ${normalizedPlaceId} não encontrado`);
+    }
+
+    const account = await this.accountRepo.findOne({
+      where: { id: normalizedAccountId },
+    });
+
+    if (!account) {
+      throw new NotFoundException(`Account com id ${normalizedAccountId} não encontrado`);
+    }
+
+    const urls = (photoUrls ?? [])
+      .filter((value): value is string => typeof value === 'string')
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0)
+      .map((url) => this.toPublicImageUrl(url));
+
+    if (urls.length === 0) {
+      throw new BadRequestException('Pelo menos uma foto é obrigatória.');
+    }
+
+    if (urls.length > 10) {
+      throw new BadRequestException('Máximo de 10 fotos permitido.');
+    }
+
+    const galleryEntities = urls.map((url) =>
+      this.galleryPhotoRepo.create({
+        url,
+        place,
+        account,
+        status: 'pending',
+      }),
+    );
+
+    await this.galleryPhotoRepo.save(galleryEntities);
+
+    const updatedAccommodation = await this.placeRepository.findOne({
+      where: { id: place.id },
+      relations: ['gallery_photos', 'gallery_photos.account', 'place_category', 'prices', 'camino', 'stage', 'account'],
+    });
+
+    if (!updatedAccommodation) {
+      throw new NotFoundException(
+        `Accommodation com id ${place.id} não encontrado após adicionar fotos`,
+      );
+    }
+
+    const dto = plainToInstance(AccommodationDto, updatedAccommodation, {
+      excludeExtraneousValues: true,
+    });
+    await this.attachServices([dto]);
+
+    (dto as any).ownerId = updatedAccommodation.account?.id ?? null;
+    (dto as any).ownerName = updatedAccommodation.account?.name ?? null;
+
+    this.invalidateReadCache();
+    return dto;
+  }
+
+  async approvePhoto(photoId: number): Promise<AccommodationDto> {
+    const normalizedPhotoId = Number(photoId);
+
+    if (!Number.isInteger(normalizedPhotoId)) {
+      throw new BadRequestException('photoId inválido.');
+    }
+
+    const photo = await this.galleryPhotoRepo.findOne({
+      where: { id: normalizedPhotoId },
+      relations: ['place', 'account'],
+    });
+
+    if (!photo) {
+      throw new NotFoundException(`Photo com id ${normalizedPhotoId} não encontrada`);
+    }
+
+    photo.status = 'approved';
+    photo.approvedAt = new Date();
+    photo.rejectionReason = null;
+
+    await this.galleryPhotoRepo.save(photo);
+
+    const accommodation = await this.placeRepository.findOne({
+      where: { id: photo.place.id },
+      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
+    });
+
+    if (!accommodation) {
+      throw new NotFoundException(`Accommodation com id ${photo.place.id} não encontrado`);
+    }
+
+    const dto = plainToInstance(AccommodationDto, accommodation, {
+      excludeExtraneousValues: true,
+    });
+    await this.attachServices([dto]);
+
+    (dto as any).ownerId = accommodation.account?.id ?? null;
+    (dto as any).ownerName = accommodation.account?.name ?? null;
+
+    this.invalidateReadCache();
+    return dto;
+  }
+
+  async rejectPhoto(
+    photoId: number,
+    rejectionReason?: string,
+  ): Promise<AccommodationDto> {
+    const normalizedPhotoId = Number(photoId);
+
+    if (!Number.isInteger(normalizedPhotoId)) {
+      throw new BadRequestException('photoId inválido.');
+    }
+
+    const photo = await this.galleryPhotoRepo.findOne({
+      where: { id: normalizedPhotoId },
+      relations: ['place', 'account'],
+    });
+
+    if (!photo) {
+      throw new NotFoundException(`Photo com id ${normalizedPhotoId} não encontrada`);
+    }
+
+    photo.status = 'rejected';
+    photo.rejectionReason = rejectionReason || null;
+    photo.approvedAt = null;
+
+    await this.galleryPhotoRepo.save(photo);
+
+    const accommodation = await this.placeRepository.findOne({
+      where: { id: photo.place.id },
+      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
+    });
+
+    if (!accommodation) {
+      throw new NotFoundException(`Accommodation com id ${photo.place.id} não encontrado`);
+    }
+
+    const dto = plainToInstance(AccommodationDto, accommodation, {
+      excludeExtraneousValues: true,
+    });
+    await this.attachServices([dto]);
+
+    (dto as any).ownerId = accommodation.account?.id ?? null;
+    (dto as any).ownerName = accommodation.account?.name ?? null;
+
+    this.invalidateReadCache();
+    return dto;
+  }
+
+  async getPendingPhotosForAccommodation(
+    placeId: number,
+  ): Promise<AccommodationDto> {
+    const normalizedPlaceId = Number(placeId);
+
+    if (!Number.isInteger(normalizedPlaceId)) {
+      throw new BadRequestException('placeId inválido.');
+    }
+
+    const place = await this.placeRepository.findOne({
+      where: { id: normalizedPlaceId },
+      relations: [
+        'camino',
+        'stage',
+        'gallery_photos',
+        'place_category',
+        'prices',
+        'account',
+      ],
+    });
+
+    if (!place) {
+      throw new NotFoundException(`Accommodation com id ${normalizedPlaceId} não encontrado`);
+    }
+
+    // Filter to only show pending photos
+    if (place.gallery_photos && Array.isArray(place.gallery_photos)) {
+      place.gallery_photos = place.gallery_photos.filter(
+        (photo: any) => photo.status === 'pending',
+      );
+    }
+
+    const dto = plainToInstance(AccommodationDto, place, {
+      excludeExtraneousValues: true,
+    });
+    await this.attachServices([dto]);
+
+    (dto as any).ownerId = place.account?.id ?? null;
+    (dto as any).ownerName = place.account?.name ?? null;
+
+    return dto;
+  }
+
+  async getPendingPhotosAdmin(): Promise<AccommodationDto[]> {
+    try {
+      // Get all accommodations with pending gallery photos
+      const accommodations = await this.placeRepository
+        .createQueryBuilder('place')
+        .leftJoinAndSelect('place.gallery_photos', 'photos')
+        .leftJoinAndSelect('photos.account', 'photo_account')
+        .leftJoinAndSelect('place.place_category', 'place_category')
+        .leftJoinAndSelect('place.account', 'account')
+        .where('photos.status = :status', { status: 'pending' })
+        .andWhere('place.status = :placeStatus', { placeStatus: 'approved' })
+        .distinct(true)
+        .getMany();
+
+      const dtos = plainToInstance(AccommodationDto, accommodations, {
+        excludeExtraneousValues: true,
+      });
+      await this.attachServices(dtos);
+
+      // Set owner info for each accommodation
+      accommodations.forEach((place, index) => {
+        (dtos[index] as any).ownerId = place.account?.id ?? null;
+        (dtos[index] as any).ownerName = place.account?.name ?? null;
+      });
+
+      return dtos;
+    } catch (e) {
+      throw new BadRequestException(`Error fetching pending photos: ${e.message}`);
+    }
   }
 
   async requestRemoval(

@@ -41,7 +41,8 @@ export class AccommodationsController {
           if (!data.payload || !data.payload?.id) {
             throw new BadRequestException('ID do accommodation é obrigatório.');
           }
-          return this.accommodationsService.findOne(Number(data.payload.id));
+          const accountId = data.payload?.accountId ? Number(data.payload.accountId) : undefined;
+          return this.accommodationsService.findOne(Number(data.payload.id), accountId);
 
         case 'create':
           if (!data.payload) {
@@ -88,6 +89,22 @@ export class AccommodationsController {
             data.payload.data as UpdateAccommodationDto,
           );
 
+        case 'addphotos':
+          if (!data.payload?.placeId) {
+            throw new BadRequestException('placeId é obrigatório.');
+          }
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          if (!Array.isArray(data.payload?.photoUrls)) {
+            throw new BadRequestException('photoUrls é obrigatório.');
+          }
+          return this.accommodationsService.addGalleryPhotos(
+            Number(data.payload.placeId),
+            Number(data.payload.accountId),
+            data.payload.photoUrls,
+          );
+
         case 'requestremoval':
         case 'requestdelete':
         case 'deleterequest':
@@ -110,6 +127,32 @@ export class AccommodationsController {
           return this.accommodationsService.getRemovalRequestsByAccount(
             Number(data.payload.accountId),
           );
+
+        case 'approvephotos':
+          if (!data.payload?.photoId) {
+            throw new BadRequestException('photoId é obrigatório.');
+          }
+          return this.accommodationsService.approvePhoto(Number(data.payload.photoId));
+
+        case 'rejectphotos':
+          if (!data.payload?.photoId) {
+            throw new BadRequestException('photoId é obrigatório.');
+          }
+          return this.accommodationsService.rejectPhoto(
+            Number(data.payload.photoId),
+            data.payload?.rejectionReason || undefined,
+          );
+
+        case 'getpendingphotos':
+          if (!data.payload?.placeId) {
+            throw new BadRequestException('placeId é obrigatório.');
+          }
+          return this.accommodationsService.getPendingPhotosForAccommodation(
+            Number(data.payload.placeId),
+          );
+
+        case 'getpendingphotosadmin':
+          return this.accommodationsService.getPendingPhotosAdmin();
 
         default:
           throw new BadRequestException('Ação desconhecida.');
