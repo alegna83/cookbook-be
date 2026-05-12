@@ -166,24 +166,34 @@ export class AccommodationsService {
   private filterApprovedPhotos(
     places: Accommodation[] | AccommodationDto[],
     currentAccountId?: number,
+    viewerIsAdmin = false,
   ): void {
+    if (viewerIsAdmin) {
+      console.log(`[PHOTO_FILTER] Admin viewer - returning ALL photos`);
+      return;
+    }
+
     for (const place of places) {
       if (
         place.gallery_photos &&
         Array.isArray(place.gallery_photos)
       ) {
-        // If viewer is the owner, show all photos including pending
-        // Otherwise, only show approved photos
-        const acct = (place as any).account;
-        const ownerIdFromDto = (place as any).ownerId ?? (place as any).owner_id ?? null;
-        const ownerId = acct?.id ?? ownerIdFromDto;
-        const isOwner = currentAccountId != null && ownerId != null && Number(ownerId) === Number(currentAccountId);
+        const beforeCount = place.gallery_photos.length;
+        place.gallery_photos = (place.gallery_photos as any[]).filter((photo: any) => {
+          const photoStatus = photo.status || 'approved';
+          const uploaderId = photo.account?.id ?? photo.uploaderId ?? photo.account_id ?? null;
+          const isOwnPendingPhoto =
+            currentAccountId != null &&
+            photoStatus === 'pending' &&
+            uploaderId != null &&
+            Number(uploaderId) === Number(currentAccountId);
 
-        if (!isOwner) {
-          place.gallery_photos = (place.gallery_photos as any[]).filter(
-            (photo: any) => photo.status === 'approved' || !photo.status,
-          );
-        }
+          const shouldInclude = photoStatus === 'approved' || isOwnPendingPhoto;
+          console.log(`[PHOTO_FILTER] Photo ID ${photo.id}: status=${photoStatus}, uploaderId=${uploaderId}, currentAccountId=${currentAccountId}, isOwn=${isOwnPendingPhoto}, include=${shouldInclude}`);
+          return shouldInclude;
+        });
+        const afterCount = place.gallery_photos.length;
+        console.log(`[PHOTO_FILTER] Place ${place.id}: filtered from ${beforeCount} to ${afterCount} photos`);
       }
     }
   }
@@ -245,6 +255,7 @@ export class AccommodationsService {
         'camino',
         'stage',
         'gallery_photos',
+        'gallery_photos.account',
         'place_category',
         'prices',
         'account',
@@ -253,10 +264,16 @@ export class AccommodationsService {
     if (!place) {
       throw new NotFoundException(`Accommodation com id ${id} não encontrado`);
     }
+
+    const currentAccount = currentAccountId
+      ? await this.accountRepo.findOne({ where: { id: currentAccountId } })
+      : null;
+    const viewerIsAdmin = currentAccount?.userType === 'admin';
+
     const dto = plainToInstance(AccommodationDto, place, {
       excludeExtraneousValues: true,
     });
-    this.filterApprovedPhotos([dto], currentAccountId);
+    this.filterApprovedPhotos([dto], currentAccountId, viewerIsAdmin);
     await this.attachServices([dto]);
 
     (dto as any).ownerId = place.account?.id ?? null;
@@ -620,7 +637,7 @@ export class AccommodationsService {
     // Fetch updated accommodation with all relations
     const updatedAccommodation = await this.placeRepository.findOne({
       where: { id: saved.id },
-      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
+      relations: ['gallery_photos', 'gallery_photos.account', 'place_category', 'prices', 'camino', 'stage', 'account'],
     });
 
     if (!updatedAccommodation) {
@@ -701,7 +718,7 @@ export class AccommodationsService {
 
     const updatedAccommodation = await this.placeRepository.findOne({
       where: { id: place.id },
-      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
+      relations: ['gallery_photos', 'gallery_photos.account', 'place_category', 'prices', 'camino', 'stage', 'account'],
     });
 
     if (!updatedAccommodation) {
@@ -860,6 +877,7 @@ export class AccommodationsService {
       const accommodations = await this.placeRepository
         .createQueryBuilder('place')
         .leftJoinAndSelect('place.gallery_photos', 'photos')
+        .leftJoinAndSelect('photos.account', 'photo_account')
         .leftJoinAndSelect('place.place_category', 'place_category')
         .leftJoinAndSelect('place.account', 'account')
         .where('photos.status = :status', { status: 'pending' })

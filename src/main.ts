@@ -42,12 +42,17 @@ async function bootstrap() {
     console.log('Allowed origins:', process.env.FRONTEND_URL?.split(','));
   }
 
-  const allowedOrigins = process.env.FRONTEND_URL
+  const configuredOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map((origin) => origin.trim())
-    : ['http://localhost:3000'];
+    : [];
+
+  const devOrigins = [
+    /^https?:\/\/localhost(?::\d+)?$/,
+    /^https?:\/\/127\.0\.0\.1(?::\d+)?$/,
+  ];
 
   app.enableCors({
-    origin: allowedOrigins, //process.env.FRONTEND_URL?.split(',') || ['http://localhost:3000'],
+    origin: [...configuredOrigins, ...devOrigins],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
