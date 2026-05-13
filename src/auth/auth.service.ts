@@ -147,6 +147,21 @@ export class AuthService {
           data.payload.rejectionReason,
         );
 
+      case 'approvephoto':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.accommodationsService.approvePhoto(data.payload.id);
+
+      case 'rejectphoto':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.accommodationsService.rejectPhoto(
+          data.payload.id,
+          data.payload.rejectionReason,
+        );
+
       case 'approveremovalrequest':
         if (!data.payload?.id) {
           throw new BadRequestException('ID é obrigatório.');
