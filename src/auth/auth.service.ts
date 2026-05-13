@@ -111,6 +111,10 @@ export class AuthService {
       case 'getremovalrequests':
         return this.accommodationsService.getPendingRemovalRequests();
 
+      case 'getpendingphotos':
+      case 'getpendinggalleryphotos':
+        return this.accommodationsService.getPendingPhotos();
+
       case 'approveaccommodation':
         if (!data.payload?.id) {
           throw new BadRequestException('ID é obrigatório.');

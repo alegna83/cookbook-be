@@ -8,9 +8,10 @@ import { CreateAccommodationDto } from './dto/create-accommodation.dto';
 import { UpdateAccommodationDto } from './dto/update-accommodation.dto';
 import { CreateRemovalRequestDto } from './dto/create-removal-request.dto';
 import { AccommodationCategory } from 'src/accommodation-categories/entities/accommodation-category.entity';
-import { GalleryPhoto } from 'src/gallery/entities/gallery-photo.entity';
 import { Account } from 'src/accounts/account.entity';
+import { GalleryPhoto } from 'src/gallery/entities/gallery-photo.entity';
 import { PlaceRemovalRequest } from './entities/place-removal-request.entity';
+import { ContentModerationService } from 'src/moderation/content-moderation.service';
 
 @Injectable()
 export class AccommodationsService {
@@ -39,6 +40,7 @@ export class AccommodationsService {
     private readonly accountRepo: Repository<Account>,
     @InjectRepository(PlaceRemovalRequest)
     private readonly removalRequestRepo: Repository<PlaceRemovalRequest>,
+    private readonly moderationService: ContentModerationService,
   ) {}
 
   private getCachedValue<T>(key: string): T | undefined {
@@ -113,6 +115,64 @@ export class AccommodationsService {
       .replace(/\/$/, '');
 
     return `${base}/${value.replace(/^\/+/, '')}`;
+  }
+
+  private filterGalleryPhotosForViewer(
+    photos: GalleryPhoto[],
+    currentAccountId?: number,
+    viewerIsAdmin = false,
+  ): GalleryPhoto[] {
+    if (viewerIsAdmin) {
+      return photos;
+    }
+
+    return photos.filter((photo) => {
+      const photoStatus = photo.status || 'approved';
+      const uploaderId = photo.account?.id ?? null;
+      const isOwnPendingPhoto =
+        currentAccountId != null &&
+        photoStatus === 'pending' &&
+        uploaderId != null &&
+        Number(uploaderId) === Number(currentAccountId);
+
+      return photoStatus === 'approved' || isOwnPendingPhoto;
+    });
+  }
+
+  private async buildModeratedGalleryPhotos(
+    urls: string[],
+    place: Accommodation,
+    accountId?: number,
+  ): Promise<GalleryPhoto[]> {
+    const normalizedUrls = urls
+      .map((url) => this.toPublicImageUrl(url))
+      .map((url) => url.trim())
+      .filter((url) => url.length > 0);
+
+    if (!normalizedUrls.length) {
+      return [];
+    }
+
+    const moderation = await this.moderationService.moderateImageUrls(
+      normalizedUrls,
+    );
+
+    if (moderation.decision === 'reject') {
+      throw new BadRequestException(
+        moderation.reason || 'Image blocked by content moderation.',
+      );
+    }
+
+    return normalizedUrls.map((url) =>
+      this.galleryPhotoRepo.create({
+        url,
+        place,
+        account: accountId ? ({ id: accountId } as any) : undefined,
+        status: 'pending',
+        approvedAt: null,
+        rejectionReason: null,
+      }),
+    );
   }
 
   private async attachServices(
@@ -264,13 +324,21 @@ export class AccommodationsService {
     if (!place) {
       throw new NotFoundException(`Accommodation com id ${id} não encontrado`);
     }
-
     const currentAccount = currentAccountId
       ? await this.accountRepo.findOne({ where: { id: currentAccountId } })
       : null;
     const viewerIsAdmin = currentAccount?.userType === 'admin';
 
-    const dto = plainToInstance(AccommodationDto, place, {
+    const filteredGalleryPhotos = this.filterGalleryPhotosForViewer(
+      place.gallery_photos ?? [],
+      currentAccountId,
+      viewerIsAdmin,
+    );
+
+    const dto = plainToInstance(AccommodationDto, {
+      ...place,
+      gallery_photos: filteredGalleryPhotos,
+    }, {
       excludeExtraneousValues: true,
     });
     this.filterApprovedPhotos([dto], currentAccountId, viewerIsAdmin);
@@ -288,6 +356,21 @@ export class AccommodationsService {
       .map((url) => url.trim())
       .filter((url) => url.length > 0)
       .map((url) => this.toPublicImageUrl(url));
+    const accountId = (data as any).account_id
+      ? Number((data as any).account_id)
+      : undefined;
+
+    if (galleryPhotoUrls.length > 0) {
+      const moderation = await this.moderationService.moderateImageUrls(
+        galleryPhotoUrls,
+      );
+
+      if (moderation.decision === 'reject') {
+        throw new BadRequestException(
+          moderation.reason || 'Image blocked by content moderation.',
+        );
+      }
+    }
 
     let category: AccommodationCategory | undefined;
 
@@ -355,6 +438,10 @@ export class AccommodationsService {
         this.galleryPhotoRepo.create({
           url,
           place: saved,
+          account: accountId ? ({ id: accountId } as any) : undefined,
+          status: 'pending',
+          approvedAt: null,
+          rejectionReason: null,
         }),
       );
 
@@ -363,7 +450,15 @@ export class AccommodationsService {
 
     const savedWithRelations = await this.placeRepository.findOne({
       where: { id: saved.id },
-      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
+      relations: [
+        'gallery_photos',
+        'gallery_photos.account',
+        'place_category',
+        'prices',
+        'camino',
+        'stage',
+        'account',
+      ],
     });
 
     if (!savedWithRelations) {
@@ -607,31 +702,47 @@ export class AccommodationsService {
       accommodation.place_category = found;
     }
 
+    const galleryPhotoUrls = Array.isArray(data.gallery_photos)
+      ? (data.gallery_photos ?? [])
+          .filter((value): value is string => typeof value === 'string')
+          .map((url) => url.trim())
+          .filter((url) => url.length > 0)
+          .map((url) => this.toPublicImageUrl(url))
+      : [];
+
+    if (galleryPhotoUrls.length > 0) {
+      const moderation = await this.moderationService.moderateImageUrls(
+        galleryPhotoUrls,
+      );
+
+      if (moderation.decision === 'reject') {
+        throw new BadRequestException(
+          moderation.reason || 'Image blocked by content moderation.',
+        );
+      }
+    }
+
     // Save updated accommodation
     const saved = await this.placeRepository.save(accommodation);
 
     // Update gallery photos if provided
-    if (data.gallery_photos && Array.isArray(data.gallery_photos)) {
-      const galleryPhotoUrls = (data.gallery_photos ?? [])
-        .filter((value): value is string => typeof value === 'string')
-        .map((url) => url.trim())
-        .filter((url) => url.length > 0)
-        .map((url) => this.toPublicImageUrl(url));
-
+    if (galleryPhotoUrls.length > 0) {
       // Remove existing gallery photos
       await this.galleryPhotoRepo.delete({ place: { id: saved.id } });
 
       // Add new ones if provided
-      if (galleryPhotoUrls.length > 0) {
-        const galleryEntities = galleryPhotoUrls.map((url) =>
-          this.galleryPhotoRepo.create({
-            url,
-            place: saved,
-          }),
-        );
+      const galleryEntities = galleryPhotoUrls.map((url) =>
+        this.galleryPhotoRepo.create({
+          url,
+          place: saved,
+          account: accountId ? ({ id: accountId } as any) : undefined,
+          status: 'pending',
+          approvedAt: null,
+          rejectionReason: null,
+        }),
+      );
 
-        await this.galleryPhotoRepo.save(galleryEntities);
-      }
+      await this.galleryPhotoRepo.save(galleryEntities);
     }
 
     // Fetch updated accommodation with all relations
@@ -705,38 +816,18 @@ export class AccommodationsService {
       throw new BadRequestException('Máximo de 10 fotos permitido.');
     }
 
-    const galleryEntities = urls.map((url) =>
-      this.galleryPhotoRepo.create({
-        url,
-        place,
-        account,
-        status: 'pending',
-      }),
+    const galleryEntities = await this.buildModeratedGalleryPhotos(
+      photoUrls,
+      place,
+      account.id,
     );
 
-    await this.galleryPhotoRepo.save(galleryEntities);
-
-    const updatedAccommodation = await this.placeRepository.findOne({
-      where: { id: place.id },
-      relations: ['gallery_photos', 'gallery_photos.account', 'place_category', 'prices', 'camino', 'stage', 'account'],
-    });
-
-    if (!updatedAccommodation) {
-      throw new NotFoundException(
-        `Accommodation com id ${place.id} não encontrado após adicionar fotos`,
-      );
+    if (galleryEntities.length > 0) {
+      await this.galleryPhotoRepo.save(galleryEntities);
     }
 
-    const dto = plainToInstance(AccommodationDto, updatedAccommodation, {
-      excludeExtraneousValues: true,
-    });
-    await this.attachServices([dto]);
-
-    (dto as any).ownerId = updatedAccommodation.account?.id ?? null;
-    (dto as any).ownerName = updatedAccommodation.account?.name ?? null;
-
     this.invalidateReadCache();
-    return dto;
+    return this.findOne(normalizedPlaceId, normalizedAccountId);
   }
 
   async approvePhoto(photoId: number): Promise<AccommodationDto> {
@@ -748,11 +839,20 @@ export class AccommodationsService {
 
     const photo = await this.galleryPhotoRepo.findOne({
       where: { id: normalizedPhotoId },
-      relations: ['place', 'account'],
+      relations: [
+        'place',
+        'place.gallery_photos',
+        'place.gallery_photos.account',
+        'place.place_category',
+        'place.prices',
+        'place.camino',
+        'place.stage',
+        'place.account',
+      ],
     });
 
     if (!photo) {
-      throw new NotFoundException(`Photo com id ${normalizedPhotoId} não encontrada`);
+      throw new NotFoundException(`Foto com id ${normalizedPhotoId} não encontrada`);
     }
 
     photo.status = 'approved';
@@ -760,26 +860,9 @@ export class AccommodationsService {
     photo.rejectionReason = null;
 
     await this.galleryPhotoRepo.save(photo);
-
-    const accommodation = await this.placeRepository.findOne({
-      where: { id: photo.place.id },
-      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
-    });
-
-    if (!accommodation) {
-      throw new NotFoundException(`Accommodation com id ${photo.place.id} não encontrado`);
-    }
-
-    const dto = plainToInstance(AccommodationDto, accommodation, {
-      excludeExtraneousValues: true,
-    });
-    await this.attachServices([dto]);
-
-    (dto as any).ownerId = accommodation.account?.id ?? null;
-    (dto as any).ownerName = accommodation.account?.name ?? null;
-
     this.invalidateReadCache();
-    return dto;
+
+    return this.findOne(Number(photo.place.id));
   }
 
   async rejectPhoto(
@@ -794,38 +877,30 @@ export class AccommodationsService {
 
     const photo = await this.galleryPhotoRepo.findOne({
       where: { id: normalizedPhotoId },
-      relations: ['place', 'account'],
+      relations: [
+        'place',
+        'place.gallery_photos',
+        'place.gallery_photos.account',
+        'place.place_category',
+        'place.prices',
+        'place.camino',
+        'place.stage',
+        'place.account',
+      ],
     });
 
     if (!photo) {
-      throw new NotFoundException(`Photo com id ${normalizedPhotoId} não encontrada`);
+      throw new NotFoundException(`Foto com id ${normalizedPhotoId} não encontrada`);
     }
 
     photo.status = 'rejected';
-    photo.rejectionReason = rejectionReason || null;
+    photo.rejectionReason = rejectionReason?.trim() || 'Rejected by admin.';
     photo.approvedAt = null;
 
     await this.galleryPhotoRepo.save(photo);
-
-    const accommodation = await this.placeRepository.findOne({
-      where: { id: photo.place.id },
-      relations: ['gallery_photos', 'place_category', 'prices', 'camino', 'stage', 'account'],
-    });
-
-    if (!accommodation) {
-      throw new NotFoundException(`Accommodation com id ${photo.place.id} não encontrado`);
-    }
-
-    const dto = plainToInstance(AccommodationDto, accommodation, {
-      excludeExtraneousValues: true,
-    });
-    await this.attachServices([dto]);
-
-    (dto as any).ownerId = accommodation.account?.id ?? null;
-    (dto as any).ownerName = accommodation.account?.name ?? null;
-
     this.invalidateReadCache();
-    return dto;
+
+    return this.findOne(Number(photo.place.id));
   }
 
   async getPendingPhotosForAccommodation(
@@ -853,7 +928,6 @@ export class AccommodationsService {
       throw new NotFoundException(`Accommodation com id ${normalizedPlaceId} não encontrado`);
     }
 
-    // Filter to only show pending photos
     if (place.gallery_photos && Array.isArray(place.gallery_photos)) {
       place.gallery_photos = place.gallery_photos.filter(
         (photo: any) => photo.status === 'pending',
@@ -873,7 +947,6 @@ export class AccommodationsService {
 
   async getPendingPhotosAdmin(): Promise<AccommodationDto[]> {
     try {
-      // Get all accommodations with pending gallery photos
       const accommodations = await this.placeRepository
         .createQueryBuilder('place')
         .leftJoinAndSelect('place.gallery_photos', 'photos')
@@ -890,7 +963,6 @@ export class AccommodationsService {
       });
       await this.attachServices(dtos);
 
-      // Set owner info for each accommodation
       accommodations.forEach((place, index) => {
         (dtos[index] as any).ownerId = place.account?.id ?? null;
         (dtos[index] as any).ownerName = place.account?.name ?? null;
@@ -972,6 +1044,25 @@ export class AccommodationsService {
       ),
       ownerId: place.account?.id ?? null,
       ownerName: place.account?.name ?? null,
+    }));
+  }
+
+  async getPendingPhotos(): Promise<any[]> {
+    const photos = await this.galleryPhotoRepo.find({
+      where: { status: 'pending' },
+      relations: ['place', 'place.account', 'place.place_category', 'account'],
+      order: { createdAt: 'ASC' },
+    });
+
+    return photos.map((photo) => ({
+      id: photo.id,
+      url: this.toPublicImageUrl(photo.url),
+      placeId: photo.place?.id ?? null,
+      placeName: photo.place?.place_name ?? null,
+      accountId: photo.account?.id ?? null,
+      uploaderName: photo.account?.name ?? null,
+      createdAt: photo.createdAt,
+      rejectionReason: photo.rejectionReason ?? null,
     }));
   }
 
