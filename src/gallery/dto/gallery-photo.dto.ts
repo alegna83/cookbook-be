@@ -11,10 +11,10 @@ export class GalleryPhotoDto {
   status: 'pending' | 'approved' | 'rejected';
 
   @Expose()
-  approvedAt?: Date | null;
+  approvedAt: Date | null;
 
   @Expose()
-  rejectionReason?: string | null;
+  rejectionReason: string | null;
 
   @Expose()
   @Transform(({ obj }) => {
@@ -26,5 +26,5 @@ export class GalleryPhotoDto {
     const accountId = obj?.account_id ?? obj?.accountId ?? obj?.uploaderId;
     return accountId != null ? Number(accountId) : null;
   })
-  uploaderId?: number | null;
+  uploaderId: number | null;
 }
