@@ -76,19 +76,6 @@ export class AccommodationsController {
             Number(data.payload.placeId),
           );
 
-        case 'edit':
-          if (!data.payload?.id) {
-            throw new BadRequestException('ID da acomodação é obrigatório.');
-          }
-          if (!data.payload?.accountId) {
-            throw new BadRequestException('accountId é obrigatório.');
-          }
-          return this.accommodationsService.update(
-            Number(data.payload.id),
-            Number(data.payload.accountId),
-            data.payload.data as UpdateAccommodationDto,
-          );
-
         case 'addphotos':
           if (!data.payload?.placeId) {
             throw new BadRequestException('placeId é obrigatório.');
@@ -102,7 +89,39 @@ export class AccommodationsController {
           return this.accommodationsService.addGalleryPhotos(
             Number(data.payload.placeId),
             Number(data.payload.accountId),
-            data.payload.photoUrls,
+            data.payload.photoUrls as string[],
+          );
+
+        case 'approvephoto':
+        case 'approvephotos':
+          if (!data.payload?.photoId) {
+            throw new BadRequestException('photoId é obrigatório.');
+          }
+          return this.accommodationsService.approvePhoto(
+            Number(data.payload.photoId),
+          );
+
+        case 'rejectphoto':
+        case 'rejectphotos':
+          if (!data.payload?.photoId) {
+            throw new BadRequestException('photoId é obrigatório.');
+          }
+          return this.accommodationsService.rejectPhoto(
+            Number(data.payload.photoId),
+            data.payload.rejectionReason,
+          );
+
+        case 'edit':
+          if (!data.payload?.id) {
+            throw new BadRequestException('ID da acomodação é obrigatório.');
+          }
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          return this.accommodationsService.update(
+            Number(data.payload.id),
+            Number(data.payload.accountId),
+            data.payload.data as UpdateAccommodationDto,
           );
 
         case 'requestremoval':
@@ -126,21 +145,6 @@ export class AccommodationsController {
           }
           return this.accommodationsService.getRemovalRequestsByAccount(
             Number(data.payload.accountId),
-          );
-
-        case 'approvephotos':
-          if (!data.payload?.photoId) {
-            throw new BadRequestException('photoId é obrigatório.');
-          }
-          return this.accommodationsService.approvePhoto(Number(data.payload.photoId));
-
-        case 'rejectphotos':
-          if (!data.payload?.photoId) {
-            throw new BadRequestException('photoId é obrigatório.');
-          }
-          return this.accommodationsService.rejectPhoto(
-            Number(data.payload.photoId),
-            data.payload?.rejectionReason || undefined,
           );
 
         case 'getpendingphotos':

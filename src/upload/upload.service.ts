@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import { UploadMultipleResponseDto, UploadResponseDto } from './dto/upload-response.dto';
+import { ContentModerationService } from 'src/moderation/content-moderation.service';
 
 export type UploadType = 'main-photo' | 'gallery-photos' | 'avatar';
 
@@ -8,7 +9,7 @@ export type UploadType = 'main-photo' | 'gallery-photos' | 'avatar';
 export class UploadService {
   private readonly cloudinaryConfigured: boolean;
 
-  constructor() {
+  constructor(private readonly moderationService: ContentModerationService) {
     const config = this.getCloudinaryConfigOrNull();
     this.cloudinaryConfigured = config !== null;
 
@@ -157,7 +158,29 @@ export class UploadService {
       }
 
       const [file] = files;
-      return this.uploadImage(file, 'accommodations/main');
+      const preModeration = await this.moderationService.moderateImageBuffers([
+        file.buffer,
+      ]);
+
+      if (preModeration.decision === 'reject') {
+        throw new BadRequestException(
+          preModeration.reason || 'Image blocked by content moderation.',
+        );
+      }
+
+      const uploaded = await this.uploadImage(file, 'accommodations/main');
+      const moderation = await this.moderationService.moderateImageUrls([
+        uploaded.url,
+      ]);
+
+      if (moderation.decision === 'reject') {
+        await this.destroyUploadedFiles([uploaded.publicId]);
+        throw new BadRequestException(
+          moderation.reason || 'Image blocked by content moderation.',
+        );
+      }
+
+      return uploaded;
     }
 
     if (type === 'avatar') {
@@ -166,11 +189,43 @@ export class UploadService {
       }
 
       const [file] = files;
-      return this.uploadImage(file, 'accounts/avatars');
+      const preModeration = await this.moderationService.moderateImageBuffers([
+        file.buffer,
+      ]);
+
+      if (preModeration.decision === 'reject') {
+        throw new BadRequestException(
+          preModeration.reason || 'Image blocked by content moderation.',
+        );
+      }
+
+      const uploaded = await this.uploadImage(file, 'accounts/avatars');
+      const moderation = await this.moderationService.moderateImageUrls([
+        uploaded.url,
+      ]);
+
+      if (moderation.decision === 'reject') {
+        await this.destroyUploadedFiles([uploaded.publicId]);
+        throw new BadRequestException(
+          moderation.reason || 'Image blocked by content moderation.',
+        );
+      }
+
+      return uploaded;
     }
 
     if (files.length > 10) {
       throw new BadRequestException('Máximo de 10 ficheiros permitido.');
+    }
+
+    const preModeration = await this.moderationService.moderateImageBuffers(
+      files.map((file) => file.buffer),
+    );
+
+    if (preModeration.decision === 'reject') {
+      throw new BadRequestException(
+        preModeration.reason || 'Image blocked by content moderation.',
+      );
     }
 
     const uploadedFiles = await this.uploadMultipleImages(
@@ -178,6 +233,37 @@ export class UploadService {
       'accommodations/gallery',
     );
 
-    return { urls: uploadedFiles.map((file) => file.url) };
+    const moderation = await this.moderationService.moderateImageUrls(
+      uploadedFiles.map((file) => file.url),
+    );
+
+    if (moderation.decision === 'reject') {
+      await this.destroyUploadedFiles(
+        uploadedFiles.map((file) => file.publicId),
+      );
+      throw new BadRequestException(
+        moderation.reason || 'Image blocked by content moderation.',
+      );
+    }
+
+    return {
+      urls: uploadedFiles.map((file) => file.url),
+      publicIds: uploadedFiles.map((file) => file.publicId),
+    };
+  }
+
+  private async destroyUploadedFiles(publicIds: string[]): Promise<void> {
+    const uniquePublicIds = [...new Set(publicIds.filter((id) => !!id))];
+
+    for (const publicId of uniquePublicIds) {
+      try {
+        await cloudinary.uploader.destroy(publicId, {
+          resource_type: 'image',
+          invalidate: true,
+        });
+      } catch (error) {
+        console.warn('[UPLOAD] Failed to delete moderated file:', publicId, error);
+      }
+    }
   }
 }
