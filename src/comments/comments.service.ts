@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { Comment } from './entities/comment.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { Accommodation } from '../accommodations/entities/accommodation.entity';
+import { ContentModerationService } from 'src/moderation/content-moderation.service';
 
 @Injectable()
 export class CommentsService {
@@ -12,13 +13,27 @@ export class CommentsService {
     private commentRepo: Repository<Comment>,
     @InjectRepository(Accommodation)
     private placeRepo: Repository<Accommodation>,
+    private readonly moderationService: ContentModerationService,
   ) {}
 
   async add(dto: CreateCommentDto): Promise<Comment> {
     const place = await this.placeRepo.findOne({ where: { id: dto.placeId } });
     if (!place) throw new BadRequestException('Place não encontrado');
 
+    const moderation = await this.moderationService.moderateComment(
+      dto.comment ?? '',
+    );
+
+    if (moderation.decision === 'reject') {
+      throw new BadRequestException(
+        moderation.reason || 'Comment blocked by content moderation.',
+      );
+    }
+
     const comment = this.commentRepo.create(dto);
+    comment.status = 'pending';
+    comment.approvedAt = null;
+    comment.rejectionReason = null;
     return this.commentRepo.save(comment);
   }
 
@@ -28,6 +43,22 @@ export class CommentsService {
     
     if (accountId && comment.accountId !== accountId) {
       throw new ForbiddenException('Não tem permissão para editar este comentário');
+    }
+
+    if (data.comment !== undefined) {
+      const moderation = await this.moderationService.moderateComment(
+        data.comment ?? '',
+      );
+
+      if (moderation.decision === 'reject') {
+        throw new BadRequestException(
+          moderation.reason || 'Comment blocked by content moderation.',
+        );
+      }
+
+      comment.status = 'pending';
+      comment.approvedAt = null;
+      comment.rejectionReason = null;
     }
 
     Object.assign(comment, data);

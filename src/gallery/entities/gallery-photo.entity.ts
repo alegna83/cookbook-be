@@ -17,15 +17,15 @@ export class GalleryPhoto {
   @Column({ name: 'photo_url', nullable: true })
   url: string;
 
+  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'account_id' })
+  account?: Account;
+
   @ManyToOne(() => Accommodation, (place) => place.gallery_photos, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'place_id' })
   place: Accommodation;
-
-  @ManyToOne(() => Account, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'account_id' })
-  account?: Account;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

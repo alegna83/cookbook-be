@@ -5,4 +5,5 @@ export class UploadResponseDto {
 
 export class UploadMultipleResponseDto {
   urls: string[];
+  publicIds?: string[];
 }

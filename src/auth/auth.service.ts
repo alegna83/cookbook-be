@@ -111,6 +111,10 @@ export class AuthService {
       case 'getremovalrequests':
         return this.accommodationsService.getPendingRemovalRequests();
 
+      case 'getpendingphotos':
+      case 'getpendinggalleryphotos':
+        return this.accommodationsService.getPendingPhotos();
+
       case 'approveaccommodation':
         if (!data.payload?.id) {
           throw new BadRequestException('ID é obrigatório.');
@@ -139,6 +143,21 @@ export class AuthService {
           throw new BadRequestException('ID é obrigatório.');
         }
         return this.commentsService.approveComment(
+          data.payload.id,
+          data.payload.rejectionReason,
+        );
+
+      case 'approvephoto':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.accommodationsService.approvePhoto(data.payload.id);
+
+      case 'rejectphoto':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.accommodationsService.rejectPhoto(
           data.payload.id,
           data.payload.rejectionReason,
         );

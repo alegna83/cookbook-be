@@ -14,20 +14,80 @@ export class SuggestionService {
     private readonly commentsService: CommentsService,
   ) {}
 
+  private getOpenRouterBaseUrl(): string {
+    return (
+      this.configService.get<string>('OPENROUTER_BASE_URL')?.trim() ||
+      this.configService.get<string>('OPENAI_BASE_URL')?.trim() ||
+      'https://openrouter.ai/api/v1'
+    ).replace(/\/$/, '');
+  }
+
+  private getOpenRouterApiKey(): string {
+    const apiKey = this.configService.get<string>('OPENROUTER_API_KEY')?.trim();
+
+    if (!apiKey) {
+      throw new Error('OPENROUTER_API_KEY not configured');
+    }
+
+    return apiKey;
+  }
+
+  private getOpenRouterModel(): string {
+    return (
+      this.configService.get<string>('OPENROUTER_MODEL')?.trim() ||
+      'openai/gpt-4o-mini'
+    );
+  }
+
+  private getOpenRouterHeaders() {
+    return {
+      Authorization: `Bearer ${this.getOpenRouterApiKey()}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'http://localhost',
+      'X-Title': 'suggestion-module',
+    };
+  }
+
+  private async callOpenRouterChat(
+    messages: Array<{ role: 'system' | 'user'; content: string }>,
+    temperature = 0.2,
+    maxTokens = 500,
+    model = this.getOpenRouterModel(),
+  ): Promise<string> {
+    const response = await firstValueFrom(
+      this.httpService.post(
+        `${this.getOpenRouterBaseUrl()}/chat/completions`,
+        {
+          model,
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+        },
+        {
+          headers: this.getOpenRouterHeaders(),
+        },
+      ),
+    );
+
+    const responseText =
+      response.data?.choices?.[0]?.message?.content ||
+      response.data?.message?.content ||
+      '';
+
+    if (!responseText) {
+      throw new Error('Empty response from OpenRouter API');
+    }
+
+    return responseText.trim();
+  }
+
   async sugerirLugares(prompt: string): Promise<string> {
-    console.log('Função sugerirLugares chamada com o prompt:', prompt);
-    const apiKey = this.configService.get<string>('OPENROUTER_API_KEY');
-    console.log('API Key:', apiKey);
     try {
-      const response = await firstValueFrom(
-        this.httpService.post(
-          'https://openrouter.ai/api/v1/chat/completions',
+      const fullText = await this.callOpenRouterChat(
+        [
           {
-            model: 'openai/gpt-3.5-turbo',
-            messages: [
-              {
-                role: 'system',
-                content: `Responde como um guia turístico. Dá apenas uma lista de 3 locais turísticos desportivos perto das coordenadas indicadas (num raio máximo de 5 km), com o nome e as coordenadas no formato: "Nome, latitude, longitude". Não escrevas mais nada.
+            role: 'system',
+            content: `Responde como um guia turístico. Dá apenas uma lista de 3 locais turísticos desportivos perto das coordenadas indicadas (num raio máximo de 5 km), com o nome e as coordenadas no formato: "Nome, latitude, longitude". Não escrevas mais nada.
 
                 Exemplo:
                 Estádio do Dragão, 41.1621, -8.5830
@@ -35,61 +95,24 @@ export class SuggestionService {
                 Parque da Cidade, 41.1701, -8.6756
 
                 Segue este formato.`,
-              },
-              { role: 'user', content: prompt },
-            ],
-            temperature: 0.2,
-            max_tokens: 500,
           },
-          {
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              'Content-Type': 'application/json',
-              'HTTP-Referer': 'http://localhost',
-              'X-Title': 'suggestion-module',
-            },
-          },
-        ),
+          { role: 'user', content: prompt },
+        ],
       );
 
-      console.log('Resposta da API:', response); // Exibe a resposta completa para verificação
-
-      console.log(
-        'Mensagem completa:',
-        JSON.stringify(response.data.choices[0].message, null, 2),
-      );
-
-      // Verifica se o conteúdo da resposta existe e extrai
-      const fullText =
-        response.data?.choices?.[0]?.message?.content ??
-        response.data?.message?.content ??
-        JSON.stringify(response.data);
-
-      if (!fullText) {
-        throw new Error('Resposta vazia do modelo OpenRouter');
-      }
-
-      console.log('Conteúdo completo da resposta:', fullText); // Exibe o conteúdo para verificação
-
-      // Extrair as linhas com coordenadas
       const resultLines = fullText
         .trim()
         .split('\n')
         .filter((line) => line.match(/-?\d+\.\d+/));
 
-      console.log('Linhas com coordenadas:', resultLines); // Exibe as linhas com coordenadas
-
-      // Seleciona as últimas 3 linhas com coordenadas (ou menos, se houver menos resultados)
       const shortResult = resultLines.slice(0, 3).join('\n');
 
-      // Caso não haja resultados válidos, lança um erro
       if (!shortResult) {
         throw new Error('Resposta inválida ou vazia do modelo OpenRouter');
       }
 
       return shortResult;
     } catch (error) {
-      // Exibe o erro caso a requisição falhe
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error(
         'Erro ao fazer a requisição:',
@@ -294,48 +317,18 @@ Reply ONLY with the accommodation name from the list. Nothing else.`;
      * @returns AI response text
      */
     private async callAI(userPrompt: string, systemContext: string = 'You are a helpful travel assistant.'): Promise<string> {
-      const apiKey = this.configService.get<string>('OPENROUTER_API_KEY');
-
-      if (!apiKey) {
-        throw new Error('OPENROUTER_API_KEY not configured');
-      }
-
       try {
-        const response = await firstValueFrom(
-          this.httpService.post(
-            'https://openrouter.ai/api/v1/chat/completions',
+        const responseText = await this.callOpenRouterChat(
+          [
             {
-              model: 'openai/gpt-3.5-turbo',
-              messages: [
-                {
-                  role: 'system',
-                  content: systemContext,
-                },
-                { role: 'user', content: userPrompt },
-              ],
-              temperature: 0.2,
-              max_tokens: 500,
+              role: 'system',
+              content: systemContext,
             },
-            {
-              headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost',
-                'X-Title': 'suggestion-module',
-              },
-            },
-          ),
+            { role: 'user', content: userPrompt },
+          ],
+          0.2,
+          500,
         );
-
-        const responseText =
-          response.data?.choices?.[0]?.message?.content ||
-          response.data?.message?.content ||
-          '';
-
-        if (!responseText) {
-          throw new Error('Empty response from OpenRouter API');
-        }
-
         return responseText.trim();
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error);
