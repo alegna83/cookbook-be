@@ -32,6 +32,15 @@ export class Account {
   @Column({ type: 'varchar', length: 1024, nullable: true })
   avatar: string | null;
 
+  @Column({ type: 'boolean', default: false })
+  isEmailVerified: boolean;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  emailVerificationToken: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  emailVerificationTokenExpiry: Date | null;
+
   @OneToMany(() => Accommodation, (place) => place.account)
   places?: Accommodation[];
 }

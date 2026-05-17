@@ -6,23 +6,6 @@ import { AccountsService } from './accounts.service';
 export class AccountsController {
   constructor(private readonly accountsService: AccountsService) {}
 
-  @Post('register')
-  async register(
-    @Body('email') email: string,
-    @Body('name') name: string,
-    @Body('password') password: string,
-    @Body('pilgrim_reason') pilgrim_reason: string,
-    @Body('pilgrim_reason_other') pilgrim_reason_other: string,
-  ) {
-    return this.accountsService.register(
-      email,
-      name,
-      password,
-      pilgrim_reason,
-      pilgrim_reason_other,
-    );
-  }
-
   @Post('update')
   async update(
     @Body('accountId') accountId: number,

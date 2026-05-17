@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { EmailService } from './email.service';
 import { AccountsModule } from '../accounts/accounts.module';
 import { AccommodationsModule } from '../accommodations/accommodations.module';
 import { CommentsModule } from '../comments/comments.module';
@@ -22,7 +23,8 @@ import { JwtModule } from '@nestjs/jwt';
     AccommodationsModule,
     CommentsModule,
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, EmailService],
+  exports: [EmailService],
   controllers: [AuthController],
 })
 export class AuthModule {}

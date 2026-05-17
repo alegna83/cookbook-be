@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Account } from './account.entity';
 import * as bcrypt from 'bcryptjs';
+import { EmailService } from '../auth/email.service';
+import * as crypto from 'crypto';
 
 const PILGRIM_REASON_OPTIONS = [
   'Spiritual and Religious',
@@ -29,17 +31,18 @@ export class AccountsService {
   constructor(
     @InjectRepository(Account)
     private accountsRepository: Repository<Account>,
+    private emailService: EmailService,
   ) {}
 
-  // Função para registrar um novo usuário
+  // Função para registar um novo utilizador - com verificação de email
   async register(
     email: string,
     name: string,
     password: string,
     pilgrim_reason: string,
     pilgrim_reason_other?: string,
-  ): Promise<Account> {
-    // Verificar se o usuário já existe
+  ): Promise<{ account: Account; message: string }> {
+    // Verificar se o utilizador já existe
     const existingAccount = await this.accountsRepository.findOne({
       where: { email },
     });
@@ -49,18 +52,37 @@ export class AccountsService {
 
     // Gerar o hash da senha
     const hashedPassword = await bcrypt.hash(password, 10);
-    //const hashedPassword = password;
 
-    // Criar o novo usuário
+    // Gerar token de verificação de email
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+
+    // Criar o novo utilizador com isEmailVerified = false
     const newAccount = this.accountsRepository.create({
       email,
       name,
       password: hashedPassword,
+      isEmailVerified: false,
+      emailVerificationToken: verificationToken,
+      emailVerificationTokenExpiry: verificationTokenExpiry,
       ...this.normalizePilgrimReason(pilgrim_reason, pilgrim_reason_other),
     });
 
-    // Salvar no banco de dados
-    return this.accountsRepository.save(newAccount);
+    const savedAccount = await this.accountsRepository.save(newAccount);
+
+    // Enviar email de verificação
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+    await this.emailService.sendEmailVerificationEmail(
+      email,
+      name,
+      verificationToken,
+      verificationUrl,
+    );
+
+    return {
+      account: savedAccount,
+      message: 'Registration successful! Please check your email to verify your account.',
+    };
   }
 
   async findByEmail(email: string): Promise<Account | null> {
@@ -154,12 +176,82 @@ export class AccountsService {
     };
   }
 
+  // Verificar token de email e marcar email como verificado
+  async verifyEmail(token: string): Promise<Account> {
+    const account = await this.accountsRepository.findOne({
+      where: { emailVerificationToken: token },
+    });
+
+    if (!account) {
+      throw new Error('Invalid verification token.');
+    }
+
+    // Verificar se o token expirou
+    if (!account.emailVerificationTokenExpiry || account.emailVerificationTokenExpiry < new Date()) {
+      throw new Error('Verification token has expired. Please request a new verification email.');
+    }
+
+    // Marcar email como verificado
+    account.isEmailVerified = true;
+    account.emailVerificationToken = null;
+    account.emailVerificationTokenExpiry = null;
+
+    const savedAccount = await this.accountsRepository.save(account);
+
+    // Enviar email de boas-vindas
+    await this.emailService.sendWelcomeEmail(account.email, account.name);
+
+    return savedAccount;
+  }
+
+  // Re-enviar email de verificação
+  async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    const account = await this.accountsRepository.findOne({
+      where: { email },
+    });
+
+    if (!account) {
+      throw new Error('Account not found.');
+    }
+
+    if (account.isEmailVerified) {
+      throw new Error('This email is already verified.');
+    }
+
+    // Gerar novo token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+
+    account.emailVerificationToken = verificationToken;
+    account.emailVerificationTokenExpiry = verificationTokenExpiry;
+
+    await this.accountsRepository.save(account);
+
+    // Enviar novo email de verificação
+    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+    await this.emailService.sendEmailVerificationEmail(
+      email,
+      account.name,
+      verificationToken,
+      verificationUrl,
+    );
+
+    return {
+      message: 'Verification email sent! Please check your email.',
+    };
+  }
+
   // Função para autenticar o usuário
   async login(email: string, password: string): Promise<Account> {
     console.log('login no accounts');
     const account = await this.accountsRepository.findOne({ where: { email } });
     if (!account) {
       throw new Error('Account not found.');
+    }
+
+    // Verificar se o email foi verificado
+    if (!account.isEmailVerified) {
+      throw new Error('Please verify your email before logging in.');
     }
 
     const isPasswordValid = password === account.password; //await bcrypt.compare(password, account.password);
