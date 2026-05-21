@@ -27,6 +27,11 @@ export class AuthService {
       throw new Error('Email not found');
     }
 
+    // Verificar se o email foi verificado
+    if (!account.isEmailVerified) {
+      throw new Error('Please verify your email before logging in.');
+    }
+
     // Verifique se a senha está correta
     const isPasswordValid = await bcrypt.compare(password, account.password);
     if (!isPasswordValid) {

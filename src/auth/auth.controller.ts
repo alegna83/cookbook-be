@@ -71,6 +71,18 @@ export class AuthController {
     return this.accountsService.verifyEmail(verifyDto.token);
   }
 
+  @Post('request-password-reset')
+  @HttpCode(200)
+  async requestPasswordReset(@Body() body: any) {
+    return this.accountsService.requestPasswordReset(body.email);
+  }
+
+  @Post('reset-password')
+  @HttpCode(200)
+  async resetPassword(@Body() body: any) {
+    return this.accountsService.resetPassword(body.token, body.newPassword);
+  }
+
   @Post('resend-verification')
   @HttpCode(200)
   async resendVerification(@Body() resendDto: ResendVerificationDto) {

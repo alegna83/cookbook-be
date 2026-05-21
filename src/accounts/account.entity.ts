@@ -41,6 +41,12 @@ export class Account {
   @Column({ type: 'timestamp', nullable: true })
   emailVerificationTokenExpiry: Date | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  passwordResetToken: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  passwordResetTokenExpiry: Date | null;
+
   @OneToMany(() => Accommodation, (place) => place.account)
   places?: Accommodation[];
 }

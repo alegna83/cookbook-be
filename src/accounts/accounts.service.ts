@@ -95,6 +95,7 @@ export class AccountsService {
         'pilgrim_reason',
         'pilgrim_reason_other',
         'password',
+        'isEmailVerified',
         'userType',
         'avatar',
       ],
@@ -239,6 +240,48 @@ export class AccountsService {
     return {
       message: 'Verification email sent! Please check your email.',
     };
+  }
+
+  // Request password reset: generate token, save and send email
+  async requestPasswordReset(email: string): Promise<{ message: string }> {
+    const account = await this.accountsRepository.findOne({ where: { email } });
+    if (!account) {
+      // Avoid revealing whether email exists
+      return { message: 'If that email exists, a password reset link has been sent.' };
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    account.passwordResetToken = resetToken;
+    account.passwordResetTokenExpiry = resetExpiry;
+
+    await this.accountsRepository.save(account);
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    await this.emailService.sendPasswordResetEmail(account.email, account.name, resetToken, resetUrl);
+
+    return { message: 'If that email exists, a password reset link has been sent.' };
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+    const account = await this.accountsRepository.findOne({ where: { passwordResetToken: token } });
+    if (!account) {
+      throw new Error('Invalid or expired reset token.');
+    }
+
+    if (!account.passwordResetTokenExpiry || account.passwordResetTokenExpiry < new Date()) {
+      throw new Error('Reset token has expired. Please request a new password reset.');
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    account.password = hashed;
+    account.passwordResetToken = null;
+    account.passwordResetTokenExpiry = null;
+
+    await this.accountsRepository.save(account);
+
+    return { message: 'Password has been reset successfully.' };
   }
 
   // Função para autenticar o usuário
