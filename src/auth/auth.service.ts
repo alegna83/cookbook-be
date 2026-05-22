@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AccountsService } from '../accounts/accounts.service';
 import { AccommodationsService } from '../accommodations/accommodations.service';
@@ -24,18 +24,18 @@ export class AuthService {
     // Verifique se o usuário existe
     const account = await this.accountsService.findByEmail(email);
     if (!account) {
-      throw new Error('Email not found');
+      throw new UnauthorizedException('Email not found');
     }
 
     // Verificar se o email foi verificado
     if (!account.isEmailVerified) {
-      throw new Error('Please verify your email before logging in.');
+      throw new BadRequestException('Please verify your email before logging in.');
     }
 
     // Verifique se a senha está correta
     const isPasswordValid = await bcrypt.compare(password, account.password);
     if (!isPasswordValid) {
-      throw new Error('Invalid password');
+      throw new UnauthorizedException('Invalid password');
     }
 
     /*return {
@@ -66,14 +66,14 @@ export class AuthService {
   async validateToken(req: Request) {
     const token = req.headers['authorization']?.split(' ')[1]; // Extrai o token após "Bearer "
     if (!token) {
-      throw new Error('Token não fornecido.');
+      throw new BadRequestException('Token não fornecido.');
     }
 
     try {
       const payload = await this.jwtService.verifyAsync(token); // Usa o verifyAsync para tratar assíncronamente
       return payload;
     } catch (e) {
-      throw new Error('Token inválido.');
+      throw new UnauthorizedException('Token inválido.');
     }
   }
 
