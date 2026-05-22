@@ -17,7 +17,7 @@ async function verifyAdminUser() {
            password = $2
        WHERE email = $1
        RETURNING id, email, name, "isEmailVerified"`,
-      [email, '$2b$10$UyAn/EFUwigk8WmPxFPC/edUHQLUE3haq34Qy4ghSVhXlqN.kd6yi']
+      [email, '$2b$10$R31MDy6URPYmvFLox.Z2gugap4KAeYCJ5W6/70KtN7mdjClsOeGKy']
     );
 
     if (result.rows.length > 0) {
@@ -27,7 +27,7 @@ async function verifyAdminUser() {
       console.log(`  Email Verified: ${result.rows[0].isEmailVerified}`);
       console.log(`\nLogin credentials:`);
       console.log(`  Email: admin@mail.pt`);
-      console.log(`  Password: admin123`);
+      console.log(`  Password: Admin.1234`);
     } else {
       console.log('✗ User not found');
     }

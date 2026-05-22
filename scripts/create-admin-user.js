@@ -8,8 +8,8 @@ const pool = new Pool({
 async function createAdminUser() {
   const client = await pool.connect();
   try {
-    // Hash: admin123
-    const passwordHash = '$2b$10$UyAn/EFUwigk8WmPxFPC/edUHQLUE3haq34Qy4ghSVhXlqN.kd6yi';
+    // Hash: Admin.1234
+    const passwordHash = '$2b$10$R31MDy6URPYmvFLox.Z2gugap4KAeYCJ5W6/70KtN7mdjClsOeGKy';
     const email = 'admin@mail.pt';
     const name = 'Admin';
 
@@ -42,7 +42,7 @@ async function createAdminUser() {
     console.log(`  Email: ${result.rows[0].email}`);
     console.log(`  ID: ${result.rows[0].id}`);
     console.log(`  Email Verified: ${result.rows[0].isEmailVerified}`);
-    console.log(`\nPassword: admin123`);
+    console.log(`\nPassword: Admin.1234`);
   } catch (error) {
     console.error('✗ Error creating admin user:', error.message);
   } finally {
