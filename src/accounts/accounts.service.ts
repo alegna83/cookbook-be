@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Account } from './account.entity';
@@ -282,6 +282,38 @@ export class AccountsService {
     await this.accountsRepository.save(account);
 
     return { message: 'Password has been reset successfully.' };
+  }
+
+  // Change password for authenticated user
+  async changePassword(accountId: number, currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    if (!currentPassword || !newPassword) {
+      throw new BadRequestException('Current password and new password are required.');
+    }
+
+    if (newPassword.length < 8) {
+      throw new BadRequestException('New password must be at least 8 characters long.');
+    }
+
+    if (currentPassword === newPassword) {
+      throw new BadRequestException('New password must be different from current password.');
+    }
+
+    const account = await this.accountsRepository.findOne({ where: { id: accountId } });
+    if (!account) {
+      throw new BadRequestException('Account not found.');
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, account.password);
+    if (!isMatch) {
+      throw new UnauthorizedException('Current password is incorrect.');
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    account.password = hashed;
+
+    await this.accountsRepository.save(account);
+
+    return { message: 'Password changed successfully.' };
   }
 
   // Função para autenticar o usuário

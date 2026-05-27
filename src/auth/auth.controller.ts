@@ -13,6 +13,7 @@ import { LoginDto } from './dto/login.dto';
 import { HandleAdminDto } from './dto/handle-admin.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { Response, Request } from 'express';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -87,6 +88,19 @@ export class AuthController {
   @HttpCode(200)
   async resendVerification(@Body() resendDto: ResendVerificationDto) {
     return this.accountsService.resendVerificationEmail(resendDto.email);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  async changePassword(@Req() req: Request, @Body() dto: ChangePasswordDto) {
+    // req.user is the validated JWT payload (see JwtStrategy)
+    const user: any = (req as any).user;
+    if (!user || !user.id) {
+      throw new BadRequestException('Invalid token payload.');
+    }
+
+    return this.accountsService.changePassword(user.id, dto.currentPassword, dto.newPassword);
   }
 
   // 🔐 Admin endpoint encapsulado
