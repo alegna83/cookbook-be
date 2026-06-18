@@ -1,0 +1,32 @@
+@startuml
+title Stays4Pilgrims - Frontend and backend communication overview
+
+skinparam componentStyle rectangle
+
+component "Stays4Pilgrims Frontend" as FE
+component "Stays4Pilgrims Backend" as BE
+
+FE --> BE : Auth
+FE --> BE : Accommodation browsing
+FE --> BE : Comments
+FE --> BE : Uploads
+FE --> BE : Account updates
+FE --> BE : Moderation actions
+
+note bottom of FE
+  Detailed flows:
+  - communication-auth-flow.puml
+  - communication-accommodation-flow.puml
+  - communication-media-moderation-flow.puml
+end note
+
+note bottom of BE
+  Main API groups:
+  /auth
+  /accounts
+  /accommodations
+  /comments
+  /upload
+end note
+
+@enduml

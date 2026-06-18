@@ -1,0 +1,62 @@
+@startuml
+title Add Place (create) sequence
+actor User
+participant Frontend as FE
+participant "API - AccommodationsController" as API
+participant "AccommodationsService" as SVC
+participant "ContentModerationService" as MOD
+participant "CategoryRepo / DB" as CATDB
+participant "PlaceRepo / DB" as PLDB
+participant "GalleryPhotoRepo / DB" as GDB
+
+User -> FE: Fill "Add place" form (data + main_photo + gallery_photos)
+FE -> API: POST /accommodations/handle { action: 'create', payload: CreateAccommodationDto }
+activate API
+API -> SVC: create(CreateAccommodationDto)
+activate SVC
+alt gallery_photos present
+  SVC -> MOD: moderateImageUrls(galleryPhotoUrls)
+  activate MOD
+  MOD --> SVC: moderation result (allow/reject)
+  deactivate MOD
+  alt moderation rejected
+    SVC --> API: throw BadRequest (images rejected)
+    deactivate SVC
+    API --> FE: 400 Bad Request
+    deactivate API
+    return
+  end
+end
+
+alt place_category provided
+  SVC -> CATDB: find category by id or name
+  activate CATDB
+  CATDB --> SVC: category or not found
+  deactivate CATDB
+end
+
+SVC -> PLDB: save new Accommodation (main_photo normalized)
+activate PLDB
+PLDB --> SVC: saved place id
+deactivate PLDB
+
+alt gallery_photos present
+  SVC -> GDB: save gallery photos as status='pending'
+  activate GDB
+  GDB --> SVC: saved gallery entries
+  deactivate GDB
+end
+
+SVC -> PLDB: findOne with relations (gallery_photos, category, prices...)
+activate PLDB
+PLDB --> SVC: full saved entity
+deactivate PLDB
+
+SVC --> API: return created AccommodationDto
+deactivate SVC
+API --> FE: 200 OK {AccommodationDto}
+deactivate API
+
+note over FE,GDB: Gallery photos are created pending moderation; approved later by admin or moderation pipeline
+
+@enduml

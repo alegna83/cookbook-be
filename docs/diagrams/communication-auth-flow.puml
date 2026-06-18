@@ -1,0 +1,49 @@
+@startuml
+title Stays4Pilgrims - Authentication and account communication
+
+actor User
+participant "Stays4Pilgrims Frontend" as FE
+participant "Stays4Pilgrims Backend" as BE
+participant "AuthController" as AuthController
+participant "AccountsService" as AccountsService
+database "PostgreSQL" as DB
+participant "Email service" as Email
+
+User -> FE : register / login / reset password
+FE -> BE : POST /auth/register
+BE -> AuthController : register(dto)
+AuthController -> AccountsService : register(...)
+AccountsService -> DB : insert account + hash password
+AccountsService -> Email : send verification email
+BE --> FE : 201 Created + account payload
+
+User -> FE : verify email token
+FE -> BE : POST /auth/verify-email
+BE -> AuthController : verifyEmail(token)
+AuthController -> AccountsService : verifyEmail(token)
+AccountsService -> DB : mark email_verified = true
+BE --> FE : 200 OK
+
+User -> FE : login
+FE -> BE : POST /auth/login
+BE -> AuthController : login(email, password)
+AuthController -> AccountsService : login(email, password)
+AccountsService -> DB : validate credentials
+BE --> FE : JWT / session data
+
+User -> FE : request password reset
+FE -> BE : POST /auth/request-password-reset
+BE -> AuthController : requestPasswordReset(email)
+AuthController -> AccountsService : requestPasswordReset(email)
+AccountsService -> DB : create reset token
+AccountsService -> Email : send reset email
+BE --> FE : 200 OK
+
+User -> FE : change password
+FE -> BE : POST /auth/change-password
+BE -> AuthController : changePassword(token, dto)
+AuthController -> AccountsService : changePassword(userId, current, new)
+AccountsService -> DB : update password hash
+BE --> FE : 200 OK
+
+@enduml

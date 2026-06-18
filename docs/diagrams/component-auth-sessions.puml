@@ -1,0 +1,50 @@
+@startuml
+title Sequence: Authentication & JWT Flow
+
+participant "Frontend" as FE
+participant "Public Routes" as ROUTES
+participant "Accounts Service" as ACC_SVC
+participant "Auth Service" as AUTH_SVC
+participant "JWT Strategy" as JWT
+database "PostgreSQL" as DB
+database "JWT Cache" as CACHE
+
+FE ->> ROUTES: POST /login {email, password}
+ROUTES ->> ACC_SVC: findByEmail(email)
+ACC_SVC ->> DB: SELECT * FROM accounts WHERE email
+DB -->> ACC_SVC: account record
+ROUTES ->> AUTH_SVC: validatePassword(input, hash)
+AUTH_SVC ->> AUTH_SVC: bcrypt.compare()
+AUTH_SVC -->> ROUTES: valid
+ROUTES ->> JWT: generateTokenPair(id, email)
+JWT ->> CACHE: store accessToken (15m)
+JWT ->> CACHE: store refreshToken (7d)
+JWT -->> ROUTES: tokens
+ROUTES -->> FE: {accessToken, refreshToken}
+
+FE ->> ROUTES: GET /accommodations\nHeader: Authorization: Bearer <token>
+ROUTES ->> JWT: validateToken(token)
+JWT ->> CACHE: getToken()
+CACHE -->> JWT: token data
+JWT ->> JWT: verify signature
+JWT -->> ROUTES: valid
+ROUTES -->> FE: data
+
+note right of AUTH_SVC
+  Uses bcrypt.compare()
+  Sensitive operation - no plain password in logs
+end note
+
+note right of JWT
+  Algorithm: HS256
+  Payload: {id, email, userType}
+  Secret: process.env.JWT_SECRET
+end note
+
+note right of CACHE
+  In-memory with TTL
+  Access token: 15 minutes
+  Refresh token: 7 days
+end note
+
+@enduml

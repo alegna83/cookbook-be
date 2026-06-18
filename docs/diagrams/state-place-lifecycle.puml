@@ -1,0 +1,60 @@
+@startuml Place Lifecycle State Machine
+title Place / Accommodation Lifecycle
+
+[*] --> Draft
+
+Draft --> PendingModeration: User submits for review
+Draft --> Draft: Edit (allowed during draft)
+
+PendingModeration --> Approved: Admin/moderator approves
+PendingModeration --> Rejected: Admin/moderator rejects
+PendingModeration --> Draft: Rejected → user can re-edit
+
+Approved --> Published: Admin publishes or auto-publish
+Published --> Archived: Admin archives or user requests removal (approved)
+Published --> Flagged: User reports abuse / content violation detected
+
+Flagged --> Archived: Admin removes after review
+Flagged --> Published: Admin reviews & clears flag
+
+Rejected --> Draft: User receives rejection reason, edits and resubmits
+
+Archived --> [*]
+
+note right of Draft
+  Initial state after creation
+  User can edit all fields
+  Gallery photos are pending
+end note
+
+note right of PendingModeration
+  Awaiting admin approval
+  Cannot edit (except owner)
+  Gallery photos are pending
+end note
+
+note right of Approved
+  Admin has approved content
+  Ready to be published
+  Can still be edited or removed
+end note
+
+note right of Published
+  Visible to all users
+  Listed in search/map
+  Cannot edit (removal request required)
+end note
+
+note right of Archived
+  Out of public view
+  Preserved in DB for audit
+  Cannot be reverted
+end note
+
+note right of Flagged
+  Marked for review
+  Still visible during review (admin only)
+  Can be reactivated if cleared
+end note
+
+@enduml

@@ -1,0 +1,42 @@
+@startuml
+title Add to Favorites sequence
+actor User
+participant Frontend as FE
+participant "API - FavoritesController" as API
+participant "FavoritesService" as SVC
+database "FavoritesRepo / DB" as DB
+
+User -> FE: Click heart icon on place
+alt already favorited
+  FE -> API: POST /favorites/handle { action: 'toggle', payload: {placeId, accountId} }
+else not favorited
+  FE -> API: POST /favorites/handle { action: 'toggle', payload: {placeId, accountId} }
+end
+activate API
+API -> SVC: toggle(accountId, placeId)
+activate SVC
+SVC -> DB: find Favorite {account, place}
+activate DB
+DB --> SVC: existing or null
+deactivate DB
+alt exists
+  SVC -> DB: delete favorite
+  activate DB
+  DB --> SVC: deleted
+  deactivate DB
+  SVC --> API: {action: 'removed', ok: true}
+else not exists
+  SVC -> DB: create new Favorite {accountId, placeId}
+  activate DB
+  DB --> SVC: saved favorite entity
+  deactivate DB
+  SVC --> API: {action: 'added', favoriteId, createdAt}
+end
+deactivate SVC
+API --> FE: 200 OK {action, favoriteId?}
+deactivate API
+FE --> User: Update heart icon UI (filled/empty)
+
+note over SVC,DB: Favorite is a M-to-M relationship between Account and Accommodation
+
+@enduml

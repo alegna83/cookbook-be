@@ -1,0 +1,47 @@
+@startuml
+title Add Comment sequence
+actor User
+participant Frontend as FE
+participant "API - CommentsController" as API
+participant "CommentsService" as SVC
+participant "ContentModerationService" as MOD
+database "CommentsRepo / DB" as DB
+
+User -> FE: Write comment + rating for place, submit
+FE -> API: POST /comments/handle { action: 'add', payload: {placeId, accountId, comment, rating} }
+activate API
+API -> SVC: add({placeId, accountId, comment, rating})
+activate SVC
+SVC -> MOD: moderateComment(comment)
+activate MOD
+MOD --> SVC: moderation result {decision, reason, target: 'comment'}
+deactivate MOD
+alt moderation rejected
+  SVC --> API: throw BadRequest (comment rejected)
+  deactivate SVC
+  API --> FE: 400 Bad Request {reason}
+  deactivate API
+  return
+end
+SVC -> DB: check account exists
+activate DB
+DB --> SVC: account or not found
+deactivate DB
+SVC -> DB: check place exists & is approved
+activate DB
+DB --> SVC: place or not found
+deactivate DB
+SVC -> DB: create new Comment {accountId, placeId, comment, rating, status: 'pending'}
+activate DB
+DB --> SVC: saved comment entity
+deactivate DB
+SVC --> API: return created CommentDto
+deactivate SVC
+API --> FE: 201 Created {commentId, rating, comment, status: 'pending', author}
+deactivate API
+FE --> User: Show comment in list (pending approval)
+
+note over SVC,MOD: Comments are moderated for spam, hate speech, etc.
+note over DB: Status: pending → admin approves/rejects
+
+@enduml

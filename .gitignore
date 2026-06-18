@@ -44,6 +44,9 @@ lerna-debug.log*
 .env.docker
 .env.docker.local
 
+# local PlantUML helper
+/plantuml.jar
+
 # temp directory
 .temp
 .tmp

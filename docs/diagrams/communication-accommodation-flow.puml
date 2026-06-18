@@ -1,0 +1,52 @@
+@startuml
+title Stays4Pilgrims - Accommodation browsing and comments communication
+
+actor User
+participant "Stays4Pilgrims Frontend" as FE
+participant "Stays4Pilgrims Backend" as BE
+participant "AccommodationsController" as AccommodationsController
+participant "AccommodationsService" as AccommodationsService
+participant "CommentsController" as CommentsController
+participant "CommentsService" as CommentsService
+database "PostgreSQL" as DB
+
+User -> FE : open home / Camino / accommodation detail
+FE -> BE : POST /accommodations/handle {action:getall}
+BE -> AccommodationsController : handle(getall)
+AccommodationsController -> AccommodationsService : findAll(page, limit)
+AccommodationsService -> DB : fetch list of accommodations
+BE --> FE : list of accommodations
+
+User -> FE : filter by Camino
+FE -> BE : POST /accommodations/handle {action:getbycamino}
+BE -> AccommodationsController : handle(getbycamino)
+AccommodationsController -> AccommodationsService : findByCamino(name)
+AccommodationsService -> DB : fetch filtered list
+BE --> FE : filtered accommodations
+
+User -> FE : open accommodation detail
+FE -> BE : POST /accommodations/handle {action:getone}
+BE -> AccommodationsController : handle(getone)
+AccommodationsController -> AccommodationsService : findOne(id, accountId)
+AccommodationsService -> DB : fetch accommodation + relations
+BE --> FE : accommodation detail + gallery + services
+
+FE -> BE : POST /comments/handle {action:list}
+BE -> CommentsController : handle(list)
+CommentsController -> CommentsService : listByPlace(placeId, page, limit)
+CommentsService -> DB : fetch comments for place
+BE --> FE : comments + pagination
+
+FE -> BE : POST /comments/handle {action:exists}
+BE -> CommentsController : handle(exists)
+CommentsController -> CommentsService : exists(accountId, placeId)
+CommentsService -> DB : check if user already commented
+BE --> FE : { exists: true/false }
+
+FE -> BE : POST /comments/handle {action:getStats}
+BE -> CommentsController : handle(getStats)
+CommentsController -> CommentsService : getStats(placeId)
+CommentsService -> DB : aggregate ratings
+BE --> FE : rating summary
+
+@enduml

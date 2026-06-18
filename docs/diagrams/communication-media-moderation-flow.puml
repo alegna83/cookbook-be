@@ -1,0 +1,51 @@
+@startuml
+title Stays4Pilgrims - Media upload, contribution and moderation communication
+
+actor User
+participant "Stays4Pilgrims Frontend" as FE
+participant "Stays4Pilgrims Backend" as BE
+participant "UploadController" as UploadController
+participant "UploadService" as UploadService
+participant "AccommodationsController" as AccommodationsController
+participant "AccountsController" as AccountsController
+participant "AccommodationsService" as AccommodationsService
+database "PostgreSQL" as DB
+participant "Cloudinary" as Cloudinary
+
+User -> FE : select photo(s)
+FE -> BE : POST /upload {type: main-photo|gallery-photos|avatar}
+BE -> UploadController : uploadMedia(type, files)
+UploadController -> UploadService : uploadMedia(files, type)
+UploadService -> Cloudinary : store media files
+Cloudinary --> UploadService : public URLs
+UploadService --> BE : uploaded URLs
+BE --> FE : upload response
+
+alt avatar upload
+  FE -> BE : POST /accounts/update { avatar }
+  BE -> AccountsController : update(accountId, avatar)
+  AccountsController -> DB : persist avatar URL
+  BE --> FE : updated account
+else accommodation media contribution
+  FE -> BE : POST /accommodations/handle {action:addphotos}
+  BE -> AccommodationsController : handle(addphotos)
+  AccommodationsController -> AccommodationsService : addGalleryPhotos(placeId, accountId, urls)
+  AccommodationsService -> DB : save pending / approved photos
+  BE --> FE : contribution accepted
+end
+
+User -> FE : owner/admin checks moderation queue
+FE -> BE : POST /accommodations/handle {action:getpendingphotos|getpendingphotosadmin}
+BE -> AccommodationsController : handle(getpendingphotos*)
+AccommodationsController -> AccommodationsService : getPendingPhotos(...)
+AccommodationsService -> DB : fetch pending photos
+BE --> FE : pending photos list
+
+User -> FE : approve / reject photo
+FE -> BE : POST /accommodations/handle {action:approvephoto|rejectphoto}
+BE -> AccommodationsController : handle(approvephoto/rejectphoto)
+AccommodationsController -> AccommodationsService : approvePhoto / rejectPhoto
+AccommodationsService -> DB : update moderation state
+BE --> FE : moderation result
+
+@enduml

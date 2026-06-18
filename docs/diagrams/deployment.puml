@@ -1,0 +1,12 @@
+@startuml
+' Deployment diagram
+actor User
+node "Browser / Mobile" as Client
+node "Stays4Pilgrims Frontend Server / CDN" as CDN
+node "Stays4Pilgrims Backend (NestJS)" as Backend
+database "Postgres (managed)" as DB
+Client -> CDN : GET static assets
+CDN -> Backend : API calls
+Backend -> DB : queries
+note right of Backend : Env vars in .env (local development)
+@enduml

@@ -1,0 +1,10 @@
+@startuml
+' System overview
+actor "User" as User
+component "Stays4Pilgrims Frontend (Web/Mobile)\n(see: camino_places_app)" as Frontend
+component "Stays4Pilgrims Backend (NestJS)" as API
+database "PostgreSQL" as DB
+User -> Frontend : Interacts
+Frontend -> API : HTTP/REST, GraphQL
+API -> DB : SQL queries
+@enduml

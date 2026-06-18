@@ -1,0 +1,12 @@
+@startuml
+' Frontend architecture
+actor User
+node "Stays4Pilgrims Frontend\n(/Users/angelaantunes/Documents/tese/camino_places_app)" as FE
+component "UI" as UI
+component "State (Redux / Context)" as State
+component "API Client" as Client
+User -> UI : clicks/interacts
+UI -> State : updates
+UI -> Client : fetch/update
+Client -> "Backend API" : HTTP/REST
+@enduml
