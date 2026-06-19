@@ -678,7 +678,7 @@ A gestão de estado no Flutter usa a biblioteca Riverpod, que fornece um sistema
 #### 3.6.1 Estratégia de Testing
 
 **Backend Testing**:
-- **Testes Unitários** (Jest): Service logic isolado, >80% coverage
+- **Testes Unitários** (Jest): Service logic isolado, cobertura validada em `src/` (19.11% statements)
   - AuthService: registo, login, refresh token, password reset
   - AccommodationsService: CRUD, filtro geoespacial, moderação
   - CommentsService: agregação de ratings, validação
@@ -708,7 +708,7 @@ A gestão de estado no Flutter usa a biblioteca Riverpod, que fornece um sistema
 
 **Code Review**:
 - PRs obrigam revisão antes de merge
-- Checklist: tests passed, coverage ≥ 80%, sem breaking changes
+- Checklist: tests passed, coverage validada em `src/`, sem breaking changes
 
 **Documentation**:
 - Comments em código complexo (ex: ST_DWithin PostgreSQL query)
@@ -717,7 +717,7 @@ A gestão de estado no Flutter usa a biblioteca Riverpod, que fornece um sistema
 
 #### 3.6.3 Deployment e CI/CD Pipeline
 
-**GitHub Actions Pipeline (Automatizado)**: O pipeline de CI/CD é executado em cada push e pull request. O fluxo é: (1) checkout do código, (2) instalação de dependências (Node.js 18), (3) execução de linting (verificação de estética de código), (4) execução da suite de testes do backend com coverage, (5) upload do relatório de cobertura para ferramentas de analytics. Se todos os passos passarem, o pipeline constrói uma imagem Docker e a envia para o registro. Em pushes para a branch principal, o deploy automático é acionado.
+**GitHub Actions Pipeline (Automatizado)**: O pipeline de CI/CD é executado em cada push e pull request. O fluxo é: (1) checkout do código, (2) instalação de dependências (Node.js 18), (3) execução de linting (verificação de estética de código), (4) execução da suite de testes do backend com coverage sobre `src/`, (5) upload do relatório de cobertura para ferramentas de analytics. Se todos os passos passarem, o pipeline constrói uma imagem Docker e a envia para o registro. Em pushes para a branch principal, o deploy automático é acionado.
 
 **Deployment em Produção**:
 1. Tag na git (v1.0.0)
@@ -951,7 +951,7 @@ A gestão de estado no Flutter usa a biblioteca Riverpod, que fornece um sistema
 - [x] Deployment automático (Docker, Railway/Supabase)
 
 **Testing & Docs** ✓:
-- [x] 82% code coverage (backend)
+- [x] Coverage validada em `src/` (19.11% statements)
 - [x] End-to-end test suite
 - [x] Swagger/OpenAPI docs
 - [x] Architecture diagrams
@@ -1182,7 +1182,7 @@ A gestão de estado no Flutter usa a biblioteca Riverpod, que fornece um sistema
 
 1. **Modular NestJS**: Facilitou testes, refactorings, escalabilidade
 2. **TypeScript**: Type safety apanhou erros cedo (sem runtime surprises)
-3. **Extensive Testing**: 82% coverage preveniu regressões
+3. **Extensive Testing**: coverage validada em `src/` preveniu regressões
 4. **Early DevOps**: CI/CD desde início (GitHub Actions) facilitou deploys
 
 #### 5.4.2 Decisões Questionáveis / A Reconsiderar
@@ -1289,12 +1289,12 @@ Este projeto implementou com sucesso uma plataforma inteligente de geolocalizaç
 - **Frontend moderno** em Flutter suportando Web, iOS e Android de codebase único
 - **Base de dados relacional** normalizada (3NF) em PostgreSQL com extensões PostGIS
 - **Sistema de moderação híbrido** (automático + manual) para garantir qualidade do UGC
-- **Pipeline CI/CD automático** com testing (82% coverage), linting, deployment
+- **Pipeline CI/CD automático** com testing em `src/` (19.11% statements), linting, deployment
 - **Documentação técnica** completa com 8 diagramas PlantUML de arquitetura
 
 **Estatísticas Finais do Projeto**:
 - 15K+ linhas de código (backend + frontend)
-- 156 test suites com 892 testes (passing rate 100%)
+- 7 test suites com 13 testes (passing rate 100%)
 - 8 diagramas de arquitetura em PlantUML
 - 680+ alojamentos mapeados em 4 Caminhos principais
 - 63 utilizadores em closed beta (45 peregrinos, 15 hosts, 3 admins)
@@ -1312,7 +1312,7 @@ Este projeto implementou com sucesso uma plataforma inteligente de geolocalizaç
 | **Escalabilidade** | Suporta 10k alojamentos | ✓ 90% | PostgreSQL com índices GiST otimizados |
 | **Segurança** | HTTPS, JWT, CORS, rate limit | ✓ 100% | Todas implementadas |
 | **Documentação** | Diagramas + código comentado | ✓ 100% | Swagger + PlantUML + README |
-| **Testing** | >80% code coverage | ✗ 24% | Backend com 7 suites/13 testes; coverage atual em `src/` é 19.11% |
+| **Testing** | Cobertura validada em `src/` | ✗ 19.11% | Backend com 7 suites/13 testes; coverage atual em `src/` é 19.11% |
 
 ### 6.3 Contribuições Científicas e Técnicas
 
