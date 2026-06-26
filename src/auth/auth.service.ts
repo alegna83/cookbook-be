@@ -178,6 +178,24 @@ export class AuthService {
           throw e;
         }
 
+      case 'getpendingedits':
+        return this.accommodationsService.getPendingEditRequests();
+
+      case 'approveedit':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.accommodationsService.approveEditRequest(data.payload.id);
+
+      case 'rejectedit':
+        if (!data.payload?.id) {
+          throw new BadRequestException('ID é obrigatório.');
+        }
+        return this.accommodationsService.rejectEditRequest(
+          data.payload.id,
+          data.payload.rejectionReason,
+        );
+
       case 'rejectremovalrequest':
       case 'rejectremoval':
         if (!data.payload?.id) {

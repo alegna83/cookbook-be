@@ -6,6 +6,7 @@ import { AccommodationCategory } from '../accommodation-categories/entities/acco
 import { GalleryPhoto } from '../gallery/entities/gallery-photo.entity';
 import { Account } from '../accounts/account.entity';
 import { PlaceRemovalRequest } from './entities/place-removal-request.entity';
+import { PlaceEditRequest } from './entities/place-edit-request.entity';
 import { ContentModerationService } from '../moderation/content-moderation.service';
 import { NotFoundException } from '@nestjs/common';
 
@@ -20,6 +21,7 @@ describe('AccommodationsService (unit)', () => {
     const galleryMock = {};
     accountRepo = { findOne: jest.fn() };
     const removalMock = {};
+    const editMock = {};
     const moderationMock = { moderateImageUrls: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -30,6 +32,7 @@ describe('AccommodationsService (unit)', () => {
         { provide: getRepositoryToken(GalleryPhoto), useValue: galleryMock },
         { provide: getRepositoryToken(Account), useValue: accountRepo },
         { provide: getRepositoryToken(PlaceRemovalRequest), useValue: removalMock },
+        { provide: getRepositoryToken(PlaceEditRequest), useValue: editMock },
         { provide: ContentModerationService, useValue: moderationMock },
       ],
     }).compile();

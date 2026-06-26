@@ -57,31 +57,43 @@ export class AccountsService {
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationTokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
 
-    // Criar o novo utilizador com isEmailVerified = false
+    // Development mode: auto-verify emails for testing
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const bypassEmailVerification = process.env.BYPASS_EMAIL_VERIFICATION === 'true';
+    const isEmailVerified = isDevelopment && bypassEmailVerification;
+
+    // Criar o novo utilizador com isEmailVerified = false (ou true em dev mode)
     const newAccount = this.accountsRepository.create({
       email,
       name,
       password: hashedPassword,
-      isEmailVerified: false,
-      emailVerificationToken: verificationToken,
-      emailVerificationTokenExpiry: verificationTokenExpiry,
+      isEmailVerified,
+      emailVerificationToken: isEmailVerified ? null : verificationToken,
+      emailVerificationTokenExpiry: isEmailVerified ? null : verificationTokenExpiry,
       ...this.normalizePilgrimReason(pilgrim_reason, pilgrim_reason_other),
     });
 
     const savedAccount = await this.accountsRepository.save(newAccount);
 
-    // Enviar email de verificação
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-    await this.emailService.sendEmailVerificationEmail(
-      email,
-      name,
-      verificationToken,
-      verificationUrl,
-    );
+    // Only send email if not in dev bypass mode
+    if (!isEmailVerified) {
+      // Enviar email de verificação
+      const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+      await this.emailService.sendEmailVerificationEmail(
+        email,
+        name,
+        verificationToken,
+        verificationUrl,
+      );
+    } else {
+      console.log(`[AccountsService] 🔧 DEV BYPASS: Account email auto-verified (isEmailVerified=true)`);
+    }
 
     return {
       account: savedAccount,
-      message: 'Registration successful! Please check your email to verify your account.',
+      message: isEmailVerified 
+        ? 'Registration successful! Your email has been auto-verified (dev mode). You can now log in.'
+        : 'Registration successful! Please check your email to verify your account.',
     };
   }
 
@@ -207,6 +219,7 @@ export class AccountsService {
 
   // Re-enviar email de verificação
   async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    console.log(`[AccountsService] resendVerificationEmail requested for email=${email}`);
     const account = await this.accountsRepository.findOne({
       where: { email },
     });
@@ -230,12 +243,19 @@ export class AccountsService {
 
     // Enviar novo email de verificação
     const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-    await this.emailService.sendEmailVerificationEmail(
-      email,
-      account.name,
-      verificationToken,
-      verificationUrl,
-    );
+    try {
+      console.log('[AccountsService] Sending verification email via EmailService');
+      await this.emailService.sendEmailVerificationEmail(
+        email,
+        account.name,
+        verificationToken,
+        verificationUrl,
+      );
+      console.log('[AccountsService] sendEmailVerificationEmail completed successfully');
+    } catch (e) {
+      console.error('[AccountsService] Error while sending verification email:', e);
+      throw new Error('Could not send verification email. Please contact support or try again later.');
+    }
 
     return {
       message: 'Verification email sent! Please check your email.',
