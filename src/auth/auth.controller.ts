@@ -87,6 +87,7 @@ export class AuthController {
   @Post('resend-verification')
   @HttpCode(200)
   async resendVerification(@Body() resendDto: ResendVerificationDto) {
+    console.log('[AuthController] resendVerification called for', resendDto?.email);
     return this.accountsService.resendVerificationEmail(resendDto.email);
   }
 

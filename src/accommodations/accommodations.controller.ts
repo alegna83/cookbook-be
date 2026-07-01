@@ -124,6 +124,43 @@ export class AccommodationsController {
             data.payload.data as UpdateAccommodationDto,
           );
 
+        case 'requestedit':
+          if (!data.payload?.placeId) {
+            throw new BadRequestException('placeId é obrigatório.');
+          }
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          if (!data.payload?.payload) {
+            throw new BadRequestException('payload com alterações é obrigatório.');
+          }
+          return this.accommodationsService.requestEdit({
+            placeId: Number(data.payload.placeId),
+            accountId: Number(data.payload.accountId),
+            payload: data.payload.payload,
+          });
+
+        case 'getpendingedits':
+          return this.accommodationsService.getPendingEditRequests();
+
+        case 'getmyeditrequests':
+          if (!data.payload?.accountId) {
+            throw new BadRequestException('accountId é obrigatório.');
+          }
+          return this.accommodationsService.getEditRequestsByAccount(Number(data.payload.accountId));
+
+        case 'approveedit':
+          if (!data.payload?.id) {
+            throw new BadRequestException('id do pedido de edição é obrigatório.');
+          }
+          return this.accommodationsService.approveEditRequest(Number(data.payload.id));
+
+        case 'rejectedit':
+          if (!data.payload?.id) {
+            throw new BadRequestException('id do pedido de edição é obrigatório.');
+          }
+          return this.accommodationsService.rejectEditRequest(Number(data.payload.id), data.payload?.rejectionReason);
+
         case 'requestremoval':
         case 'requestdelete':
         case 'deleterequest':

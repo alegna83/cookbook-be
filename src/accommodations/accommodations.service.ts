@@ -11,6 +11,8 @@ import { AccommodationCategory } from 'src/accommodation-categories/entities/acc
 import { Account } from 'src/accounts/account.entity';
 import { GalleryPhoto } from 'src/gallery/entities/gallery-photo.entity';
 import { PlaceRemovalRequest } from './entities/place-removal-request.entity';
+import { PlaceEditRequest } from './entities/place-edit-request.entity';
+import { CreateEditRequestDto } from './dto/create-edit-request.dto';
 import { ContentModerationService } from 'src/moderation/content-moderation.service';
 
 @Injectable()
@@ -40,8 +42,25 @@ export class AccommodationsService {
     private readonly accountRepo: Repository<Account>,
     @InjectRepository(PlaceRemovalRequest)
     private readonly removalRequestRepo: Repository<PlaceRemovalRequest>,
+    @InjectRepository(PlaceEditRequest)
+    private readonly editRequestRepo: Repository<PlaceEditRequest>,
     private readonly moderationService: ContentModerationService,
   ) {}
+
+  private formatEditRequest(req: PlaceEditRequest): Record<string, unknown> {
+    return {
+      id: req.id,
+      placeId: req.placeId ?? req.place?.id ?? null,
+      accountId: req.accountId ?? req.account?.id ?? null,
+      requesterName: req.requesterName ?? req.account?.name ?? null,
+      requesterEmail: req.requesterEmail ?? req.account?.email ?? null,
+      payload: req.payload ?? null,
+      status: req.status,
+      rejectionReason: req.rejectionReason ?? null,
+      createdAt: req.createdAt,
+      reviewedAt: req.reviewedAt ?? null,
+    };
+  }
 
   private getCachedValue<T>(key: string): T | undefined {
     const cached = this.readCache.get(key);
@@ -1025,6 +1044,205 @@ export class AccommodationsService {
     const saved = await this.removalRequestRepo.save(request);
     this.invalidateReadCache();
     return this.formatRemovalRequest(saved);
+  }
+
+  // User submits an edit proposal for an existing accommodation
+  async requestEdit(data: CreateEditRequestDto): Promise<Record<string, unknown>> {
+    const placeId = Number(data.placeId);
+    const accountId = Number(data.accountId);
+
+    if (!Number.isInteger(placeId) || !Number.isInteger(accountId)) {
+      throw new BadRequestException('placeId e accountId são obrigatórios.');
+    }
+
+    const place = await this.placeRepository.findOne({ where: { id: placeId }, relations: ['account'] });
+
+    if (!place) {
+      throw new NotFoundException(`Accommodation com id ${placeId} não encontrado`);
+    }
+
+    const account = await this.accountRepo.findOne({ where: { id: accountId } });
+    if (!account) {
+      throw new NotFoundException(`Account com id ${accountId} não encontrado`);
+    }
+
+    const existing = await this.editRequestRepo.findOne({ where: { placeId, accountId, status: 'pending' } });
+    if (existing) {
+      return this.formatEditRequest(existing);
+    }
+
+    const request = this.editRequestRepo.create({
+      placeId,
+      accountId,
+      requesterName: account.name ?? null,
+      requesterEmail: account.email ?? null,
+      payload: data.payload ?? null,
+      status: 'pending',
+    });
+
+    const saved = await this.editRequestRepo.save(request);
+    this.invalidateReadCache();
+    return this.formatEditRequest(saved);
+  }
+
+  async getPendingEditRequests(): Promise<Record<string, unknown>[]> {
+    const requests = await this.editRequestRepo.find({
+      where: { status: 'pending' },
+      relations: ['place', 'account'],
+      order: { createdAt: 'ASC' },
+    });
+
+    return requests.map((r) => this.formatEditRequest(r));
+  }
+
+  async getEditRequestsByAccount(accountId: number): Promise<Record<string, unknown>[]> {
+    const normalized = Number(accountId);
+
+    if (!Number.isInteger(normalized)) {
+      return [];
+    }
+
+    const requests = await this.editRequestRepo.find({
+      where: { accountId: normalized },
+      relations: ['place', 'account'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return requests.map((r) => this.formatEditRequest(r));
+  }
+
+  // Admin approves an edit request: apply payload to accommodation
+  async approveEditRequest(id: number): Promise<Record<string, unknown>> {
+    const req = await this.editRequestRepo.findOne({ where: { id }, relations: ['place', 'account'] });
+
+    if (!req) {
+      throw new NotFoundException(`Edit request com id ${id} não encontrado`);
+    }
+
+    if (!req.placeId || !req.payload) {
+      req.status = 'rejected';
+      req.rejectionReason = 'Pedido inválido ou sem payload.';
+      req.reviewedAt = new Date();
+      const savedReq = await this.editRequestRepo.save(req);
+      return this.formatEditRequest(savedReq);
+    }
+
+    const place = await this.placeRepository.findOne({ where: { id: req.placeId }, relations: ['gallery_photos', 'account'] });
+
+    if (!place) {
+      throw new NotFoundException(`Accommodation com id ${req.placeId} não encontrado`);
+    }
+
+    const payload = req.payload as Record<string, any>;
+
+    // Apply permitted fields only
+    const updatableFields = [
+      'place_name',
+      'address',
+      'region',
+      'phone',
+      'email',
+      'website',
+      'location_help',
+      'pilgrim_exclusive',
+      'allow_reservation',
+      'latitude',
+      'longitude',
+      'main_photo',
+      'place_category',
+      'services',
+      'nearbyActivities',
+    ];
+
+    for (const key of Object.keys(payload)) {
+      if (updatableFields.includes(key)) {
+        if (key === 'main_photo') {
+          place.main_photo = this.toPublicImageUrl(payload[key]);
+        } else if (key === 'place_category') {
+          // try to resolve category if passed
+          const rawCategory = payload[key];
+          if (rawCategory !== undefined && rawCategory !== null) {
+            let found: AccommodationCategory | null = null;
+            if (typeof rawCategory === 'number') {
+              found = await this.categoryRepo.findOne({ where: { id: rawCategory } });
+            } else if (typeof rawCategory === 'string') {
+              const maybeId = Number(rawCategory.trim());
+              if (Number.isInteger(maybeId)) {
+                found = await this.categoryRepo.findOne({ where: { id: maybeId } });
+              } else {
+                found = await this.categoryRepo
+                  .createQueryBuilder('category')
+                  .where('LOWER(BTRIM(category.name)) = LOWER(BTRIM(:name))', { name: rawCategory.trim() })
+                  .getOne();
+              }
+            }
+            if (found) {
+              place.place_category = found;
+            }
+          }
+        } else if (key === 'latitude' || key === 'longitude') {
+          (place as any)[key] = Number(payload[key]);
+        } else if (key === 'services' || key === 'nearbyActivities') {
+          const value = payload[key];
+          (place as any)[key] = Array.isArray(value)
+            ? value.map((item) => String(item).trim()).filter((item) => item.length > 0)
+            : [];
+        } else {
+          (place as any)[key] = payload[key];
+        }
+      }
+    }
+
+    // If gallery_photos provided in payload, add as pending photos (moderated)
+    if (Array.isArray(payload.gallery_photos) && payload.gallery_photos.length > 0) {
+      const galleryUrls = payload.gallery_photos.map((u: any) => this.toPublicImageUrl(String(u)));
+      const moderated = await this.moderationService.moderateImageUrls(galleryUrls);
+      if (moderated.decision === 'reject') {
+        // reject the edit request due to moderation
+        req.status = 'rejected';
+        req.rejectionReason = moderated.reason || 'Image blocked by moderation.';
+        req.reviewedAt = new Date();
+        const savedReq = await this.editRequestRepo.save(req);
+        return this.formatEditRequest(savedReq);
+      }
+
+      // remove previous gallery photos and add new ones as pending
+      await this.galleryPhotoRepo.delete({ place: { id: place.id } });
+      const galleryEntities = galleryUrls.map((url: string) => this.galleryPhotoRepo.create({
+        url,
+        place,
+        account: req.account ? ({ id: req.account.id } as any) : undefined,
+        status: 'pending',
+        approvedAt: null,
+        rejectionReason: null,
+      }));
+      await this.galleryPhotoRepo.save(galleryEntities);
+    }
+
+    // Save place changes
+    await this.placeRepository.save(place);
+
+    req.status = 'approved';
+    req.reviewedAt = new Date();
+    req.rejectionReason = null;
+    const savedReq = await this.editRequestRepo.save(req);
+    this.invalidateReadCache();
+    return this.formatEditRequest(savedReq);
+  }
+
+  async rejectEditRequest(id: number, rejectionReason?: string): Promise<Record<string, unknown>> {
+    const req = await this.editRequestRepo.findOne({ where: { id }, relations: ['place', 'account'] });
+
+    if (!req) {
+      throw new NotFoundException(`Edit request com id ${id} não encontrado`);
+    }
+
+    req.status = 'rejected';
+    req.reviewedAt = new Date();
+    req.rejectionReason = rejectionReason?.trim() || null;
+
+    const saved = await this.editRequestRepo.save(req);
+    return this.formatEditRequest(saved);
   }
 
   // ✅ Admin approval methods

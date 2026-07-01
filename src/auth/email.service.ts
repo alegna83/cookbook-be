@@ -1,12 +1,49 @@
 import { Injectable } from '@nestjs/common';
+import * as nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 import { Resend } from 'resend';
+
+type EmailProvider = 'smtp' | 'resend';
 
 @Injectable()
 export class EmailService {
-  private resend: Resend;
+  private readonly provider: EmailProvider;
+  private readonly fromEmail: string;
+  private readonly resend?: Resend;
+  private readonly transporter?: Transporter;
+  private readonly isDevelopment = process.env.NODE_ENV === 'development';
+  private readonly bypassEmailVerification = process.env.BYPASS_EMAIL_VERIFICATION === 'true';
 
   constructor() {
-    this.resend = new Resend(process.env.RESEND_API_KEY);
+    this.provider = this.resolveProvider();
+    this.fromEmail = this.resolveFromEmail();
+
+    if (this.provider === 'resend') {
+      const apiKey = process.env.RESEND_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error('RESEND_API_KEY is required when EMAIL_PROVIDER=resend');
+      }
+
+      this.resend = new Resend(apiKey);
+      return;
+    }
+
+    const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
+    const port = Number(process.env.SMTP_PORT ?? 465);
+    const secure = this.parseBoolean(process.env.SMTP_SECURE, port === 465);
+    const user = process.env.SMTP_USER?.trim();
+    const pass = process.env.SMTP_PASS?.trim();
+
+    if (!user || !pass) {
+      throw new Error('SMTP_USER and SMTP_PASS are required when EMAIL_PROVIDER=smtp');
+    }
+
+    this.transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+    });
   }
 
   async sendEmailVerificationEmail(
@@ -15,66 +52,127 @@ export class EmailService {
     verificationToken: string,
     verificationUrl: string,
   ): Promise<any> {
-    try {
-      const result = await this.resend.emails.send({
-        from: 'onboarding@resend.dev',
-        to: email,
-        subject: 'Verify your email - Camino Places',
-        html: this.getVerificationEmailTemplate(name, verificationUrl),
-      });
-
-      if (result.error) {
-        console.error('Email send error:', result.error);
-        throw new Error(`Failed to send verification email: ${result.error}`);
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Error sending verification email:', error);
-      throw error;
+    if (this.bypassEmailVerification && this.isDevelopment) {
+      console.log(
+        `[EmailService] DEV BYPASS: verification email not sent to ${email}. Token=${verificationToken.substring(0, 8)}...`,
+      );
+      return { id: `dev-${Date.now()}`, message: 'DEV: Email bypassed' };
     }
+
+    return this.sendEmail(
+      email,
+      'Verify your email - Camino Places',
+      this.getVerificationEmailTemplate(name, verificationUrl),
+    );
   }
 
   async sendWelcomeEmail(email: string, name: string): Promise<any> {
-    try {
-      const result = await this.resend.emails.send({
-        from: 'onboarding@resend.dev',
-        to: email,
-        subject: 'Welcome to Camino Places!',
-        html: this.getWelcomeEmailTemplate(name),
-      });
+    return this.sendEmail(
+      email,
+      'Welcome to Camino Places!',
+      this.getWelcomeEmailTemplate(name),
+    );
+  }
 
-      if (result.error) {
-        console.error('Email send error:', result.error);
-        throw new Error(`Failed to send welcome email: ${result.error}`);
+  async sendPasswordResetEmail(
+    email: string,
+    name: string,
+    resetToken: string,
+    resetUrl: string,
+  ): Promise<any> {
+    return this.sendEmail(
+      email,
+      'Reset your password - Camino Places',
+      this.getPasswordResetTemplate(name, resetUrl),
+    );
+  }
+
+  private async sendEmail(email: string, subject: string, html: string): Promise<any> {
+    try {
+      if (this.provider === 'resend') {
+        return await this.sendWithResend(email, subject, html);
       }
 
-      return result;
+      return await this.sendWithSmtp(email, subject, html);
     } catch (error) {
-      console.error('Error sending welcome email:', error);
+      console.error('[EmailService] Error sending email:', error);
       throw error;
     }
   }
 
-  async sendPasswordResetEmail(email: string, name: string, resetToken: string, resetUrl: string): Promise<any> {
-    try {
-      const result = await this.resend.emails.send({
-        from: 'onboarding@resend.dev',
-        to: email,
-        subject: 'Reset your password - Camino Places',
-        html: this.getPasswordResetTemplate(name, resetUrl),
-      });
-
-      if (result.error) {
-        console.error('Email send error:', result.error);
-        throw new Error(`Failed to send password reset email: ${result.error}`);
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Error sending password reset email:', error);
-      throw error;
+  private async sendWithResend(email: string, subject: string, html: string): Promise<any> {
+    if (!this.resend) {
+      throw new Error('Resend client is not configured.');
     }
+
+    if (this.isUsingResendTestSender() && !this.bypassEmailVerification) {
+      throw new Error(
+        'Resend sender is still using onboarding@resend.dev. Verify a domain in Resend and set RESEND_FROM_EMAIL to an address on that domain.',
+      );
+    }
+
+    const result = await this.resend.emails.send({
+      from: this.fromEmail,
+      to: email,
+      subject,
+      html,
+    });
+
+    if ((result as any)?.error) {
+      const errorObj = (result as any).error;
+      console.error('[EmailService] Resend email error:', errorObj);
+      throw new Error(errorObj?.message || JSON.stringify(errorObj));
+    }
+
+    return result;
+  }
+
+  private async sendWithSmtp(email: string, subject: string, html: string): Promise<any> {
+    if (!this.transporter) {
+      throw new Error('SMTP transporter is not configured.');
+    }
+
+    const info = await this.transporter.sendMail({
+      from: this.fromEmail,
+      to: email,
+      subject,
+      html,
+    });
+
+    console.log('[EmailService] SMTP sendMail result:', {
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+    });
+
+    return info;
+  }
+
+  private resolveProvider(): EmailProvider {
+    const configured = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
+    return configured === 'resend' ? 'resend' : 'smtp';
+  }
+
+  private resolveFromEmail(): string {
+    if (this.provider === 'smtp') {
+      return (
+        process.env.SMTP_FROM?.trim() ||
+        process.env.EMAIL_FROM?.trim() ||
+        'Camino Places <stays4pilgrims@gmail.com>'
+      );
+    }
+
+    return process.env.RESEND_FROM_EMAIL?.trim() || 'Camino Places <onboarding@resend.dev>';
+  }
+
+  private parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
+    if (value == null) return defaultValue;
+    return value.trim().toLowerCase() === 'true';
+  }
+
+  private isUsingResendTestSender(): boolean {
+    const normalizedFrom = this.fromEmail.toLowerCase();
+    return normalizedFrom.includes('onboarding@resend.dev') || normalizedFrom.includes('@resend.dev');
   }
 
   private getVerificationEmailTemplate(name: string, verificationUrl: string): string {
@@ -157,7 +255,14 @@ export class EmailService {
       <html>
         <head>
           <meta charset="utf-8">
-          <style> body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; } .container { max-width: 600px; margin: 0 auto; padding: 20px; } .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; } .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; } .button { display: inline-block; background: #e55353; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; } .footer { text-align: center; font-size: 12px; color: #666; margin-top: 20px; } </style>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+            .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+            .button { display: inline-block; background: #e55353; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+            .footer { text-align: center; font-size: 12px; color: #666; margin-top: 20px; }
+          </style>
         </head>
         <body>
           <div class="container">
