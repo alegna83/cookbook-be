@@ -17,6 +17,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
+    "test:integration:auth-comments": "node scripts/run-auth-comments-integration.js",
+    "test:integration:upload-suggestions": "node scripts/run-upload-suggestions-integration.js",
+    "test:integration": "npm run test:integration:auth-comments && npm run test:integration:upload-suggestions",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "migration:generate": "typeorm migration:generate",
@@ -88,31 +91,5 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": ".",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "moduleNameMapper": {
-      "^src/(.*)$": "<rootDir>/src/$1"
-    },
-    "collectCoverageFrom": [
-      "src/**/*.ts",
-      "!src/**/*.spec.ts",
-      "!src/**/*.d.ts"
-    ],
-    "coveragePathIgnorePatterns": [
-      "/dist/",
-      "/coverage/"
-    ],
-    "coverageDirectory": "coverage",
-    "testEnvironment": "node"
   }
 }
