@@ -22,6 +22,8 @@ export class AccommodationsService {
     { expiresAt: number; value: unknown }
   >();
 
+  private readonly pendingReads = new Map<string, Promise<unknown>>();
+
   private readonly shouldLogTimings =
     process.env.LOG_REQUEST_TIMINGS === 'true';
 
@@ -88,6 +90,44 @@ export class AccommodationsService {
 
   private invalidateReadCache(): void {
     this.readCache.clear();
+  }
+
+  private async getOrLoad<T>(key: string, loader: () => Promise<T>): Promise<T> {
+    const cached = this.getCachedValue<T>(key);
+
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const pending = this.pendingReads.get(key);
+    if (pending) {
+      return pending as Promise<T>;
+    }
+
+    const promise = (async () => {
+      try {
+        const value = await loader();
+        return this.setCachedValue(key, value);
+      } finally {
+        this.pendingReads.delete(key);
+      }
+    })();
+
+    this.pendingReads.set(key, promise);
+    return promise;
+  }
+
+  private normalizeBoundsValue(value: number): number {
+    return Number(value.toFixed(4));
+  }
+
+  private buildBoundsCacheKey(bounds: {
+    south: number;
+    west: number;
+    north: number;
+    east: number;
+  }): string {
+    return `getByBounds:${this.normalizeBoundsValue(bounds.south)}:${this.normalizeBoundsValue(bounds.west)}:${this.normalizeBoundsValue(bounds.north)}:${this.normalizeBoundsValue(bounds.east)}`;
   }
 
   private logTiming(step: string, startNs: bigint): void {
@@ -507,32 +547,28 @@ export class AccommodationsService {
 
     const maybeCaminoId = Number(normalized);
     const cacheKey = `findByCamino:${Number.isInteger(maybeCaminoId) ? maybeCaminoId : normalized.toLowerCase()}`;
-    const cached = this.getCachedValue<Accommodation[]>(cacheKey);
+    return this.getOrLoad(cacheKey, async () => {
+      const query = this.placeRepository
+        .createQueryBuilder('place')
+        .leftJoinAndSelect('place.camino', 'camino')
+        .leftJoinAndSelect('place.stage', 'stage')
+        .leftJoinAndSelect('place.place_category', 'place_category');
 
-    if (cached) {
-      return cached;
-    }
+      if (Number.isInteger(maybeCaminoId)) {
+        query.where('camino.id = :caminoId', { caminoId: maybeCaminoId });
+      } else {
+        query.where('LOWER(BTRIM(camino.name)) = LOWER(BTRIM(:caminoName))', {
+          caminoName: normalized,
+        });
+      }
 
-    const query = this.placeRepository
-      .createQueryBuilder('place')
-      .leftJoinAndSelect('place.camino', 'camino')
-      .leftJoinAndSelect('place.stage', 'stage')
-      .leftJoinAndSelect('place.place_category', 'place_category');
+      query.andWhere('place.status = :status', { status: 'approved' });
 
-    if (Number.isInteger(maybeCaminoId)) {
-      query.where('camino.id = :caminoId', { caminoId: maybeCaminoId });
-    } else {
-      query.where('LOWER(BTRIM(camino.name)) = LOWER(BTRIM(:caminoName))', {
-        caminoName: normalized,
-      });
-    }
+      const places = await query.getMany();
+      await this.attachServices(places);
 
-    query.andWhere('place.status = :status', { status: 'approved' });
-
-    const places = await query.getMany();
-    await this.attachServices(places);
-
-    return this.setCachedValue(cacheKey, places);
+      return places;
+    });
   }
 
   async findByAccount(accountId: number): Promise<AccommodationDto[]> {
@@ -570,38 +606,35 @@ export class AccommodationsService {
   }
 
   async getByBounds(bounds: any) {
-    const { south, west, north, east } = bounds;
-    const cacheKey = `getByBounds:${south}:${west}:${north}:${east}`;
-    const cached = this.getCachedValue<Accommodation[]>(cacheKey);
+    const cacheKey = this.buildBoundsCacheKey(bounds);
 
-    if (cached) {
-      return cached;
-    }
+    return this.getOrLoad(cacheKey, async () => {
+      const { south, west, north, east } = bounds;
+      const totalStartNs = process.hrtime.bigint();
+      const queryStartNs = process.hrtime.bigint();
+      const places = await this.placeRepository
+        .createQueryBuilder('place')
+        .leftJoinAndSelect('place.place_category', 'place_category')
+        .leftJoinAndSelect(
+          'place.gallery_photos',
+          'gallery_photos',
+          'gallery_photos.status = :photoStatus',
+          { photoStatus: 'approved' },
+        )
+        .where('place.latitude BETWEEN :south AND :north', { south, north })
+        .andWhere('place.longitude BETWEEN :west AND :east', { west, east })
+        .andWhere('place.status = :status', { status: 'approved' })
+        .getMany();
+      this.logTiming('getByBounds.db', queryStartNs);
 
-    const totalStartNs = process.hrtime.bigint();
-    const queryStartNs = process.hrtime.bigint();
-    const places = await this.placeRepository
-      .createQueryBuilder('place')
-      .leftJoinAndSelect('place.place_category', 'place_category')
-      .leftJoinAndSelect(
-        'place.gallery_photos',
-        'gallery_photos',
-        'gallery_photos.status = :photoStatus',
-        { photoStatus: 'approved' },
-      )
-      .where('place.latitude BETWEEN :south AND :north', { south, north })
-      .andWhere('place.longitude BETWEEN :west AND :east', { west, east })
-      .andWhere('place.status = :status', { status: 'approved' })
-      .getMany();
-    this.logTiming('getByBounds.db', queryStartNs);
+      const servicesStartNs = process.hrtime.bigint();
+      await this.attachServices(places);
+      this.logTiming('getByBounds.services', servicesStartNs);
 
-    const servicesStartNs = process.hrtime.bigint();
-    await this.attachServices(places);
-    this.logTiming('getByBounds.services', servicesStartNs);
+      this.logTiming('getByBounds.total', totalStartNs);
 
-    this.logTiming('getByBounds.total', totalStartNs);
-
-    return this.setCachedValue(cacheKey, places);
+      return places;
+    });
   }
 
   async findAccommodationByPlaceId(placeId: number): Promise<any> {

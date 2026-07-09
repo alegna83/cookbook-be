@@ -22,15 +22,77 @@ export class CaminosService {
 
 @Injectable()
 export class CaminosService {
+  private readonly readCache = new Map<
+    string,
+    { expiresAt: number; value: unknown }
+  >();
+
+  private readonly pendingReads = new Map<string, Promise<unknown>>();
+
+  private readonly cacheTtlMs = (() => {
+    const defaultTtl = process.env.NODE_ENV === 'production' ? 300000 : 60000;
+    const parsed = Number(process.env.CAMINOS_CACHE_TTL_MS ?? defaultTtl);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : defaultTtl;
+  })();
+
   constructor(
     @InjectRepository(Camino)
     private caminoRepository: Repository<Camino>,
   ) {}
 
+  private getCachedValue<T>(key: string): T | undefined {
+    const cached = this.readCache.get(key);
+
+    if (!cached) {
+      return undefined;
+    }
+
+    if (cached.expiresAt <= Date.now()) {
+      this.readCache.delete(key);
+      return undefined;
+    }
+
+    return cached.value as T;
+  }
+
+  private setCachedValue<T>(key: string, value: T): T {
+    this.readCache.set(key, {
+      value,
+      expiresAt: Date.now() + this.cacheTtlMs,
+    });
+
+    return value;
+  }
+
+  private async getOrLoad<T>(key: string, loader: () => Promise<T>): Promise<T> {
+    const cached = this.getCachedValue<T>(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const pending = this.pendingReads.get(key);
+    if (pending) {
+      return pending as Promise<T>;
+    }
+
+    const promise = (async () => {
+      try {
+        const value = await loader();
+        return this.setCachedValue(key, value);
+      } finally {
+        this.pendingReads.delete(key);
+      }
+    })();
+
+    this.pendingReads.set(key, promise);
+    return promise;
+  }
+
   async findAll(): Promise<any[]> {
-    // Query crua SQL usando a função f(x) = 1/(1 + x²)
-    // Normaliza o número de peregrinos dividindo pelo máximo global
-    const query = `
+    return this.getOrLoad('findAll', async () => {
+      // Query crua SQL usando a função f(x) = 1/(1 + x²)
+      // Normaliza o número de peregrinos dividindo pelo máximo global
+      const query = `
       WITH stats AS (
       SELECT
         s.camino_id,
@@ -59,8 +121,7 @@ export class CaminosService {
     ORDER BY COALESCE(sc.ranking_score::float, 0) DESC, c.name ASC;
     `;
 
-    const caminos = (await this.caminoRepository.query(query)) as Camino[];
-    console.log('Caminos with ranking scores:', caminos);
-    return caminos;
+      return (await this.caminoRepository.query(query)) as Camino[];
+    });
   }
 }
