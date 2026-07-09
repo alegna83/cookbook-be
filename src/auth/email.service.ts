@@ -125,8 +125,8 @@ export class EmailService {
     }
 
     if (this.isUsingResendTestSender() && !this.bypassEmailVerification) {
-      throw new Error(
-        'Resend sender is still using onboarding@resend.dev. Verify a domain in Resend and set RESEND_FROM_EMAIL to an address on that domain.',
+      console.warn(
+        '[EmailService] Using Resend test sender (onboarding@resend.dev). This is allowed temporarily for testing, but you should switch to a verified domain sender for production.',
       );
     }
 
