@@ -4,10 +4,11 @@ import type { Transporter } from 'nodemailer';
 import { Resend } from 'resend';
 
 type EmailProvider = 'smtp' | 'resend';
+type ResolvedEmailProvider = EmailProvider | 'noop';
 
 @Injectable()
 export class EmailService {
-  private readonly provider: EmailProvider;
+  private readonly provider: ResolvedEmailProvider;
   private readonly fromEmail: string;
   private readonly resend?: Resend;
   private readonly transporter?: Transporter;
@@ -28,22 +29,30 @@ export class EmailService {
       return;
     }
 
-    const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
-    const port = Number(process.env.SMTP_PORT ?? 465);
-    const secure = this.parseBoolean(process.env.SMTP_SECURE, port === 465);
-    const user = process.env.SMTP_USER?.trim();
-    const pass = process.env.SMTP_PASS?.trim();
+    if (this.provider === 'smtp') {
+      const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
+      const port = Number(process.env.SMTP_PORT ?? 465);
+      const secure = this.parseBoolean(process.env.SMTP_SECURE, port === 465);
+      const user = process.env.SMTP_USER?.trim();
+      const pass = process.env.SMTP_PASS?.trim();
 
-    if (!user || !pass) {
-      throw new Error('SMTP_USER and SMTP_PASS are required when EMAIL_PROVIDER=smtp');
+      if (!user || !pass) {
+        throw new Error('SMTP_USER and SMTP_PASS are required when EMAIL_PROVIDER=smtp');
+      }
+
+      this.transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: { user, pass },
+      });
+
+      return;
     }
 
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      auth: { user, pass },
-    });
+    console.warn(
+      '[EmailService] No email provider credentials configured. Email sending will be disabled, but the app will continue to boot.',
+    );
   }
 
   async sendEmailVerificationEmail(
@@ -89,6 +98,16 @@ export class EmailService {
 
   private async sendEmail(email: string, subject: string, html: string): Promise<any> {
     try {
+      if (this.provider === 'noop') {
+        console.warn(
+          `[EmailService] Email disabled. Skipping send to ${email} with subject: ${subject}`,
+        );
+        return {
+          id: `noop-${Date.now()}`,
+          message: 'Email delivery disabled by configuration',
+        };
+      }
+
       if (this.provider === 'resend') {
         return await this.sendWithResend(email, subject, html);
       }
@@ -148,9 +167,25 @@ export class EmailService {
     return info;
   }
 
-  private resolveProvider(): EmailProvider {
+  private resolveProvider(): ResolvedEmailProvider {
     const configured = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
-    return configured === 'resend' ? 'resend' : 'smtp';
+
+    const hasResend = Boolean(process.env.RESEND_API_KEY?.trim());
+    const hasSmtp = Boolean(
+      process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim(),
+    );
+
+    if (configured === 'resend') {
+      return hasResend ? 'resend' : 'noop';
+    }
+
+    if (configured === 'smtp') {
+      return hasSmtp ? 'smtp' : hasResend ? 'resend' : 'noop';
+    }
+
+    if (hasResend) return 'resend';
+    if (hasSmtp) return 'smtp';
+    return 'noop';
   }
 
   private resolveFromEmail(): string {
