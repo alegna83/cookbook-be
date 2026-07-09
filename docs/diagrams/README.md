@@ -8,6 +8,7 @@ See also:
 
 Files:
 
+- docs/diagrams/project-architecture.puml
 - docs/diagrams/system-overview.puml
 - docs/diagrams/backend-architecture.puml
 - docs/diagrams/frontend-architecture.puml
@@ -19,6 +20,7 @@ Files:
 
 Rendered images:
 
+- docs/diagrams/png/project-architecture.png
 - docs/diagrams/png/system-overview.png
 - docs/diagrams/png/backend-architecture.png
 - docs/diagrams/png/frontend-architecture.png
