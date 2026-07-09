@@ -37,14 +37,27 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Authorization',
     credentials: true,
   });*/
-  if (shouldLogRequests) {
-    console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
-    console.log('Allowed origins:', process.env.FRONTEND_URL?.split(','));
-  }
-
   const configuredOrigins = process.env.FRONTEND_URL
     ? process.env.FRONTEND_URL.split(',').map((origin) => origin.trim())
     : [];
+
+  const defaultOrigins = [
+    'https://stays4pilgrims-camino.web.app',
+    'https://camino-places-app.web.app',
+    'http://localhost:3000',
+    'http://localhost:8080',
+  ];
+
+  const allowedOrigins = new Set(
+    [...configuredOrigins, ...defaultOrigins].map((origin) =>
+      origin.replace(/\/$/, ''),
+    ),
+  );
+
+  if (shouldLogRequests) {
+    console.log('FRONTEND_URL:', process.env.FRONTEND_URL);
+    console.log('Allowed origins:', [...allowedOrigins]);
+  }
 
   const devOrigins = [
     /^https?:\/\/localhost(?::\d+)?$/,
@@ -52,9 +65,22 @@ async function bootstrap() {
   ];
 
   app.enableCors({
-    origin: [...configuredOrigins, ...devOrigins],
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+
+      const normalizedOrigin = origin.replace(/\/$/, '');
+      const isAllowed =
+        allowedOrigins.has(normalizedOrigin) ||
+        devOrigins.some((pattern) => pattern.test(normalizedOrigin));
+
+      callback(isAllowed ? null : new Error(`CORS blocked for origin ${origin}`), isAllowed);
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
   });
 
   await app.listen(process.env.PORT ?? 3000);
