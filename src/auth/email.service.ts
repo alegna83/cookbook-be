@@ -140,6 +140,26 @@ export class EmailService {
     if ((result as any)?.error) {
       const errorObj = (result as any).error;
       console.error('[EmailService] Resend email error:', errorObj);
+
+      const errorMessage = String(errorObj?.message || '').toLowerCase();
+      const isTestSenderRestriction =
+        errorObj?.statusCode === 403 &&
+        errorObj?.name === 'validation_error' &&
+        errorMessage.includes('only send testing emails') &&
+        errorMessage.includes('verify a domain');
+
+      if (isTestSenderRestriction) {
+        console.warn(
+          `[EmailService] Resend test sender blocked delivery to ${email}. Returning a soft success so registration can continue.`,
+        );
+
+        return {
+          id: `resend-test-${Date.now()}`,
+          message: 'Email not delivered because Resend test sender can only email the verified test address.',
+          blockedByResendTestSender: true,
+        };
+      }
+
       throw new Error(errorObj?.message || JSON.stringify(errorObj));
     }
 
