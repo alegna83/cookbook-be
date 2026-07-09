@@ -19,6 +19,12 @@ export class EmailService {
     this.provider = this.resolveProvider();
     this.fromEmail = this.resolveFromEmail();
 
+    if (this.shouldFallbackToSmtp()) {
+      console.warn(
+        '[EmailService] Resend is configured with the test sender. Falling back to SMTP so verification emails can actually be delivered.',
+      );
+    }
+
     if (this.provider === 'resend') {
       const apiKey = process.env.RESEND_API_KEY?.trim();
       if (!apiKey) {
@@ -195,6 +201,10 @@ export class EmailService {
       process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim(),
     );
 
+    if (hasSmtp && this.isConfiguredResendTestSender()) {
+      return 'smtp';
+    }
+
     if (configured === 'resend') {
       return hasResend ? 'resend' : 'noop';
     }
@@ -210,14 +220,32 @@ export class EmailService {
 
   private resolveFromEmail(): string {
     if (this.provider === 'smtp') {
+      const smtpUser = process.env.SMTP_USER?.trim();
       return (
         process.env.SMTP_FROM?.trim() ||
         process.env.EMAIL_FROM?.trim() ||
-        'Camino Places <stays4pilgrims@gmail.com>'
+        (smtpUser ? `Camino Places <${smtpUser}>` : 'Camino Places <stays4pilgrims@gmail.com>')
       );
     }
 
     return process.env.RESEND_FROM_EMAIL?.trim() || 'Camino Places <onboarding@resend.dev>';
+  }
+
+  private shouldFallbackToSmtp(): boolean {
+    return this.provider === 'smtp' && this.isConfiguredResendTestSender() && this.hasSmtpCredentials();
+  }
+
+  private hasSmtpCredentials(): boolean {
+    return Boolean(process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim());
+  }
+
+  private isConfiguredResendTestSender(): boolean {
+    const configuredFrom = process.env.RESEND_FROM_EMAIL?.trim().toLowerCase();
+    if (!configuredFrom) {
+      return true;
+    }
+
+    return configuredFrom.includes('onboarding@resend.dev') || configuredFrom.includes('@resend.dev');
   }
 
   private parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
