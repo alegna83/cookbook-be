@@ -198,19 +198,17 @@ export class EmailService {
       process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim(),
     );
 
-    // Force using SMTP if SMTP credentials are present. This ensures environments
-    // with SMTP configured will always use SMTP (even if RESEND is available).
-    if (hasSmtp) return 'smtp';
-
     if (configured === 'resend') {
       return hasResend ? 'resend' : 'noop';
     }
 
     if (configured === 'smtp') {
-      return hasSmtp ? 'smtp' : hasResend ? 'resend' : 'noop';
+      return this.isDevelopment ? (hasSmtp ? 'smtp' : hasResend ? 'resend' : 'noop') : hasResend ? 'resend' : 'noop';
     }
 
+    if (this.isDevelopment && hasSmtp) return 'smtp';
     if (hasResend) return 'resend';
+    if (hasSmtp) return this.isDevelopment ? 'smtp' : 'noop';
     return 'noop';
   }
 
@@ -224,7 +222,13 @@ export class EmailService {
       );
     }
 
-    return process.env.RESEND_FROM_EMAIL?.trim() || 'Stays4Pilgrims <onboarding@resend.dev>';
+      const resendFromEmail = process.env.RESEND_FROM_EMAIL?.trim();
+
+      if (!resendFromEmail && !this.isDevelopment) {
+        throw new Error('RESEND_FROM_EMAIL is required in production when using Resend');
+      }
+
+      return resendFromEmail || 'Stays4Pilgrims <onboarding@resend.dev>';
   }
 
   private shouldFallbackToSmtp(): boolean {
