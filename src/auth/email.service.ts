@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { Resend } from 'resend';
@@ -136,40 +136,22 @@ export class EmailService {
       );
     }
 
-    const result = await this.resend.emails.send({
-      from: this.fromEmail,
-      to: email,
-      subject,
-      html,
-    });
+    try {
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject,
+        html,
+      });
 
-    if ((result as any)?.error) {
-      const errorObj = (result as any).error;
-      console.error('[EmailService] Resend email error:', errorObj);
-
-      const errorMessage = String(errorObj?.message || '').toLowerCase();
-      const isTestSenderRestriction =
-        errorObj?.statusCode === 403 &&
-        errorObj?.name === 'validation_error' &&
-        errorMessage.includes('only send testing emails') &&
-        errorMessage.includes('verify a domain');
-
-      if (isTestSenderRestriction) {
-        console.warn(
-          `[EmailService] Resend test sender blocked delivery to ${email}. Returning a soft success so registration can continue.`,
-        );
-
-        return {
-          id: `resend-test-${Date.now()}`,
-          message: 'Email not delivered because Resend test sender can only email the verified test address.',
-          blockedByResendTestSender: true,
-        };
+      if ((result as any)?.error) {
+        this.throwOrRethrowResendError((result as any).error, email);
       }
 
-      throw new Error(errorObj?.message || JSON.stringify(errorObj));
+      return result;
+    } catch (error) {
+      this.throwOrRethrowResendError(error, email);
     }
-
-    return result;
   }
 
   private async sendWithSmtp(email: string, subject: string, html: string): Promise<any> {
@@ -256,6 +238,25 @@ export class EmailService {
   private isUsingResendTestSender(): boolean {
     const normalizedFrom = this.fromEmail.toLowerCase();
     return normalizedFrom.includes('onboarding@resend.dev') || normalizedFrom.includes('@resend.dev');
+  }
+
+  private throwOrRethrowResendError(error: any, email: string): never {
+    console.error('[EmailService] Resend email error:', error);
+
+    const errorMessage = String(error?.message || error?.response?.message || '').toLowerCase();
+    const isTestSenderRestriction =
+      error?.statusCode === 403 &&
+      error?.name === 'validation_error' &&
+      errorMessage.includes('only send testing emails') &&
+      errorMessage.includes('verify a domain');
+
+    if (isTestSenderRestriction) {
+      throw new BadRequestException(
+        `Resend is using the test sender and cannot send verification emails to ${email}. Use a verified domain sender in RESEND_FROM_EMAIL or switch to SMTP.`,
+      );
+    }
+
+    throw new Error(error?.message || error?.response?.message || JSON.stringify(error));
   }
 
   private getVerificationEmailTemplate(name: string, verificationUrl: string): string {
