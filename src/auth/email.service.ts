@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import dns from 'dns/promises';
 import { Resend } from 'resend';
 
 type EmailProvider = 'smtp' | 'resend';
@@ -11,7 +12,8 @@ export class EmailService {
   private readonly provider: ResolvedEmailProvider;
   private readonly fromEmail: string;
   private readonly resend?: Resend;
-  private readonly transporter?: Transporter;
+  private transporter?: Transporter;
+  private smtpConfig?: { host: string; port: number; secure: boolean; auth: { user: string; pass: string } };
   private readonly isDevelopment = process.env.NODE_ENV === 'development';
   private readonly bypassEmailVerification = process.env.BYPASS_EMAIL_VERIFICATION === 'true';
 
@@ -46,12 +48,8 @@ export class EmailService {
         throw new Error('SMTP_USER and SMTP_PASS are required when EMAIL_PROVIDER=smtp');
       }
 
-      this.transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: { user, pass },
-      });
+      // Store SMTP config and create transporter lazily at send time.
+      this.smtpConfig = { host, port, secure, auth: { user, pass } };
 
       return;
     }
@@ -76,7 +74,7 @@ export class EmailService {
 
     return this.sendEmail(
       email,
-      'Verify your email - Camino Places',
+      'Verify your email - Stays4Pilgrims',
       this.getVerificationEmailTemplate(name, verificationUrl),
     );
   }
@@ -84,7 +82,7 @@ export class EmailService {
   async sendWelcomeEmail(email: string, name: string): Promise<any> {
     return this.sendEmail(
       email,
-      'Welcome to Camino Places!',
+      'Welcome to Stays4Pilgrims!',
       this.getWelcomeEmailTemplate(name),
     );
   }
@@ -97,7 +95,7 @@ export class EmailService {
   ): Promise<any> {
     return this.sendEmail(
       email,
-      'Reset your password - Camino Places',
+      'Reset your password - Stays4Pilgrims',
       this.getPasswordResetTemplate(name, resetUrl),
     );
   }
@@ -156,7 +154,25 @@ export class EmailService {
 
   private async sendWithSmtp(email: string, subject: string, html: string): Promise<any> {
     if (!this.transporter) {
-      throw new Error('SMTP transporter is not configured.');
+      if (!this.smtpConfig) {
+        throw new Error('SMTP transporter is not configured.');
+      }
+
+      let resolvedHost = this.smtpConfig.host;
+      try {
+        const lookup = await dns.lookup(this.smtpConfig.host, { family: 4 });
+        resolvedHost = lookup.address;
+      } catch (err) {
+        console.warn('[EmailService] Could not resolve IPv4 for SMTP host, falling back to configured host', err?.message || err);
+      }
+
+      this.transporter = nodemailer.createTransport({
+        host: resolvedHost,
+        port: this.smtpConfig.port,
+        secure: this.smtpConfig.secure,
+        auth: this.smtpConfig.auth,
+        tls: { servername: this.smtpConfig.host },
+      });
     }
 
     const info = await this.transporter.sendMail({
@@ -177,15 +193,14 @@ export class EmailService {
 
   private resolveProvider(): ResolvedEmailProvider {
     const configured = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
-
     const hasResend = Boolean(process.env.RESEND_API_KEY?.trim());
     const hasSmtp = Boolean(
       process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim(),
     );
 
-    if (hasSmtp && this.isConfiguredResendTestSender()) {
-      return 'smtp';
-    }
+    // Force using SMTP if SMTP credentials are present. This ensures environments
+    // with SMTP configured will always use SMTP (even if RESEND is available).
+    if (hasSmtp) return 'smtp';
 
     if (configured === 'resend') {
       return hasResend ? 'resend' : 'noop';
@@ -196,7 +211,6 @@ export class EmailService {
     }
 
     if (hasResend) return 'resend';
-    if (hasSmtp) return 'smtp';
     return 'noop';
   }
 
@@ -206,11 +220,11 @@ export class EmailService {
       return (
         process.env.SMTP_FROM?.trim() ||
         process.env.EMAIL_FROM?.trim() ||
-        (smtpUser ? `Camino Places <${smtpUser}>` : 'Camino Places <stays4pilgrims@gmail.com>')
+        (smtpUser ? `Stays4Pilgrims <${smtpUser}>` : 'Stays4Pilgrims <stays4pilgrims@gmail.com>')
       );
     }
 
-    return process.env.RESEND_FROM_EMAIL?.trim() || 'Camino Places <onboarding@resend.dev>';
+    return process.env.RESEND_FROM_EMAIL?.trim() || 'Stays4Pilgrims <onboarding@resend.dev>';
   }
 
   private shouldFallbackToSmtp(): boolean {
@@ -277,8 +291,8 @@ export class EmailService {
         </head>
         <body>
           <div class="container">
-            <div class="header">
-              <h1>Welcome to Camino Places!</h1>
+              <div class="header">
+              <h1>Welcome to Stays4Pilgrims!</h1>
             </div>
             <div class="content">
               <p>Hi ${name},</p>
@@ -292,7 +306,7 @@ export class EmailService {
               <p>If you didn't create this account, please ignore this email.</p>
             </div>
             <div class="footer">
-              <p>&copy; 2026 Camino Places. All rights reserved.</p>
+              <p>&copy; 2026 Stays4Pilgrims. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -325,7 +339,7 @@ export class EmailService {
               <p>Happy pilgrimaging! 🥾</p>
             </div>
             <div class="footer">
-              <p>&copy; 2026 Camino Places. All rights reserved.</p>
+              <p>&copy; 2026 Stays4Pilgrims. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -351,7 +365,7 @@ export class EmailService {
         <body>
           <div class="container">
             <div class="header">
-              <h1>Camino Places</h1>
+              <h1>Stays4Pilgrims</h1>
             </div>
             <div class="content">
               <p>Hi ${name},</p>
