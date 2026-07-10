@@ -410,7 +410,7 @@ export class EmailService {
             </div>
             <div class="content">
               <p>Hi ${name},</p>
-              <p>Your email has been successfully verified! You can now log in and start exploring Camino Places.</p>
+              <p>Your email has been successfully verified! You can now log in and start exploring Stays4Pilgrims.</p>
               <p>Happy pilgrimaging! 🥾</p>
             </div>
             <div class="footer">
