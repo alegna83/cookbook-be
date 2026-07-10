@@ -240,27 +240,25 @@ export class EmailService {
   private resolveProvider(): ResolvedEmailProvider {
     const configured = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
     const hasResend = Boolean(process.env.RESEND_API_KEY?.trim());
+    const hasBrevo = Boolean(process.env.BREVO_API_KEY?.trim());
     const hasSmtp = Boolean(
       process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim(),
     );
 
-    if (hasSmtp) {
-      return 'smtp';
+    if (configured === 'brevo') {
+      return hasBrevo ? 'brevo' : 'noop';
     }
 
     if (configured === 'resend') {
       return hasResend ? 'resend' : 'noop';
     }
 
-    if (configured === 'brevo') {
-      return Boolean(process.env.BREVO_API_KEY?.trim()) ? 'brevo' : 'noop';
-    }
-
     if (configured === 'smtp') {
-      return 'noop';
+      return hasSmtp ? 'smtp' : 'noop';
     }
 
-    if (process.env.BREVO_API_KEY?.trim()) return 'brevo';
+    if (hasSmtp) return 'smtp';
+    if (hasBrevo) return 'brevo';
     if (hasResend) return 'resend';
     return 'noop';
   }
