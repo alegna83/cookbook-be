@@ -1,22 +1,32 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { lookup as dnsLookup } from 'node:dns/promises';
 import { Resend } from 'resend';
 
-type EmailProvider = 'smtp' | 'resend';
+type EmailProvider = 'smtp' | 'resend' | 'brevo';
+type ResolvedEmailProvider = EmailProvider | 'noop';
 
 @Injectable()
 export class EmailService {
-  private readonly provider: EmailProvider;
+  private readonly provider: ResolvedEmailProvider;
   private readonly fromEmail: string;
   private readonly resend?: Resend;
-  private readonly transporter?: Transporter;
+  private readonly brevoApiKey?: string;
+  private transporter?: Transporter;
+  private smtpConfig?: { host: string; port: number; secure: boolean; auth: { user: string; pass: string } };
   private readonly isDevelopment = process.env.NODE_ENV === 'development';
   private readonly bypassEmailVerification = process.env.BYPASS_EMAIL_VERIFICATION === 'true';
 
   constructor() {
     this.provider = this.resolveProvider();
     this.fromEmail = this.resolveFromEmail();
+
+    if (this.shouldFallbackToSmtp()) {
+      console.warn(
+        '[EmailService] Resend is configured with the test sender. Falling back to SMTP so verification emails can actually be delivered.',
+      );
+    }
 
     if (this.provider === 'resend') {
       const apiKey = process.env.RESEND_API_KEY?.trim();
@@ -28,22 +38,36 @@ export class EmailService {
       return;
     }
 
-    const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
-    const port = Number(process.env.SMTP_PORT ?? 465);
-    const secure = this.parseBoolean(process.env.SMTP_SECURE, port === 465);
-    const user = process.env.SMTP_USER?.trim();
-    const pass = process.env.SMTP_PASS?.trim();
+    if (this.provider === 'brevo') {
+      const apiKey = process.env.BREVO_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error('BREVO_API_KEY is required when EMAIL_PROVIDER=brevo');
+      }
 
-    if (!user || !pass) {
-      throw new Error('SMTP_USER and SMTP_PASS are required when EMAIL_PROVIDER=smtp');
+      this.brevoApiKey = apiKey;
+      return;
     }
 
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      auth: { user, pass },
-    });
+    if (this.provider === 'smtp') {
+      const host = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com';
+      const port = Number(process.env.SMTP_PORT ?? 465);
+      const secure = this.parseBoolean(process.env.SMTP_SECURE, port === 465);
+      const user = process.env.SMTP_USER?.trim();
+      const pass = process.env.SMTP_PASS?.trim();
+
+      if (!user || !pass) {
+        throw new Error('SMTP_USER and SMTP_PASS are required when EMAIL_PROVIDER=smtp');
+      }
+
+      // Store SMTP config and create transporter lazily at send time.
+      this.smtpConfig = { host, port, secure, auth: { user, pass } };
+
+      return;
+    }
+
+    console.warn(
+      '[EmailService] No email provider credentials configured. Email sending will be disabled, but the app will continue to boot.',
+    );
   }
 
   async sendEmailVerificationEmail(
@@ -61,7 +85,7 @@ export class EmailService {
 
     return this.sendEmail(
       email,
-      'Verify your email - Camino Places',
+      'Verify your email - Stays4Pilgrims',
       this.getVerificationEmailTemplate(name, verificationUrl),
     );
   }
@@ -69,7 +93,7 @@ export class EmailService {
   async sendWelcomeEmail(email: string, name: string): Promise<any> {
     return this.sendEmail(
       email,
-      'Welcome to Camino Places!',
+      'Welcome to Stays4Pilgrims!',
       this.getWelcomeEmailTemplate(name),
     );
   }
@@ -82,15 +106,29 @@ export class EmailService {
   ): Promise<any> {
     return this.sendEmail(
       email,
-      'Reset your password - Camino Places',
+      'Reset your password - Stays4Pilgrims',
       this.getPasswordResetTemplate(name, resetUrl),
     );
   }
 
   private async sendEmail(email: string, subject: string, html: string): Promise<any> {
     try {
+      if (this.provider === 'noop') {
+        console.warn(
+          `[EmailService] Email disabled. Skipping send to ${email} with subject: ${subject}`,
+        );
+        return {
+          id: `noop-${Date.now()}`,
+          message: 'Email delivery disabled by configuration',
+        };
+      }
+
       if (this.provider === 'resend') {
         return await this.sendWithResend(email, subject, html);
+      }
+
+      if (this.provider === 'brevo') {
+        return await this.sendWithBrevo(email, subject, html);
       }
 
       return await this.sendWithSmtp(email, subject, html);
@@ -106,30 +144,81 @@ export class EmailService {
     }
 
     if (this.isUsingResendTestSender() && !this.bypassEmailVerification) {
-      throw new Error(
-        'Resend sender is still using onboarding@resend.dev. Verify a domain in Resend and set RESEND_FROM_EMAIL to an address on that domain.',
+      console.warn(
+        '[EmailService] Using Resend test sender (onboarding@resend.dev). This is allowed temporarily for testing, but you should switch to a verified domain sender for production.',
       );
     }
 
-    const result = await this.resend.emails.send({
-      from: this.fromEmail,
-      to: email,
-      subject,
-      html,
-    });
+    try {
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject,
+        html,
+      });
 
-    if ((result as any)?.error) {
-      const errorObj = (result as any).error;
-      console.error('[EmailService] Resend email error:', errorObj);
-      throw new Error(errorObj?.message || JSON.stringify(errorObj));
+      if ((result as any)?.error) {
+        this.throwOrRethrowResendError((result as any).error, email);
+      }
+
+      return result;
+    } catch (error) {
+      this.throwOrRethrowResendError(error, email);
+    }
+  }
+
+  private async sendWithBrevo(email: string, subject: string, html: string): Promise<any> {
+    if (!this.brevoApiKey) {
+      throw new Error('Brevo client is not configured.');
     }
 
-    return result;
+    const senderName = this.extractDisplayName(this.fromEmail) || 'Stays4Pilgrims';
+    const senderEmail = this.extractEmailAddress(this.fromEmail);
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': this.brevoApiKey,
+        'content-type': 'application/json',
+        accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Brevo email error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
   }
 
   private async sendWithSmtp(email: string, subject: string, html: string): Promise<any> {
     if (!this.transporter) {
-      throw new Error('SMTP transporter is not configured.');
+      if (!this.smtpConfig) {
+        throw new Error('SMTP transporter is not configured.');
+      }
+
+      let resolvedHost = this.smtpConfig.host;
+      try {
+        const lookup = await dnsLookup(this.smtpConfig.host, { family: 4 });
+        resolvedHost = lookup.address;
+      } catch (err) {
+        console.warn('[EmailService] Could not resolve IPv4 for SMTP host, falling back to configured host', err?.message || err);
+      }
+
+      this.transporter = nodemailer.createTransport({
+        host: resolvedHost,
+        port: this.smtpConfig.port,
+        secure: this.smtpConfig.secure,
+        auth: this.smtpConfig.auth,
+        tls: { servername: this.smtpConfig.host },
+      });
     }
 
     const info = await this.transporter.sendMail({
@@ -148,21 +237,76 @@ export class EmailService {
     return info;
   }
 
-  private resolveProvider(): EmailProvider {
+  private resolveProvider(): ResolvedEmailProvider {
     const configured = process.env.EMAIL_PROVIDER?.trim().toLowerCase();
-    return configured === 'resend' ? 'resend' : 'smtp';
+    const hasResend = Boolean(process.env.RESEND_API_KEY?.trim());
+    const hasBrevo = Boolean(process.env.BREVO_API_KEY?.trim());
+    const hasSmtp = Boolean(
+      process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim(),
+    );
+
+    if (configured === 'brevo') {
+      return hasBrevo ? 'brevo' : 'noop';
+    }
+
+    if (configured === 'resend') {
+      return hasResend ? 'resend' : 'noop';
+    }
+
+    if (configured === 'smtp') {
+      return hasSmtp ? 'smtp' : 'noop';
+    }
+
+    if (hasSmtp) return 'smtp';
+    if (hasBrevo) return 'brevo';
+    if (hasResend) return 'resend';
+    return 'noop';
   }
 
   private resolveFromEmail(): string {
     if (this.provider === 'smtp') {
+      const smtpUser = process.env.SMTP_USER?.trim();
       return (
         process.env.SMTP_FROM?.trim() ||
         process.env.EMAIL_FROM?.trim() ||
-        'Camino Places <stays4pilgrims@gmail.com>'
+        (smtpUser ? `Stays4Pilgrims <${smtpUser}>` : 'Stays4Pilgrims <stays4pilgrims@gmail.com>')
       );
     }
 
-    return process.env.RESEND_FROM_EMAIL?.trim() || 'Camino Places <onboarding@resend.dev>';
+    if (this.provider === 'brevo') {
+      const brevoSender = process.env.BREVO_FROM_EMAIL?.trim();
+
+      if (!brevoSender && !this.isDevelopment) {
+        throw new Error('BREVO_FROM_EMAIL is required in production when using Brevo');
+      }
+
+      return brevoSender || 'Stays4Pilgrims <noreply@localhost>';
+    }
+
+    const resendFromEmail = process.env.RESEND_FROM_EMAIL?.trim();
+
+    if (!resendFromEmail && !this.isDevelopment) {
+      throw new Error('RESEND_FROM_EMAIL is required in production when using Resend');
+    }
+
+    return resendFromEmail || 'Stays4Pilgrims <onboarding@resend.dev>';
+  }
+
+  private shouldFallbackToSmtp(): boolean {
+    return this.provider === 'smtp' && this.isConfiguredResendTestSender() && this.hasSmtpCredentials();
+  }
+
+  private hasSmtpCredentials(): boolean {
+    return Boolean(process.env.SMTP_USER?.trim() && process.env.SMTP_PASS?.trim());
+  }
+
+  private isConfiguredResendTestSender(): boolean {
+    const configuredFrom = process.env.RESEND_FROM_EMAIL?.trim().toLowerCase();
+    if (!configuredFrom) {
+      return true;
+    }
+
+    return configuredFrom.includes('onboarding@resend.dev') || configuredFrom.includes('@resend.dev');
   }
 
   private parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
@@ -170,9 +314,38 @@ export class EmailService {
     return value.trim().toLowerCase() === 'true';
   }
 
+  private extractEmailAddress(input: string): string {
+    const match = input.match(/<([^>]+)>/);
+    return (match?.[1] || input).trim();
+  }
+
+  private extractDisplayName(input: string): string {
+    const match = input.match(/^\s*([^<]+)\s*<[^>]+>\s*$/);
+    return (match?.[1] || '').trim();
+  }
+
   private isUsingResendTestSender(): boolean {
     const normalizedFrom = this.fromEmail.toLowerCase();
     return normalizedFrom.includes('onboarding@resend.dev') || normalizedFrom.includes('@resend.dev');
+  }
+
+  private throwOrRethrowResendError(error: any, email: string): never {
+    console.error('[EmailService] Resend email error:', error);
+
+    const errorMessage = String(error?.message || error?.response?.message || '').toLowerCase();
+    const isTestSenderRestriction =
+      error?.statusCode === 403 &&
+      error?.name === 'validation_error' &&
+      errorMessage.includes('only send testing emails') &&
+      errorMessage.includes('verify a domain');
+
+    if (isTestSenderRestriction) {
+      throw new BadRequestException(
+        `Resend is using the test sender and cannot send verification emails to ${email}. Use a verified domain sender in RESEND_FROM_EMAIL or switch to SMTP.`,
+      );
+    }
+
+    throw new Error(error?.message || error?.response?.message || JSON.stringify(error));
   }
 
   private getVerificationEmailTemplate(name: string, verificationUrl: string): string {
@@ -193,8 +366,8 @@ export class EmailService {
         </head>
         <body>
           <div class="container">
-            <div class="header">
-              <h1>Welcome to Camino Places!</h1>
+              <div class="header">
+              <h1>Welcome to Stays4Pilgrims!</h1>
             </div>
             <div class="content">
               <p>Hi ${name},</p>
@@ -208,7 +381,7 @@ export class EmailService {
               <p>If you didn't create this account, please ignore this email.</p>
             </div>
             <div class="footer">
-              <p>&copy; 2026 Camino Places. All rights reserved.</p>
+              <p>&copy; 2026 Stays4Pilgrims. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -241,7 +414,7 @@ export class EmailService {
               <p>Happy pilgrimaging! 🥾</p>
             </div>
             <div class="footer">
-              <p>&copy; 2026 Camino Places. All rights reserved.</p>
+              <p>&copy; 2026 Stays4Pilgrims. All rights reserved.</p>
             </div>
           </div>
         </body>
@@ -267,7 +440,7 @@ export class EmailService {
         <body>
           <div class="container">
             <div class="header">
-              <h1>Camino Places</h1>
+              <h1>Stays4Pilgrims</h1>
             </div>
             <div class="content">
               <p>Hi ${name},</p>
