@@ -4,7 +4,7 @@ import type { Transporter } from 'nodemailer';
 import { lookup as dnsLookup } from 'node:dns/promises';
 import { Resend } from 'resend';
 
-type EmailProvider = 'smtp' | 'resend';
+type EmailProvider = 'smtp' | 'resend' | 'brevo';
 type ResolvedEmailProvider = EmailProvider | 'noop';
 
 @Injectable()
@@ -12,6 +12,7 @@ export class EmailService {
   private readonly provider: ResolvedEmailProvider;
   private readonly fromEmail: string;
   private readonly resend?: Resend;
+  private readonly brevoApiKey?: string;
   private transporter?: Transporter;
   private smtpConfig?: { host: string; port: number; secure: boolean; auth: { user: string; pass: string } };
   private readonly isDevelopment = process.env.NODE_ENV === 'development';
@@ -34,6 +35,16 @@ export class EmailService {
       }
 
       this.resend = new Resend(apiKey);
+      return;
+    }
+
+    if (this.provider === 'brevo') {
+      const apiKey = process.env.BREVO_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error('BREVO_API_KEY is required when EMAIL_PROVIDER=brevo');
+      }
+
+      this.brevoApiKey = apiKey;
       return;
     }
 
@@ -116,6 +127,10 @@ export class EmailService {
         return await this.sendWithResend(email, subject, html);
       }
 
+      if (this.provider === 'brevo') {
+        return await this.sendWithBrevo(email, subject, html);
+      }
+
       return await this.sendWithSmtp(email, subject, html);
     } catch (error) {
       console.error('[EmailService] Error sending email:', error);
@@ -150,6 +165,37 @@ export class EmailService {
     } catch (error) {
       this.throwOrRethrowResendError(error, email);
     }
+  }
+
+  private async sendWithBrevo(email: string, subject: string, html: string): Promise<any> {
+    if (!this.brevoApiKey) {
+      throw new Error('Brevo client is not configured.');
+    }
+
+    const senderName = this.extractDisplayName(this.fromEmail) || 'Stays4Pilgrims';
+    const senderEmail = this.extractEmailAddress(this.fromEmail);
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': this.brevoApiKey,
+        'content-type': 'application/json',
+        accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: senderName, email: senderEmail },
+        to: [{ email }],
+        subject,
+        htmlContent: html,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Brevo email error: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    return response.json();
   }
 
   private async sendWithSmtp(email: string, subject: string, html: string): Promise<any> {
@@ -206,10 +252,15 @@ export class EmailService {
       return hasResend ? 'resend' : 'noop';
     }
 
+    if (configured === 'brevo') {
+      return Boolean(process.env.BREVO_API_KEY?.trim()) ? 'brevo' : 'noop';
+    }
+
     if (configured === 'smtp') {
       return 'noop';
     }
 
+    if (process.env.BREVO_API_KEY?.trim()) return 'brevo';
     if (hasResend) return 'resend';
     return 'noop';
   }
@@ -222,6 +273,16 @@ export class EmailService {
         process.env.EMAIL_FROM?.trim() ||
         (smtpUser ? `Stays4Pilgrims <${smtpUser}>` : 'Stays4Pilgrims <stays4pilgrims@gmail.com>')
       );
+    }
+
+    if (this.provider === 'brevo') {
+      const brevoSender = process.env.BREVO_FROM_EMAIL?.trim();
+
+      if (!brevoSender && !this.isDevelopment) {
+        throw new Error('BREVO_FROM_EMAIL is required in production when using Brevo');
+      }
+
+      return brevoSender || 'Stays4Pilgrims <noreply@localhost>';
     }
 
     const resendFromEmail = process.env.RESEND_FROM_EMAIL?.trim();
@@ -253,6 +314,16 @@ export class EmailService {
   private parseBoolean(value: string | undefined, defaultValue: boolean): boolean {
     if (value == null) return defaultValue;
     return value.trim().toLowerCase() === 'true';
+  }
+
+  private extractEmailAddress(input: string): string {
+    const match = input.match(/<([^>]+)>/);
+    return (match?.[1] || input).trim();
+  }
+
+  private extractDisplayName(input: string): string {
+    const match = input.match(/^\s*([^<]+)\s*<[^>]+>\s*$/);
+    return (match?.[1] || '').trim();
   }
 
   private isUsingResendTestSender(): boolean {
