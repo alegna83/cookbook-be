@@ -31,7 +31,7 @@ async function bootstrap() {
       'http://localhost:50323',
       'http://localhost:58230',
       'http://localhost:62819/',
-      'https://camino-places-app.web.app/'
+      'https://stays4pilgrims-camino.web.app/'
     ],
     methods: 'GET,POST,PUT,DELETE, OPTIONS',
     allowedHeaders: 'Content-Type, Authorization',
@@ -43,7 +43,7 @@ async function bootstrap() {
 
   const defaultOrigins = [
     'https://stays4pilgrims-camino.web.app',
-    'https://camino-places-app.web.app',
+    'https://stays4pilgrims-camino.web.app/',
     'http://localhost:3000',
     'http://localhost:8080',
   ];
