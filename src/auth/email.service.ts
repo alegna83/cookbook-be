@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
-import dns from 'dns/promises';
+import { lookup as dnsLookup } from 'node:dns/promises';
 import { Resend } from 'resend';
 
 type EmailProvider = 'smtp' | 'resend';
@@ -160,7 +160,7 @@ export class EmailService {
 
       let resolvedHost = this.smtpConfig.host;
       try {
-        const lookup = await dns.lookup(this.smtpConfig.host, { family: 4 });
+        const lookup = await dnsLookup(this.smtpConfig.host, { family: 4 });
         resolvedHost = lookup.address;
       } catch (err) {
         console.warn('[EmailService] Could not resolve IPv4 for SMTP host, falling back to configured host', err?.message || err);
