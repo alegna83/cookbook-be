@@ -44,6 +44,7 @@ describe('AccommodationsService (unit)', () => {
       create: jest.fn(),
       createQueryBuilder: jest.fn(),
       manager: {
+        query: jest.fn(),
         createQueryBuilder: jest.fn(),
       },
     };
@@ -108,6 +109,7 @@ describe('AccommodationsService (unit)', () => {
   });
 
   it('findByCamino should query by numeric camino id', async () => {
+    (placeRepo.manager.query as jest.Mock).mockResolvedValue([{ id: 1 }, { id: 57 }]);
     const qb = createQueryBuilderMock([{ id: 1 }]);
     placeRepo.createQueryBuilder.mockReturnValue(qb);
     jest.spyOn(service as any, 'attachServices').mockResolvedValue(undefined);
@@ -115,7 +117,17 @@ describe('AccommodationsService (unit)', () => {
     const result = await service.findByCamino('1');
 
     expect(result).toEqual([{ id: 1 }]);
+    expect(placeRepo.manager.query).toHaveBeenCalled();
     expect(placeRepo.createQueryBuilder).toHaveBeenCalled();
+  });
+
+  it('findByCamino should return empty array when caminho tree has no ids', async () => {
+    (placeRepo.manager.query as jest.Mock).mockResolvedValue([]);
+
+    const result = await service.findByCamino('57');
+
+    expect(result).toEqual([]);
+    expect(placeRepo.createQueryBuilder).not.toHaveBeenCalled();
   });
 
   it('findByAccount should return empty array for invalid account id', async () => {

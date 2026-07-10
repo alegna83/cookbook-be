@@ -139,6 +139,55 @@ export class AccommodationsService {
     console.log(`[ACCOMMODATIONS_TIMING] ${step}: ${elapsedMs.toFixed(2)}ms`);
   }
 
+  private async resolveCaminoTreeIds(
+    caminoIdentifier: string,
+  ): Promise<number[]> {
+    const normalized = caminoIdentifier?.trim();
+
+    if (!normalized) {
+      return [];
+    }
+
+    const maybeCaminoId = Number(normalized);
+    const isNumeric = Number.isInteger(maybeCaminoId);
+
+    const rootRows = isNumeric
+      ? await this.placeRepository.manager.query(
+          `
+          WITH RECURSIVE camino_tree AS (
+            SELECT id
+            FROM caminos
+            WHERE id = $1
+            UNION ALL
+            SELECT c.id
+            FROM caminos c
+            INNER JOIN camino_tree ct ON c.parent_camino_id = ct.id
+          )
+          SELECT id FROM camino_tree
+          `,
+          [maybeCaminoId],
+        )
+      : await this.placeRepository.manager.query(
+          `
+          WITH RECURSIVE camino_tree AS (
+            SELECT id
+            FROM caminos
+            WHERE LOWER(BTRIM(name)) = LOWER(BTRIM($1))
+            UNION ALL
+            SELECT c.id
+            FROM caminos c
+            INNER JOIN camino_tree ct ON c.parent_camino_id = ct.id
+          )
+          SELECT id FROM camino_tree
+          `,
+          [normalized],
+        );
+
+    return rootRows
+      .map((row: { id?: number | string }) => Number(row.id))
+      .filter((id) => Number.isInteger(id));
+  }
+
   private formatRemovalRequest(request: PlaceRemovalRequest): Record<string, unknown> {
     return {
       id: request.id,
@@ -548,19 +597,19 @@ export class AccommodationsService {
     const maybeCaminoId = Number(normalized);
     const cacheKey = `findByCamino:${Number.isInteger(maybeCaminoId) ? maybeCaminoId : normalized.toLowerCase()}`;
     return this.getOrLoad(cacheKey, async () => {
+      const caminoIds = await this.resolveCaminoTreeIds(normalized);
+
+      if (!caminoIds.length) {
+        return [];
+      }
+
       const query = this.placeRepository
         .createQueryBuilder('place')
         .leftJoinAndSelect('place.camino', 'camino')
         .leftJoinAndSelect('place.stage', 'stage')
         .leftJoinAndSelect('place.place_category', 'place_category');
 
-      if (Number.isInteger(maybeCaminoId)) {
-        query.where('camino.id = :caminoId', { caminoId: maybeCaminoId });
-      } else {
-        query.where('LOWER(BTRIM(camino.name)) = LOWER(BTRIM(:caminoName))', {
-          caminoName: normalized,
-        });
-      }
+      query.where('camino.id IN (:...caminoIds)', { caminoIds });
 
       query.andWhere('place.status = :status', { status: 'approved' });
 
