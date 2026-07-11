@@ -17,7 +17,6 @@ import { EmailService } from 'src/auth/email.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-  providers: [AccommodationsService, EmailService],
       Camino,
       Stage,
       AccommodationCategory,
@@ -30,7 +29,7 @@ import { EmailService } from 'src/auth/email.service';
     ContentModerationModule,
   ],
   controllers: [AccommodationsController],
-  providers: [AccommodationsService],
+  providers: [AccommodationsService, EmailService],
   exports: [AccommodationsService],
 })
 export class AccommodationsModule {}
