@@ -14,6 +14,7 @@ import { PlaceRemovalRequest } from './entities/place-removal-request.entity';
 import { PlaceEditRequest } from './entities/place-edit-request.entity';
 import { CreateEditRequestDto } from './dto/create-edit-request.dto';
 import { ContentModerationService } from 'src/moderation/content-moderation.service';
+import { EmailService } from 'src/auth/email.service';
 
 @Injectable()
 export class AccommodationsService {
@@ -47,6 +48,7 @@ export class AccommodationsService {
     @InjectRepository(PlaceEditRequest)
     private readonly editRequestRepo: Repository<PlaceEditRequest>,
     private readonly moderationService: ContentModerationService,
+    private readonly emailService: EmailService,
   ) {}
 
   private formatEditRequest(req: PlaceEditRequest): Record<string, unknown> {
@@ -137,6 +139,101 @@ export class AccommodationsService {
 
     const elapsedMs = Number(process.hrtime.bigint() - startNs) / 1_000_000;
     console.log(`[ACCOMMODATIONS_TIMING] ${step}: ${elapsedMs.toFixed(2)}ms`);
+  }
+
+  private async getAdminEmails(): Promise<string[]> {
+    const admins = await this.accountRepo.find({ where: { userType: 'admin' } });
+
+    return [...new Set(
+      admins
+        .map((admin) => admin.email?.trim())
+        .filter((email): email is string => !!email),
+    )];
+  }
+
+  private buildAdminNotificationHtml(options: {
+    title: string;
+    summary: string;
+    itemLabel: string;
+    itemValue: string;
+    requesterName?: string | null;
+    requesterEmail?: string | null;
+    reason?: string | null;
+  }): string {
+    const escapeHtml = (value: string) =>
+      value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
+    const rows = [
+      ['Item', options.itemValue],
+      ['Requester', options.requesterName?.trim() || 'Unknown'],
+      ['Requester email', options.requesterEmail?.trim() || 'Unknown'],
+    ];
+
+    if (options.reason?.trim()) {
+      rows.push(['Reason', options.reason.trim()]);
+    }
+
+    const rowsHtml = rows
+      .map(
+        ([label, value]) => `
+          <tr>
+            <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">${escapeHtml(label)}</td>
+            <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(value)}</td>
+          </tr>
+        `,
+      )
+      .join('');
+
+    return `
+      <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <h2 style="margin: 0 0 16px; color: #0f172a;">${escapeHtml(options.title)}</h2>
+        <p style="margin: 0 0 16px;">${escapeHtml(options.summary)}</p>
+        <table style="border-collapse: collapse; width: 100%; max-width: 720px;">
+          <tbody>
+            <tr>
+              <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">${escapeHtml(options.itemLabel)}</td>
+              <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(options.itemValue)}</td>
+            </tr>
+            ${rowsHtml}
+          </tbody>
+        </table>
+        <p style="margin: 16px 0 0; color: #475569;">Open the admin panel to review the queue.</p>
+      </div>
+    `;
+  }
+
+  private async notifyAdminsAboutPendingItem(options: {
+    subject: string;
+    title: string;
+    summary: string;
+    itemLabel: string;
+    itemValue: string;
+    requesterName?: string | null;
+    requesterEmail?: string | null;
+    reason?: string | null;
+  }): Promise<void> {
+    try {
+      const adminEmails = await this.getAdminEmails();
+
+      if (adminEmails.length === 0) {
+        return;
+      }
+
+      const html = this.buildAdminNotificationHtml(options);
+
+      await Promise.allSettled(
+        adminEmails.map((email) =>
+          this.emailService.sendCustomEmail(email, options.subject, html),
+        ),
+      );
+    } catch (error) {
+      console.error('[AccommodationsService] Failed to notify admins:', error);
+    }
   }
 
   private async resolveCaminoTreeIds(
@@ -584,6 +681,15 @@ export class AccommodationsService {
     (dto as any).ownerName = savedWithRelations.account?.name ?? null;
 
     this.invalidateReadCache();
+    await this.notifyAdminsAboutPendingItem({
+      subject: 'Pending accommodation review - Stays4Pilgrims',
+      title: 'New accommodation pending review',
+      summary: 'A new accommodation was submitted and is waiting for admin approval.',
+      itemLabel: 'Accommodation',
+      itemValue: savedWithRelations.place_name ?? `Accommodation #${saved.id}`,
+      requesterName: savedWithRelations.account?.name ?? null,
+      requesterEmail: savedWithRelations.account?.email ?? null,
+    });
     return dto;
   }
 
@@ -928,6 +1034,15 @@ export class AccommodationsService {
     }
 
     this.invalidateReadCache();
+    await this.notifyAdminsAboutPendingItem({
+      subject: 'Pending photo moderation - Stays4Pilgrims',
+      title: 'New photos pending review',
+      summary: 'A user added new photos to an accommodation and they are waiting for admin approval.',
+      itemLabel: 'Accommodation',
+      itemValue: place.place_name ?? `Accommodation #${place.id}`,
+      requesterName: account.name ?? null,
+      requesterEmail: account.email ?? null,
+    });
     return this.findOne(normalizedPlaceId, normalizedAccountId);
   }
 
@@ -1125,6 +1240,16 @@ export class AccommodationsService {
 
     const saved = await this.removalRequestRepo.save(request);
     this.invalidateReadCache();
+    await this.notifyAdminsAboutPendingItem({
+      subject: 'Pending removal request - Stays4Pilgrims',
+      title: 'New removal request pending review',
+      summary: 'A user requested the removal of an accommodation and it is waiting for admin approval.',
+      itemLabel: 'Accommodation',
+      itemValue: place.place_name ?? `Accommodation #${place.id}`,
+      requesterName: saved.requesterName ?? place.account?.name ?? null,
+      requesterEmail: saved.requesterEmail ?? place.account?.email ?? null,
+      reason: saved.reason ?? null,
+    });
     return this.formatRemovalRequest(saved);
   }
 
@@ -1164,6 +1289,15 @@ export class AccommodationsService {
 
     const saved = await this.editRequestRepo.save(request);
     this.invalidateReadCache();
+    await this.notifyAdminsAboutPendingItem({
+      subject: 'Pending edit request - Stays4Pilgrims',
+      title: 'New edit request pending review',
+      summary: 'A user submitted changes to an accommodation and it is waiting for admin approval.',
+      itemLabel: 'Accommodation',
+      itemValue: place.place_name ?? `Accommodation #${place.id}`,
+      requesterName: saved.requesterName ?? account.name ?? null,
+      requesterEmail: saved.requesterEmail ?? account.email ?? null,
+    });
     return this.formatEditRequest(saved);
   }
 

@@ -4,7 +4,9 @@ import { Repository } from 'typeorm';
 import { Comment } from './entities/comment.entity';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { Accommodation } from '../accommodations/entities/accommodation.entity';
+import { Account } from '../accounts/account.entity';
 import { ContentModerationService } from 'src/moderation/content-moderation.service';
+import { EmailService } from 'src/auth/email.service';
 
 @Injectable()
 export class CommentsService {
@@ -13,8 +15,57 @@ export class CommentsService {
     private commentRepo: Repository<Comment>,
     @InjectRepository(Accommodation)
     private placeRepo: Repository<Accommodation>,
+    @InjectRepository(Account)
+    private accountRepo: Repository<Account>,
     private readonly moderationService: ContentModerationService,
+    private readonly emailService: EmailService,
   ) {}
+
+  private async getAdminEmails(): Promise<string[]> {
+    const admins = await this.accountRepo.find({ where: { userType: 'admin' } });
+
+    return [...new Set(
+      admins
+        .map((admin) => admin.email?.trim())
+        .filter((email): email is string => !!email),
+    )];
+  }
+
+  private async notifyAdminsAboutPendingComment(comment: Comment, placeName: string): Promise<void> {
+    try {
+      const adminEmails = await this.getAdminEmails();
+
+      if (adminEmails.length === 0) {
+        return;
+      }
+
+      const subject = 'Pending comment review - Stays4Pilgrims';
+      const html = `
+        <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+          <h2 style="margin: 0 0 16px; color: #0f172a;">New comment pending review</h2>
+          <p style="margin: 0 0 16px;">A new comment was submitted and is waiting for admin approval.</p>
+          <table style="border-collapse: collapse; width: 100%; max-width: 720px;">
+            <tbody>
+              <tr>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Accommodation</td>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${placeName || `Accommodation #${comment.placeId}`}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Comment</td>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${(comment.comment ?? '').toString().replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string))}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      await Promise.allSettled(
+        adminEmails.map((email) => this.emailService.sendCustomEmail(email, subject, html)),
+      );
+    } catch (error) {
+      console.error('[CommentsService] Failed to notify admins:', error);
+    }
+  }
 
   async add(dto: CreateCommentDto): Promise<Comment> {
     const place = await this.placeRepo.findOne({ where: { id: dto.placeId } });
@@ -34,7 +85,9 @@ export class CommentsService {
     comment.status = 'pending';
     comment.approvedAt = null;
     comment.rejectionReason = null;
-    return this.commentRepo.save(comment);
+    const saved = await this.commentRepo.save(comment);
+    await this.notifyAdminsAboutPendingComment(saved, place.place_name ?? '');
+    return saved;
   }
 
   async update(id: number, data: { rating?: number; comment?: string }, accountId?: number): Promise<Comment> {
@@ -45,6 +98,7 @@ export class CommentsService {
       throw new ForbiddenException('Não tem permissão para editar este comentário');
     }
 
+    let shouldNotifyAdmins = false;
     if (data.comment !== undefined) {
       const moderation = await this.moderationService.moderateComment(
         data.comment ?? '',
@@ -59,10 +113,18 @@ export class CommentsService {
       comment.status = 'pending';
       comment.approvedAt = null;
       comment.rejectionReason = null;
+      shouldNotifyAdmins = true;
     }
 
     Object.assign(comment, data);
-    return this.commentRepo.save(comment);
+    const saved = await this.commentRepo.save(comment);
+
+    if (shouldNotifyAdmins) {
+      const place = await this.placeRepo.findOne({ where: { id: comment.placeId } });
+      await this.notifyAdminsAboutPendingComment(saved, place?.place_name ?? '');
+    }
+
+    return saved;
   }
 
   async remove(id: number, accountId?: number): Promise<void> {

@@ -111,6 +111,10 @@ export class EmailService {
     );
   }
 
+  async sendCustomEmail(email: string, subject: string, html: string): Promise<any> {
+    return this.sendEmail(email, subject, html);
+  }
+
   private async sendEmail(email: string, subject: string, html: string): Promise<any> {
     try {
       if (this.provider === 'noop') {

@@ -12,11 +12,12 @@ import { Account } from 'src/accounts/account.entity';
 import { PlaceRemovalRequest } from './entities/place-removal-request.entity';
 import { PlaceEditRequest } from './entities/place-edit-request.entity';
 import { ContentModerationModule } from 'src/moderation/content-moderation.module';
+import { EmailService } from 'src/auth/email.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
-      Accommodation,
+  providers: [AccommodationsService, EmailService],
       Camino,
       Stage,
       AccommodationCategory,

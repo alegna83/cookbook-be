@@ -9,11 +9,12 @@ import { Account } from '../accounts/account.entity';
 import { PlaceRemovalRequest } from './entities/place-removal-request.entity';
 import { PlaceEditRequest } from './entities/place-edit-request.entity';
 import { ContentModerationService } from '../moderation/content-moderation.service';
+import { EmailService } from '../auth/email.service';
 
 describe('AccommodationsService (unit)', () => {
   let service: AccommodationsService;
   let placeRepo: { findOne: jest.Mock; save: jest.Mock; remove: jest.Mock; create: jest.Mock; createQueryBuilder: jest.Mock; manager: any };
-  let accountRepo: { findOne: jest.Mock };
+  let accountRepo: { findOne: jest.Mock; find: jest.Mock };
   let categoryRepo: { findOne: jest.Mock; createQueryBuilder: jest.Mock };
   let galleryPhotoRepo: { create: jest.Mock; save: jest.Mock; delete: jest.Mock; findOne: jest.Mock; find: jest.Mock };
   let removalRequestRepo: { findOne: jest.Mock; create: jest.Mock; save: jest.Mock; find: jest.Mock; createQueryBuilder: jest.Mock };
@@ -69,7 +70,8 @@ describe('AccommodationsService (unit)', () => {
       save: jest.fn(),
       find: jest.fn(),
     };
-    accountRepo = { findOne: jest.fn() };
+    accountRepo = { findOne: jest.fn(), find: jest.fn().mockResolvedValue([]) };
+    const emailService = { sendCustomEmail: jest.fn().mockResolvedValue({}) };
     const moderationMock = { moderateImageUrls: jest.fn() };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -82,6 +84,7 @@ describe('AccommodationsService (unit)', () => {
         { provide: getRepositoryToken(PlaceRemovalRequest), useValue: removalRequestRepo },
         { provide: getRepositoryToken(PlaceEditRequest), useValue: editRequestRepo },
         { provide: ContentModerationService, useValue: moderationMock },
+        { provide: EmailService, useValue: emailService },
       ],
     }).compile();
 
