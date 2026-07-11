@@ -17,6 +17,7 @@ import { EmailService } from 'src/auth/email.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([
+      Accommodation,
       Camino,
       Stage,
       AccommodationCategory,
