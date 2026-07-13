@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { EmailService } from 'src/auth/email.service';
 import { ContactRequestDto } from './contact-request.dto';
 
@@ -36,7 +36,16 @@ export class ContactService {
     const html = this.buildEmailHtml({ name, email, phone, title, message });
     const subject = `[Contact] ${title}`;
 
-    await this.emailService.sendCustomEmail(this.receiverEmail, subject, html);
+    const result = await this.emailService.sendCustomEmail(this.receiverEmail, subject, html);
+
+    if (
+      result?.message === 'Email delivery disabled by configuration' ||
+      String(result?.id ?? '').startsWith('noop-')
+    ) {
+      throw new InternalServerErrorException(
+        'Contact email delivery is disabled in the backend configuration.',
+      );
+    }
 
     return { message: 'Your message has been sent successfully.' };
   }
