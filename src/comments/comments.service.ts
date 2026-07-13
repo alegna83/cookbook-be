@@ -21,6 +21,62 @@ export class CommentsService {
     private readonly emailService: EmailService,
   ) {}
 
+  private async notifyRequesterAboutDecision(options: {
+    email?: string | null;
+    name?: string | null;
+    decision: 'approved' | 'rejected';
+    placeName: string;
+    reason?: string | null;
+  }): Promise<void> {
+    const recipient = options.email?.trim();
+
+    if (!recipient) {
+      return;
+    }
+
+    const decisionLabel = options.decision === 'approved' ? 'approved' : 'rejected';
+    const subject = `Your comment was ${decisionLabel} - Stays4Pilgrims`;
+
+    const escapeHtml = (value: string) =>
+      value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    const reasonRow = options.reason?.trim()
+      ? `
+        <tr>
+          <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Reason</td>
+          <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(options.reason.trim())}</td>
+        </tr>
+      `
+      : '';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <h2 style="margin: 0 0 16px; color: #0f172a;">Your comment was ${escapeHtml(decisionLabel)}</h2>
+        <p style="margin: 0 0 16px;">Hello ${escapeHtml(options.name?.trim() || 'there')}, your comment on <strong>${escapeHtml(options.placeName)}</strong> has been ${escapeHtml(decisionLabel)} by the admin team.</p>
+        <table style="border-collapse: collapse; width: 100%; max-width: 720px;">
+          <tbody>
+            <tr>
+              <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Place</td>
+              <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(options.placeName)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Decision</td>
+              <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(decisionLabel)}</td>
+            </tr>
+            ${reasonRow}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    await this.emailService.sendCustomEmail(recipient, subject, html);
+  }
+
   private async getAdminEmails(): Promise<string[]> {
     const admins = await this.accountRepo.find({ where: { userType: 'admin' } });
 
@@ -207,7 +263,7 @@ export class CommentsService {
     id: number,
     rejectionReason?: string,
   ): Promise<Comment> {
-    const comment = await this.commentRepo.findOne({ where: { id } });
+    const comment = await this.commentRepo.findOne({ where: { id }, relations: ['account', 'place'] });
 
     if (!comment) {
       throw new NotFoundException('Comentário não encontrado');
@@ -221,6 +277,16 @@ export class CommentsService {
       comment.approvedAt = new Date();
     }
 
-    return this.commentRepo.save(comment);
+    const saved = await this.commentRepo.save(comment);
+
+    await this.notifyRequesterAboutDecision({
+      email: comment.account?.email ?? null,
+      name: comment.account?.name ?? null,
+      decision: rejectionReason ? 'rejected' : 'approved',
+      placeName: comment.place?.place_name ?? `Accommodation #${comment.placeId}`,
+      reason: rejectionReason ?? null,
+    });
+
+    return saved;
   }
 }

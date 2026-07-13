@@ -236,6 +236,63 @@ export class AccommodationsService {
     }
   }
 
+  private async notifyRequesterAboutDecision(options: {
+    email?: string | null;
+    name?: string | null;
+    decision: 'approved' | 'rejected';
+    itemLabel: string;
+    itemName: string;
+    reason?: string | null;
+  }): Promise<void> {
+    const recipient = options.email?.trim();
+
+    if (!recipient) {
+      return;
+    }
+
+    const decisionLabel = options.decision === 'approved' ? 'approved' : 'rejected';
+    const subject = `Your ${options.itemLabel.toLowerCase()} request was ${decisionLabel} - Stays4Pilgrims`;
+
+    const escapeHtml = (value: string) =>
+      value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+
+    const reasonRow = options.reason?.trim()
+      ? `
+        <tr>
+          <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Reason</td>
+          <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(options.reason.trim())}</td>
+        </tr>
+      `
+      : '';
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+        <h2 style="margin: 0 0 16px; color: #0f172a;">Your ${escapeHtml(options.itemLabel.toLowerCase())} request was ${escapeHtml(decisionLabel)}</h2>
+        <p style="margin: 0 0 16px;">Hello ${escapeHtml(options.name?.trim() || 'there')}, your request has been ${escapeHtml(decisionLabel)} by the admin team.</p>
+        <table style="border-collapse: collapse; width: 100%; max-width: 720px;">
+          <tbody>
+            <tr>
+              <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">${escapeHtml(options.itemLabel)}</td>
+              <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(options.itemName)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Decision</td>
+              <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(decisionLabel)}</td>
+            </tr>
+            ${reasonRow}
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    await this.emailService.sendCustomEmail(recipient, subject, html);
+  }
+
   private async resolveCaminoTreeIds(
     caminoIdentifier: string,
   ): Promise<number[]> {
@@ -1064,6 +1121,7 @@ export class AccommodationsService {
         'place.camino',
         'place.stage',
         'place.account',
+        'account',
       ],
     });
 
@@ -1077,6 +1135,14 @@ export class AccommodationsService {
 
     await this.galleryPhotoRepo.save(photo);
     this.invalidateReadCache();
+
+    await this.notifyRequesterAboutDecision({
+      email: photo.account?.email ?? null,
+      name: photo.account?.name ?? null,
+      decision: 'approved',
+      itemLabel: 'Photo',
+      itemName: photo.place?.place_name ?? `Accommodation #${photo.place?.id ?? ''}`,
+    });
 
     return this.findOne(Number(photo.place.id));
   }
@@ -1102,6 +1168,7 @@ export class AccommodationsService {
         'place.camino',
         'place.stage',
         'place.account',
+        'account',
       ],
     });
 
@@ -1115,6 +1182,15 @@ export class AccommodationsService {
 
     await this.galleryPhotoRepo.save(photo);
     this.invalidateReadCache();
+
+    await this.notifyRequesterAboutDecision({
+      email: photo.account?.email ?? null,
+      name: photo.account?.name ?? null,
+      decision: 'rejected',
+      itemLabel: 'Photo',
+      itemName: photo.place?.place_name ?? `Accommodation #${photo.place?.id ?? ''}`,
+      reason: photo.rejectionReason,
+    });
 
     return this.findOne(Number(photo.place.id));
   }
@@ -1340,6 +1416,14 @@ export class AccommodationsService {
       req.rejectionReason = 'Pedido inválido ou sem payload.';
       req.reviewedAt = new Date();
       const savedReq = await this.editRequestRepo.save(req);
+      await this.notifyRequesterAboutDecision({
+        email: req.requesterEmail ?? req.account?.email ?? null,
+        name: req.requesterName ?? req.account?.name ?? null,
+        decision: 'rejected',
+        itemLabel: 'Edit request',
+        itemName: req.place?.place_name ?? `Accommodation #${req.placeId ?? ''}`,
+        reason: req.rejectionReason,
+      });
       return this.formatEditRequest(savedReq);
     }
 
@@ -1419,6 +1503,14 @@ export class AccommodationsService {
         req.rejectionReason = moderated.reason || 'Image blocked by moderation.';
         req.reviewedAt = new Date();
         const savedReq = await this.editRequestRepo.save(req);
+        await this.notifyRequesterAboutDecision({
+          email: req.requesterEmail ?? req.account?.email ?? null,
+          name: req.requesterName ?? req.account?.name ?? null,
+          decision: 'rejected',
+          itemLabel: 'Edit request',
+          itemName: req.place?.place_name ?? `Accommodation #${req.placeId ?? ''}`,
+          reason: req.rejectionReason,
+        });
         return this.formatEditRequest(savedReq);
       }
 
@@ -1443,6 +1535,13 @@ export class AccommodationsService {
     req.rejectionReason = null;
     const savedReq = await this.editRequestRepo.save(req);
     this.invalidateReadCache();
+    await this.notifyRequesterAboutDecision({
+      email: req.requesterEmail ?? req.account?.email ?? null,
+      name: req.requesterName ?? req.account?.name ?? null,
+      decision: 'approved',
+      itemLabel: 'Edit request',
+      itemName: req.place?.place_name ?? `Accommodation #${req.placeId ?? ''}`,
+    });
     return this.formatEditRequest(savedReq);
   }
 
@@ -1506,6 +1605,7 @@ export class AccommodationsService {
   ): Promise<Accommodation> {
     const accommodation = await this.placeRepository.findOne({
       where: { id },
+      relations: ['account'],
     });
 
     if (!accommodation) {
@@ -1524,6 +1624,14 @@ export class AccommodationsService {
 
     const saved = await this.placeRepository.save(accommodation);
     this.invalidateReadCache();
+    await this.notifyRequesterAboutDecision({
+      email: accommodation.account?.email ?? null,
+      name: accommodation.account?.name ?? null,
+      decision: rejectionReason ? 'rejected' : 'approved',
+      itemLabel: 'Accommodation',
+      itemName: accommodation.place_name ?? `Accommodation #${accommodation.id}`,
+      reason: rejectionReason ?? null,
+    });
     return saved;
   }
 
@@ -1592,6 +1700,13 @@ export class AccommodationsService {
 
     const saved = await this.removalRequestRepo.save(request);
     this.invalidateReadCache();
+    await this.notifyRequesterAboutDecision({
+      email: request.requesterEmail ?? request.account?.email ?? null,
+      name: request.requesterName ?? request.account?.name ?? null,
+      decision: 'approved',
+      itemLabel: 'Removal request',
+      itemName: request.placeName ?? request.place?.place_name ?? `Accommodation #${request.placeId ?? ''}`,
+    });
     return this.formatRemovalRequest(saved);
   }
 
@@ -1613,6 +1728,14 @@ export class AccommodationsService {
     request.rejectionReason = rejectionReason?.trim() || null;
 
     const saved = await this.removalRequestRepo.save(request);
+    await this.notifyRequesterAboutDecision({
+      email: request.requesterEmail ?? request.account?.email ?? null,
+      name: request.requesterName ?? request.account?.name ?? null,
+      decision: 'rejected',
+      itemLabel: 'Removal request',
+      itemName: request.placeName ?? request.place?.place_name ?? `Accommodation #${request.placeId ?? ''}`,
+      reason: request.rejectionReason,
+    });
     return this.formatRemovalRequest(saved);
   }
 }
