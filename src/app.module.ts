@@ -16,6 +16,7 @@ import { CommentsModule } from './comments/comments.module';
 import { UploadModule } from './upload/upload.module';
 import { ContentModerationModule } from './moderation/content-moderation.module';
 import { ContactModule } from './contact/contact.module';
+import { AiChatModule } from './ai-chat/ai-chat.module';
 import { join } from 'path';
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { join } from 'path';
     UploadModule,
     ContentModerationModule,
     ContactModule,
+    AiChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
