@@ -28,6 +28,11 @@ export class AccommodationsService {
   private readonly shouldLogTimings =
     process.env.LOG_REQUEST_TIMINGS === 'true';
 
+  private readonly mapResultsLimit = (() => {
+    const parsed = Number(process.env.ACCOMMODATIONS_MAP_RESULTS_LIMIT ?? 250);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 250;
+  })();
+
   private readonly cacheTtlMs = (() => {
     const defaultTtl = process.env.NODE_ENV === 'production' ? 120000 : 30000;
     const parsed = Number(process.env.ACCOMMODATIONS_CACHE_TTL_MS ?? defaultTtl);
@@ -775,6 +780,7 @@ export class AccommodationsService {
       query.where('camino.id IN (:...caminoIds)', { caminoIds });
 
       query.andWhere('place.status = :status', { status: 'approved' });
+      query.take(this.mapResultsLimit);
 
       const places = await query.getMany();
       await this.attachServices(places);
@@ -824,18 +830,16 @@ export class AccommodationsService {
       const { south, west, north, east } = bounds;
       const totalStartNs = process.hrtime.bigint();
       const queryStartNs = process.hrtime.bigint();
+      // Keep bounds search lightweight for map interactions.
+      // The map only needs base accommodation data plus category/services;
+      // joining gallery photos here causes row explosion and larger payloads.
       const places = await this.placeRepository
         .createQueryBuilder('place')
         .leftJoinAndSelect('place.place_category', 'place_category')
-        .leftJoinAndSelect(
-          'place.gallery_photos',
-          'gallery_photos',
-          'gallery_photos.status = :photoStatus',
-          { photoStatus: 'approved' },
-        )
         .where('place.latitude BETWEEN :south AND :north', { south, north })
         .andWhere('place.longitude BETWEEN :west AND :east', { west, east })
         .andWhere('place.status = :status', { status: 'approved' })
+        .take(this.mapResultsLimit)
         .getMany();
       this.logTiming('getByBounds.db', queryStartNs);
 

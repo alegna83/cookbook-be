@@ -122,6 +122,7 @@ describe('AccommodationsService (unit)', () => {
     expect(result).toEqual([{ id: 1 }]);
     expect(placeRepo.manager.query).toHaveBeenCalled();
     expect(placeRepo.createQueryBuilder).toHaveBeenCalled();
+    expect(qb.take).toHaveBeenCalledWith(250);
   });
 
   it('findByCamino should return empty array when caminho tree has no ids', async () => {
@@ -172,6 +173,7 @@ describe('AccommodationsService (unit)', () => {
 
     expect(result).toEqual([{ id: 1 }]);
     expect(placeRepo.createQueryBuilder).toHaveBeenCalled();
+    expect(qb.take).toHaveBeenCalledWith(250);
   });
 
   it('requestRemoval should reject invalid ids', async () => {
