@@ -1,8 +1,8 @@
 @startuml
 title Sequence: Authentication & JWT Flow
 
-participant "Frontend" as FE
-participant "Public Routes" as ROUTES
+participant "Stays4Pilgrims Frontend" as FE
+participant "Stays4Pilgrims Backend - Public Routes" as ROUTES
 participant "Accounts Service" as ACC_SVC
 participant "Auth Service" as AUTH_SVC
 participant "JWT Strategy" as JWT

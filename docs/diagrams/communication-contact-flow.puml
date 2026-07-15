@@ -1,0 +1,31 @@
+@startuml
+title Stays4Pilgrims - Contact form communication
+
+actor User
+participant "Stays4Pilgrims Frontend" as FE
+participant "Stays4Pilgrims Backend" as BE
+participant "ContactController" as ContactController
+participant "ContactService" as ContactService
+participant "Email service" as Email
+
+User -> FE : open Contact Us page and fill form
+FE -> BE : POST /contact/send {name, email, phone?, title, message}
+BE -> ContactController : send(dto)
+ContactController -> ContactService : sendContactMessage(dto)
+ContactService -> ContactService : validate required fields and lengths
+
+alt email delivery enabled
+  ContactService -> Email : sendCustomEmail(receiverEmail, subject, html)
+  Email --> ContactService : delivery result
+  ContactService --> BE : { message: success }
+  BE --> FE : 200 OK
+else email delivery disabled or noop provider
+  ContactService -> Email : sendCustomEmail(...)
+  Email --> ContactService : noop / disabled configuration
+  ContactService --> BE : throw InternalServerErrorException
+  BE --> FE : 500 Contact email delivery is disabled
+end
+
+FE --> User : show success or error feedback
+
+@enduml

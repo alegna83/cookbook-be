@@ -1,21 +1,21 @@
 @startuml
 title Add to Favorites sequence
 actor User
-participant Frontend as FE
-participant "API - FavoritesController" as API
+participant "Stays4Pilgrims Frontend" as FE
+participant "Stays4Pilgrims Backend - FavoritesController" as API
 participant "FavoritesService" as SVC
 database "FavoritesRepo / DB" as DB
 
-User -> FE: Click heart icon on place
+User -> FE: Click heart icon on accommodation
 alt already favorited
-  FE -> API: POST /favorites/handle { action: 'toggle', payload: {placeId, accountId} }
+  FE -> API: POST /favorites/handle { action: 'toggle', payload: {accomodationId, accountId} }
 else not favorited
-  FE -> API: POST /favorites/handle { action: 'toggle', payload: {placeId, accountId} }
+  FE -> API: POST /favorites/handle { action: 'toggle', payload: {accomodationId, accountId} }
 end
 activate API
-API -> SVC: toggle(accountId, placeId)
+API -> SVC: toggle(accountId, accomodationId)
 activate SVC
-SVC -> DB: find Favorite {account, place}
+SVC -> DB: find Favorite {account, accommodation}
 activate DB
 DB --> SVC: existing or null
 deactivate DB
@@ -26,7 +26,7 @@ alt exists
   deactivate DB
   SVC --> API: {action: 'removed', ok: true}
 else not exists
-  SVC -> DB: create new Favorite {accountId, placeId}
+  SVC -> DB: create new Favorite {accountId, accomodationId}
   activate DB
   DB --> SVC: saved favorite entity
   deactivate DB

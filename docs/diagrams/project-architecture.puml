@@ -8,14 +8,15 @@ skinparam packageStyle rectangle
 
 actor User
 
-component "Frontend\n(Web / Mobile)" as FE
+component "Stays4Pilgrims Frontend\n(Web / Mobile)" as FE
 
-package "Backend (NestJS)" as BE {
+package "Stays4Pilgrims Backend (NestJS)" as BE {
   component "Auth + Accounts" as AUTH
-  component "Places / Accommodations" as ACC
+  component "Accommodations" as ACC
   component "Caminos / Stages / Statistics" as ROUTES
   component "Comments / Favorites / Suggestions" as SOCIAL
   component "Upload" as UPLOAD
+  component "Contact" as CONTACT
   component "Content Moderation" as MOD
 }
 
@@ -28,13 +29,16 @@ User --> FE : browse / submit content
 FE --> BE : HTTPS REST API
 
 AUTH --> DB : users, sessions, tokens
-ACC --> DB : places, categories, requests
+ACC --> DB : accommodations, categories, requests
 ROUTES --> DB : caminos, stages, statistics
 SOCIAL --> DB : comments, favorites
 UPLOAD --> CLOUDINARY : upload / delete media
 UPLOAD --> MOD : pre-check and post-check
 MOD --> OPENAI : optional image/comment moderation
 AUTH --> EMAIL : verification / reset / welcome emails
+ACC --> EMAIL : moderation decision / queue emails
+SOCIAL --> EMAIL : comment moderation emails
+CONTACT --> EMAIL : contact form delivery
 BE --> DB : TypeORM / SQL
 
 note right of BE
@@ -47,12 +51,14 @@ note right of BE
   - StatisticsCaminosModule
   - FavoritesModule
   - CommentsModule
+  - SuggestionsModule
   - UploadModule
+  - ContactModule
   - ContentModerationModule
 end note
 
 note bottom of FE
-  Frontend is the client for all user interactions.
+  Stays4Pilgrims Frontend is the client for all user interactions.
   It consumes the NestJS API and renders the UI.
 end note
 

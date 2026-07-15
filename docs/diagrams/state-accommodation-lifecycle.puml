@@ -1,5 +1,5 @@
-@startuml Place Lifecycle State Machine
-title Place / Accommodation Lifecycle
+@startuml Accommodation Lifecycle State Machine
+title Accommodation Lifecycle
 
 [*] --> Draft
 

@@ -33,19 +33,19 @@ BE --> FE : accommodation detail + gallery + services
 
 FE -> BE : POST /comments/handle {action:list}
 BE -> CommentsController : handle(list)
-CommentsController -> CommentsService : listByPlace(placeId, page, limit)
-CommentsService -> DB : fetch comments for place
+CommentsController -> CommentsService : listByAccommodation(accomodationId, page, limit)
+CommentsService -> DB : fetch comments for accommodation
 BE --> FE : comments + pagination
 
 FE -> BE : POST /comments/handle {action:exists}
 BE -> CommentsController : handle(exists)
-CommentsController -> CommentsService : exists(accountId, placeId)
+CommentsController -> CommentsService : exists(accountId, accomodationId)
 CommentsService -> DB : check if user already commented
 BE --> FE : { exists: true/false }
 
 FE -> BE : POST /comments/handle {action:getStats}
 BE -> CommentsController : handle(getStats)
-CommentsController -> CommentsService : getStats(placeId)
+CommentsController -> CommentsService : getStats(accomodationId)
 CommentsService -> DB : aggregate ratings
 BE --> FE : rating summary
 

@@ -1,0 +1,45 @@
+@startuml
+title Stays4Pilgrims - Suggestions and recommendation communication
+
+actor User
+participant "Stays4Pilgrims Frontend" as FE
+participant "Stays4Pilgrims Backend" as BE
+participant "SuggestionController" as SuggestionController
+participant "SuggestionService" as SuggestionService
+participant "AccommodationsService" as AccommodationsService
+participant "CommentsService" as CommentsService
+database "PostgreSQL" as DB
+participant "OpenRouter / OpenAI" as AI
+
+User -> FE : open home near current location
+FE -> FE : obtain current coordinates and user interest
+
+User -> FE : open nearby suggestions
+FE -> BE : POST /sugestoes/sugerir {lat, lon, interesse}
+BE -> SuggestionController : sugerir(body)
+SuggestionController -> SuggestionService : sugerirLugares(prompt)
+SuggestionService -> AI : chat completion with nearby-interest prompt
+AI --> SuggestionService : 3 text suggestions
+SuggestionService --> BE : text list
+BE --> FE : suggestions response
+FE --> User : show suggestions notification and dialog
+
+User -> FE : request best accommodation recommendation
+FE -> BE : GET /sugestoes/best-accommodation?lat&lon&radius&category
+BE -> SuggestionController : bestAccommodation(lat, lon, radius, category)
+SuggestionController -> SuggestionService : suggestBestAccommodation(...)
+SuggestionService -> AccommodationsService : getByBounds(bounds)
+AccommodationsService -> DB : fetch approved accommodations in area
+SuggestionService -> CommentsService : use ratings and review counts
+CommentsService -> DB : aggregate comment statistics
+alt enough local rating data
+  SuggestionService -> AI : optional ranking analysis with local options
+  AI --> SuggestionService : recommended option or reasoning
+else fallback to best local option
+  SuggestionService -> SuggestionService : rank by available reviews and ratings
+end
+SuggestionService --> BE : recommendation + reasoning + alternatives
+BE --> FE : JSON recommendation payload
+FE --> User : show best accommodation popup
+
+@enduml

@@ -1,16 +1,16 @@
 @startuml
 title Add Comment sequence
 actor User
-participant Frontend as FE
-participant "API - CommentsController" as API
+participant "Stays4Pilgrims Frontend" as FE
+participant "Stays4Pilgrims Backend - CommentsController" as API
 participant "CommentsService" as SVC
 participant "ContentModerationService" as MOD
 database "CommentsRepo / DB" as DB
 
-User -> FE: Write comment + rating for place, submit
-FE -> API: POST /comments/handle { action: 'add', payload: {placeId, accountId, comment, rating} }
+User -> FE: Write comment + rating for accommodation, submit
+FE -> API: POST /comments/handle { action: 'add', payload: {accomodationId, accountId, comment, rating} }
 activate API
-API -> SVC: add({placeId, accountId, comment, rating})
+API -> SVC: add({accomodationId, accountId, comment, rating})
 activate SVC
 SVC -> MOD: moderateComment(comment)
 activate MOD
@@ -27,11 +27,11 @@ SVC -> DB: check account exists
 activate DB
 DB --> SVC: account or not found
 deactivate DB
-SVC -> DB: check place exists & is approved
+SVC -> DB: check accommodation exists & is approved
 activate DB
-DB --> SVC: place or not found
+DB --> SVC: accommodation or not found
 deactivate DB
-SVC -> DB: create new Comment {accountId, placeId, comment, rating, status: 'pending'}
+SVC -> DB: create new Comment {accountId, accomodationId, comment, rating, status: 'pending'}
 activate DB
 DB --> SVC: saved comment entity
 deactivate DB

@@ -2,27 +2,28 @@
 title Dataflow - PII and Data Retention
 
 package "Stays4Pilgrims System" {
-  package "Frontend (Flutter/Web)" as Frontend {
+  package "Stays4Pilgrims Frontend (Flutter/Web)" as Frontend {
     queue "User Input\nCredentials, Profile, Reviews" as FE_INPUT
   }
 
-  package "Backend (NestJS)" as Backend {
+  package "Stays4Pilgrims Backend (NestJS)" as Backend {
     component "Auth Service\n[Hash passwords - bcrypt]" as AUTH
     component "Accounts Service\n[Email, Name, Password]" as ACC
-    component "Places Service\n[Address, Contact Info]" as PLACES
+    component "Accommodations Service\n[Address, Contact Info]" as ACCOMMODATIONS
     component "Comments Service\n[Rating, Text]" as COMMENTS
     component "Gallery Service\n[Image URLs, metadata]" as GALLERY
+    component "Contact Service\n[Name, Email, Phone, Message]" as CONTACT
   }
 
   database "PostgreSQL" as DB {
     entity "accounts\n(id, email, password_hash,\nname, phone, isEmailVerified,\ncreatedAt)" as TBL_ACC
-    entity "accommodations\n(id, place_name, address,\nphone, email, website,\naccount_id)" as TBL_PLACES
-    entity "comments\n(id, text, rating,\naccountId, placeId,\nstatus, createdAt)" as TBL_COMMENTS
-    entity "gallery_photos\n(id, url, accountId,\nplaceId, status)" as TBL_GALLERY
+    entity "accommodations\n(id, accomodation_name, address,\nphone, email, website,\naccount_id)" as TBL_ACCOMMODATIONS
+    entity "comments\n(id, text, rating,\naccountId, accomodationId,\nstatus, createdAt)" as TBL_COMMENTS
+    entity "gallery_photos\n(id, url, accountId,\naccomodationId, status)" as TBL_GALLERY
   }
 
   package "External Services" {
-    queue "Email Service\n[Verification Links]" as EMAIL_SVC
+    queue "Email Service\n[Verification, Contact, Moderation Emails]" as EMAIL_SVC
     queue "Storage (S3/Local)\n[Image Binary Data]" as STORAGE
   }
 
@@ -33,12 +34,16 @@ package "Stays4Pilgrims System" {
 }
 
 FE_INPUT --> AUTH: credentials
+FE_INPUT --> CONTACT: contact form payload
 AUTH --> TBL_ACC: hash + store
 ACC --> TBL_ACC: name, email, phone
-PLACES --> TBL_PLACES: address, contact
+ACCOMMODATIONS --> TBL_ACCOMMODATIONS: address, contact
 COMMENTS --> TBL_COMMENTS: text, rating
 GALLERY --> TBL_GALLERY: URLs
+CONTACT --> EMAIL_SVC: forward contact request
 EMAIL_SVC <--> ACC: verification flows
+EMAIL_SVC <--> COMMENTS: moderation decision emails
+EMAIL_SVC <--> ACCOMMODATIONS: moderation decision emails
 STORAGE <-- GALLERY: image uploads
 DB --> BACKUP: nightly snapshot
 DB --> AUDIT: all queries logged
@@ -49,14 +54,16 @@ note right of TBL_ACC
   Deleted accounts - anonymized after 30 days
 end note
 
-note right of TBL_PLACES
+note right of TBL_ACCOMMODATIONS
   PII: phone, email, address
-  Retention: While place is active
-  Archived places - retained 12 months
+  Retention: While accommodation is active
+  Archived accommodations - retained 12 months
 end note
 
 note right of EMAIL_SVC
   Verification: 24h transient tokens
+  Contact and moderation emails include
+  user identity, accommodation name and optional reason
   Logs: Deleted after completion
 end note
 

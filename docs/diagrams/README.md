@@ -10,25 +10,43 @@ Files:
 
 - docs/diagrams/project-architecture.puml
 - docs/diagrams/system-overview.puml
-- docs/diagrams/backend-architecture.puml
 - docs/diagrams/frontend-architecture.puml
 - docs/diagrams/deployment.puml
 - docs/diagrams/communication-auth-flow.puml
 - docs/diagrams/communication-accommodation-flow.puml
+- docs/diagrams/communication-suggestions-flow.puml
 - docs/diagrams/communication-media-moderation-flow.puml
+- docs/diagrams/communication-contact-flow.puml
 - docs/diagrams/communication-overview.puml
+- docs/diagrams/component-auth-sessions.puml
+- docs/diagrams/database-er-diagram.puml
+- docs/diagrams/dataflow-pii-retention.puml
+- docs/diagrams/sequence-add-comment.puml
+- docs/diagrams/sequence-add-favorite.puml
+- docs/diagrams/sequence-add-accommodation.puml
+- docs/diagrams/sequence-upload-moderation.puml
+- docs/diagrams/state-accommodation-lifecycle.puml
 
 Rendered images:
 
 - docs/diagrams/png/project-architecture.png
 - docs/diagrams/png/system-overview.png
-- docs/diagrams/png/backend-architecture.png
 - docs/diagrams/png/frontend-architecture.png
 - docs/diagrams/png/deployment.png
 - docs/diagrams/png/communication-auth-flow.png
 - docs/diagrams/png/communication-accommodation-flow.png
+- docs/diagrams/png/communication-suggestions-flow.png
 - docs/diagrams/png/communication-media-moderation-flow.png
+- docs/diagrams/png/communication-contact-flow.png
 - docs/diagrams/png/communication-overview.png
+- docs/diagrams/png/component-auth-sessions.png
+- docs/diagrams/png/database-er-diagram.png
+- docs/diagrams/png/dataflow-pii-retention.png
+- docs/diagrams/png/sequence-add-comment.png
+- docs/diagrams/png/sequence-add-favorite.png
+- docs/diagrams/png/sequence-add-accommodation.png
+- docs/diagrams/png/sequence-upload-moderation.png
+- docs/diagrams/png/state-accommodation-lifecycle.png
 
 Render (opções):
 
@@ -48,6 +66,6 @@ java -jar plantuml.jar -tpng -o png docs/diagrams/*.puml
 
 Notes:
 
-- O frontend código está em `/Users/angelaantunes/Documents/tese/camino_places_app` (usado nos diagramas).
-- Os diagramas são simples pontos de partida — posso expandir para sequência, componentes detalhados, ou diagramas C4 se preferires.
+- O antigo `backend-architecture.puml` foi descartado; o ficheiro atual de referência arquitetural é `project-architecture.puml`.
+- Os diagramas são simples pontos de partida — podem ser expandidos para mais sequência, componentes detalhados, ou diagramas C4.
 - Os diagramas de comunicação mostram o fluxo entre o frontend Flutter e os principais endpoints do backend NestJS.

@@ -129,735 +129,137 @@ Estas conclusões orientaram as decisões técnicas e de usabilidade tomadas dur
 
 ## METODOLOGIA / MÉTODOS / MATERIAIS
 
-### 3.1 Metodologia de Desenvolvimento
+### 3.1 Enquadramento Metodológico
 
-#### 3.1.1 Abordagem Ágil
+O desenvolvimento da solução seguiu uma metodologia iterativa, orientada por incrementos funcionais completos e validação contínua de consistência entre implementação e documentação técnica. Esta metodologia privilegiou quatro princípios: modularidade arquitetural, rastreabilidade dos fluxos funcionais, qualidade incremental e alinhamento entre representação UML e comportamento efetivo do sistema.
 
-O projeto foi desenvolvido seguindo uma metodologia ágil com:
-- Sprints iterativos de desenvolvimento
-- Revisão contínua de requisitos
-- Feedback constante do utilizador
-- Integração contínua (CI/CD)
+No plano de engenharia, o sistema foi estruturado em duas componentes principais: Stays4Pilgrims Frontend, responsável pela interação com o utilizador, e Stays4Pilgrims Backend, responsável por autenticação, regras de negócio, persistência e integração com serviços externos. A visão geral desta decomposição encontra-se em [docs/diagrams/system-overview.puml](docs/diagrams/system-overview.puml) e [docs/diagrams/project-architecture.puml](docs/diagrams/project-architecture.puml).
 
-#### 3.1.2 Fases do Projeto
+### 3.2 Arquitetura do Sistema e Decisões Técnicas
 
-**Fase 1: Análise e Planeamento**
-- Levantamento de requisitos com stakeholders
-- Definição de user stories
-- Esboço de wireframes e mockups
-- Planeamento da arquitetura
+#### 3.2.1 Estrutura global da solução
 
-**Fase 2: Desenvolvimento do Backend**
-- Desenho da base de dados relacional
-- Implementação dos serviços REST API
-- Implementação de autenticação segura (JWT)
-- Integração com Cloudinary para uploads
+A arquitetura adota o paradigma cliente-servidor e organiza-se em três camadas principais: apresentação (Stays4Pilgrims Frontend), aplicação (Stays4Pilgrims Backend) e dados (PostgreSQL). Esta separação suporta desacoplamento funcional, manutenção evolutiva e testes por componente.
 
-**Fase 3: Desenvolvimento do Frontend**
-- Implementação da UI em Flutter
-- Integração com a API do backend
-- Otimização para diferentes tamanhos de ecrã
-- Testes de usabilidade
+No Stays4Pilgrims Backend, a aplicação NestJS encontra-se segmentada por módulos de domínio registados no núcleo da aplicação: AuthModule, AccountsModule, SuggestionModule, AccommodationsModule, AccommodationCategoriesModule, CaminosModule, StagesModule, StatisticsCaminosModule, FavoritesModule, CommentsModule, UploadModule, ContentModerationModule e ContactModule. Esta organização modular reduz acoplamento entre contextos funcionais e permite evolução independente de serviços.
 
-**Fase 4: Integração e Testes**
-- Testes de integração backend-frontend
-- Testes de desempenho
-- Testes de segurança
+#### 3.2.2 Stays4Pilgrims Backend
 
-### 3.2 Decisões Arquiteturais e Justificação Técnica
+O Stays4Pilgrims Backend foi implementado com NestJS e TypeORM sobre PostgreSQL, com configuração explícita para migrações (synchronize desativado), de modo a garantir evolução controlada do esquema de dados. O padrão predominante é Controller-Service-Repository, com uso de DTOs e validação de entrada.
 
-O sucesso de uma plataforma depende não apenas da implementação correta, mas também de decisões arquiteturais bem fundamentadas. Esta subsecção detalha as principais escolhas e as razões técnicas, científicas e pragmáticas que as suportaram.
+Do ponto de vista funcional, o backend agrega os seguintes eixos:
 
-#### 3.2.1 Visão Geral da Arquitetura Integrada
+1. Autenticação, contas e segurança de sessão.
+2. Gestão de alojamentos e respetivos pedidos de alteração/remoção.
+3. Comentários, favoritos e contributos de media.
+4. Dados de caminhos e etapas.
+5. Sugestões contextuais e recomendação de alojamento.
+6. Contacto e envio de email transacional.
+7. Moderação de conteúdo em comentários e imagens.
 
-**Diagrama de Referência**: Ver `docs/diagrams/png/system-overview.png`
+Estas responsabilidades e as suas dependências com serviços externos estão representadas em [docs/diagrams/project-architecture.puml](docs/diagrams/project-architecture.puml).
 
-A solução segue uma arquitetura cliente-servidor de três camadas:
-- **Camada de Apresentação**: Aplicação Flutter (Web, iOS, Android)
-- **Camada de Lógica**: API REST em NestJS com 9 módulos especializados
-- **Camada de Dados**: PostgreSQL com índices B-tree para queries relacionais eficientes
-- **Serviços Externos**: Cloudinary (CDN + resizing), Supabase (managed DB), Resend (email API)
+#### 3.2.3 Stays4Pilgrims Frontend
 
-#### 3.2.2 Justificação da Escolha do Backend: NestJS + TypeScript
+O Stays4Pilgrims Frontend foi desenvolvido em Flutter para Web e Mobile, com arquitetura em camadas de interface, estado, cliente de API e persistência local. A gestão de estado segue o padrão implementado com flutter_bloc e Cubit, em coerência com a base de código atual. O frontend atua como consumidor da API, preservando no backend a lógica de negócio crítica.
 
-**Por que NestJS vs Express vs FastAPI?**
+Esta organização encontra-se em [docs/diagrams/frontend-architecture.puml](docs/diagrams/frontend-architecture.puml).
 
-**NestJS Vantagens Implementadas**:
+### 3.3 Metodologia de Modelação dos Fluxos Funcionais
 
-1. **Arquitetura Modular Forçada**:
-   - NestJS: 9 módulos independentes (Auth, Accounts, Accommodations, Comments, Upload, Caminos, Stages, Moderation, Favorites), cada um com Controller+Service+Repository **separados**
-   - Express: Sem estrutura mandatória → sem disciplina, tudo em `routes.js` ou `handlers/` com 5000+ linhas (comum em projetos Express não supervisionados)
-   - FastAPI (Python): Similar Express, arquitetura a definir manualmente
-   - Impacto: Em NestJS, testar AuthService é isolado (sem dependências de Accommodations). Em Express sem estrutura, tudo imports tudo (testing inferno).
+Para garantir clareza metodológica, os casos de uso foram documentados em três níveis complementares:
 
-2. **TypeScript Type Safety**:
-   - NestJS + TypeScript: Compiler apanha erros (ex: propriedade não existe, tipo errado) **antes de deploy** (Findler & Felleisen, 2002)
-   - Express + JavaScript: Todo erro de typo é descoberto em produção pelo user ("Cannot read property 'email' of undefined")
-   - FastAPI + Python: Type hints opcionais, mas dinâmico por natureza; bugs chegam em runtime
-   - Impacto real: 3 erros tipo (typos em property names) apanhados pelo TypeScript compiler, que em JS iriam ser production issues
+1. Nível de síntese de comunicação entre cliente e servidor.
+2. Nível de fluxo temático por domínio funcional.
+3. Nível de sequência técnica para operações críticas.
 
-3. **DTOs + Validação Automática**:
-   - NestJS: DTOs com decorators como `@IsEmail()`, `@MaxLength(200)`, `@IsNumber()` → validação automática + erro estruturado em HTTP 400
-   - Express: Precisa middleware validação manual ou express-validator (mais boilerplate)
-   - Impacto: Um endpoint com 10 propriedades → NestJS 10 linhas DTO, Express 50+ linhas validação
+No primeiro nível, [docs/diagrams/communication-overview.puml](docs/diagrams/communication-overview.puml) apresenta as áreas nucleares de interação entre Stays4Pilgrims Frontend e Stays4Pilgrims Backend.
 
-4. **Integração ORM Perfeita**:
-   - NestJS + TypeORM: Entidade definida uma vez como classe TypeScript, automáticamente mapeada a DB e DTOs
-   - Express + TypeORM: Sem convenção, tudo manual (namespacing, loading)
-   - Impacto: Migration com new column → NestJS: update entity class + run migrate. Express: manual scripts
+No segundo nível, os fluxos foram decompostos por domínio:
 
-5. **Dependency Injection Built-In**:
-   - NestJS: Decorators `@Injectable()` + constructor injection automático → fácil de testar (mock services)
-   - Express: Sem DI nativo, tudo require() manual → coupling tight, refactoring risky
-   - Impacto: `new AccountsController(mockAccountsService)` no teste vs imports dinâmicos em Express
+1. Autenticação e gestão de conta: [docs/diagrams/communication-auth-flow.puml](docs/diagrams/communication-auth-flow.puml).
+2. Consulta de alojamentos e comentários: [docs/diagrams/communication-accommodation-flow.puml](docs/diagrams/communication-accommodation-flow.puml).
+3. Sugestões contextuais e recomendação: [docs/diagrams/communication-suggestions-flow.puml](docs/diagrams/communication-suggestions-flow.puml).
+4. Upload e moderação de media: [docs/diagrams/communication-media-moderation-flow.puml](docs/diagrams/communication-media-moderation-flow.puml).
+5. Contacto e encaminhamento de mensagens: [docs/diagrams/communication-contact-flow.puml](docs/diagrams/communication-contact-flow.puml).
 
-6. **Performance Adequada**: Latência ~50-150ms para queries complexas (alojamentos filtrados), adequado para mobile (não é crítico ter <10ms, é offline anyway)
+No terceiro nível, foram documentadas sequências técnicas de operações críticas:
 
-#### 3.2.3 Justificação da Escolha do Frontend: Flutter
+1. Adição de comentário: [docs/diagrams/sequence-add-comment.puml](docs/diagrams/sequence-add-comment.puml).
+2. Gestão de favoritos (toggle): [docs/diagrams/sequence-add-favorite.puml](docs/diagrams/sequence-add-favorite.puml).
+3. Criação de alojamento: [docs/diagrams/sequence-add-accommodation.puml](docs/diagrams/sequence-add-accommodation.puml).
+4. Upload com moderação: [docs/diagrams/sequence-upload-moderation.puml](docs/diagrams/sequence-upload-moderation.puml).
 
-**Por que Flutter vs React Native vs Native Development?**
+Complementarmente, a camada de autenticação em sessão foi explicitada em [docs/diagrams/component-auth-sessions.puml](docs/diagrams/component-auth-sessions.puml), permitindo distinguir o fluxo lógico de autenticação do fluxo funcional de comunicação.
 
-**Flutter Vantagens Executadas**:
+### 3.4 Modelação de Dados e Nomenclatura de Entidades
 
-1. **Código Único Multi-Plataforma**: Dart executável em iOS, Android, Web: **<1 codebase**. 
-   - **React Native**: JavaScript para web/Android/iOS + bridge nativa necessária = código duplicado (~2-3 patterns)
-   - **Native**: Swift (iOS) + Kotlin (Android) + TypeScript (web) = **3 linguagens, 3x código a manter**
-   - Impacto prático: Task simples (ex: formário login) → 1 componente Flutter vs 3 em native
+#### 3.4.1 Princípio de nomenclatura
 
-2. **Performance Nativa Sem Bridge Overhead**:
-   - Flutter: Compila Dart direto para código máquina (ARM64 Android, x86 iOS) → ~1-2% mais lento que native puro (negligenciável)
-   - React Native: Passa por JavaScript bridge → 15-20% overhead em operações CPU (listas grandes, animations) (Corral et al., 2018)
-   - Impacto real: Mapa com 500 markers carrega em ~2s Flutter vs ~2.4s React Native (não crítico, mas perceptível)
+Em conformidade com a implementação do Stays4Pilgrims Backend, a modelação de dados adota a nomenclatura das entidades efetivamente usadas no domínio. O diagrama de referência é [docs/diagrams/database-er-diagram.puml](docs/diagrams/database-er-diagram.puml).
 
-3. **Desenvolvimento Rápido (Hot Reload)**:
-   - Flutter: Mudança salva → <1s reload (estado preservado)
-   - React Native: Similar mas menos estável (hot reload às vezes recarrega app inteiro)
-   - Native: 30-60s rebuild + reinstall (ciclo 30x mais lento)
-   - Impacto produtivo: Em 1 hora desenvolvimento, Flutter = ~60 ciclos, Native = ~2 ciclos
+Entidades nucleares consideradas na metodologia:
 
-4. **UI Components Prontos**:
-   - Flutter: Material Design 3 widgets built-in (buttons, cards, dialogs, navs)
-   - React Native: Precisa React Native Paper (terceiro) ou UIKitten
-   - Native: Implementa de zero para cada componente (ou usa Figma → código gerado nem sempre funciona)
+1. Account.
+2. Accommodation.
+3. AccommodationCategory.
+4. Comment.
+5. GalleryPhoto.
+6. Favorite.
+7. AccommodationPrice.
+8. AccomodationEditRequest.
+9. AccomodationRemovalRequest.
+10. Camino.
+11. Stage.
 
-5. **Mapas + Geolocalização Sem Boilerplate**:
-   - Flutter: `google_maps_flutter` + `geolocator` (2 packages, pronto em 2h)
-   - React Native: Reage Native Maps + geolocation (fragmentado, mais issues)
-   - Native: iOS → MapKit, Android → Google Maps SDK (APIs diferentes)
+Esta seleção corresponde às relações essenciais de ownership, contribuição, moderação e organização do percurso. A modelação foi intencionalmente simplificada para representar apenas os campos funcionais críticos, evitando sobrecarga documental sem valor analítico para o capítulo metodológico.
 
-6. **Maturidade Produção**: Google, Alibaba, BMW, Nubank (banco brasileiro) usam Flutter. Reduz risco de tecnologia imatura em contexto académico.
+#### 3.4.2 Integridade relacional e evolução do esquema
 
-#### 3.2.4 Justificação da Escolha da Base de Dados: PostgreSQL
+O Stays4Pilgrims Backend utiliza TypeORM com migrações versionadas para garantir evolução controlada do esquema de dados. A opção por migrações (em vez de sincronização automática) assegura rastreabilidade de alterações e compatibilidade entre versões de aplicação e base de dados.
 
-**Por que PostgreSQL?**
+No plano relacional, as associações entre Account, Accommodation, Comment, GalleryPhoto, Favorite e AccommodationPrice materializam as operações colaborativas do sistema. As entidades AccomodationEditRequest e AccomodationRemovalRequest estruturam formalmente o ciclo de revisão de mudanças propostas por utilizadores.
 
-1. **Relações Complexas Multi-Tabela**: A lógica de domínio requer queries que unem múltiplas entidades (utilizadores + alojamentos + comentários com filtros). PostgreSQL é otimizado para estes JOINs complexos com foreign keys; MongoDB seria ineficiente (Schiller & Voisard, 2004).
+### 3.5 Segurança, Moderação e Tratamento de Dados
 
-2. **Integridade Referencial**: Foreign keys garantem que comentários não existem órfãos sem alojamento, e favoritos referem sempre um utilizador e alojamento válidos. Sem isto, dados corrompem-se rapidamente em apps colaborativos.
+#### 3.5.1 Autenticação e controlo de acesso
 
-3. **Índices B-tree Eficientes**: Queries como "listar alojamentos do Camino X com rating > 4" são rápidas com índices em `camino_id` e ratings. Ideal para filtros executados centenas de vezes/segundo.
+A segurança de autenticação assenta em tokens JWT, passwords com hash bcrypt e verificação de email. O fluxo funcional está representado em [docs/diagrams/communication-auth-flow.puml](docs/diagrams/communication-auth-flow.puml), enquanto o fluxo técnico de sessão está detalhado em [docs/diagrams/component-auth-sessions.puml](docs/diagrams/component-auth-sessions.puml).
 
-4. **Suporte JSON (JSONB)**: Loja de metadados dinâmicos (ex: waypoints de etapa como array JSON) sem quebrar estrutura relacional. PostgreSQL permite consultar dentro desses JSONs com `@>` operator.
+Esta abordagem permite:
 
-5. **Simplicidade: Supabase Managed**: Sem necessidade de ops para backups, SSL, replicação—tudo automático. Alternativa SQLite seria too limited (no backups, no concurrency); MongoDB adiciona complexidade operacional.
+1. Separar autenticação de regras de domínio.
+2. Reforçar validação de identidade antes de operações sensíveis.
+3. Preservar coerência de sessão no consumo da API pelo Stays4Pilgrims Frontend.
 
-#### 3.2.5 Stack Tecnológico Justificado
+#### 3.5.2 Moderação de conteúdo
 
-| Componente | Escolha | Comparação Concreta com Alternativas |
-|-----------|---------|--------------------------------------|
-| **Backend** | NestJS | **Express**: estrutura manual → 5000+ linhas em routes/handlers. **FastAPI**: Python dinâmico vs TypeScript compiler detecta ~15% bugs antes stage. **Django**: 50MB overhead, 3-5 min startup (overkill para API simples). NestJS: 9 modulos testáveis, 500 linhas por módulo, compiler type-safe. |
-| **Frontend** | Flutter | **React Native**: bridge JS overhead 15-20% em operations intensivas (mapa x500 markers: 2.4s vs 2s). **Native Swift+Kotlin**: 1 Flutter file = 3 arquivos nativos a sincronizar (bug prone). **Web PWA**: 50% lento em mobile, offline capability incompleta. Flutter: 1 codebase = iOS+Android+web, hot reload <1s. |
-| **Database** | PostgreSQL | **MongoDB**: foreign keys impossible, queries {place + comments + ratings} requer aplicação-level joins (lento). **MySQL**: sem JSONB (waypoints como JSON array não consultável). **SQLite**: sem backup automático, multi-user access vira lock contention. PostgreSQL: normalized, JSONB, managed Supabase. |
-| **Storage** | Cloudinary | **AWS S3**: CDN separado = 2 services, resizing manual scripts. **Firebase**: vendor lock-in (export = complex), billing não-previsível (auto scaling pode estourar orçamento). Cloudinary: CDN + resizing built-in, preço por bandwidt fixed. |
-| **Auth** | JWT | **OAuth2**: Arquitectura para multi-app scenarios (não este caso, app único). Overhead consts 5-7ms per check. **Session**: Stateful no servidor (memory/Redis crash = logout forced). JWT: stateless, mobile-friedly (token no header), simples Passport.js integration. |
-
-#### 3.2.6 Arquitetura do Backend Detalhada
-
-**Diagrama de Referência**: Ver `docs/diagrams/png/system-overview.png`
-
-**Módulos Especializados**:
-
-| Módulo | Responsabilidade | Padrão | Funcionalidades |
-|--------|-----------------|---------|------------------------------|
-| **Auth** | Autenticação via JWT | Controller → Service → DB | Login, registo, email verification, password reset |
-| **Accounts** | Gestão de perfil de utilizador | REST CRUD | Avatar, nome, preferências, histórico |
-| **Accommodations** | Gestão de alojamentos | Hybrid Handler + REST | CRUD com geolocalização, moderação, filtro por Camino |
-| **Comments** | Avaliações e comentários | Handler-based | Ratings, text reviews, aprovação manual |
-| **Favorites** | Marcações de utilizador | HTTP endpoint | Add/remove, persistência |
-| **Upload** | Gestão de ficheiros | Multipart upload → Cloudinary | Image validation, CDN URL generation |
-| **Caminos** | Dados de rotas de peregrinação | Data reference | Metadados dos Caminhos de Santiago |
-| **Stages** | Segmentação de caminhos | Hierarchical | Etapas com waypoints e descrições |
-| **Moderation** | QA de conteúdo | Automated + Manual | Flag reporting, approval workflows |
-
-**Padrão de Arquitetura**: Este design modular permite adicionar novos módulos sem impactar código existente (Open/Closed Principle). Cada módulo é testável isoladamente e desacoplado dos outros via DTOs e limites de módulo.
-
-#### 3.2.7 Arquitetura do Frontend
-
-**Diagrama de Referência**: Ver `docs/diagrams/png/frontend-architecture.png`
-
-O frontend Flutter segue arquitetura em camadas:
-- **UI Layer (Widgets)**: Components visuais que renderizam screens (maps, lists, forms, user profiles)
-- **State Management (Provider/Riverpod)**: Gerencia estado de utilizador, alojamentos filtrados, sessão
-- **API Client Layer**: Abstração HTTP que comunica com backend em JSON
-- **Local Storage**: SharedPreferences para cache de JWT, preferências
-
-**Componentes Principais**:
-- **Map Screen**: Google Maps com posição em tempo real, clusters de alojamentos, filtro por proximidade
-- **Accommodation Detail**: Dados do backend, galeria lazy-loaded, comentários, fotos contributed
-- **Comments Section**: Listagem paginada, adicionar rating+review com validação cliente
-- **Search & Filter**: Filtros por Camino, categoria, range de preços; caching de queries
-- **User Profile**: CRUD de avatar (upload Cloudinary), nome, pilgrim_reason
-- **Auth Flow**: Login/registo, JWT storage, refresh token automático antes de expiração
-
-#### 3.2.8 Fluxos de Comunicação Frontend-Backend
-
-**Diagramas de Sequência de Referência**:
-- `docs/diagrams/png/communication-overview.png` – Resumo das 6 áreas de integração
-- `docs/diagrams/png/communication-auth-flow.png` – Fluxo detalhado: registo, email verification, login, password reset
-- `docs/diagrams/png/communication-accommodation-flow.png` – Fluxo: listagem com paginação, filtro, detalhe, comentários
-- `docs/diagrams/png/communication-media-moderation-flow.png` – Fluxo: upload de imagens, moderação, aprovação/rejeição
-
-### 3.3 Arquitetura da Base de Dados
-
-**Diagrama de Referência**: Ver `docs/diagrams/png/database-er-diagram.png`
+A moderação foi tratada como componente transversal da metodologia, incidindo sobre comentários, imagens e decisões administrativas. O fluxo consolidado de media e moderação encontra-se em [docs/diagrams/communication-media-moderation-flow.puml](docs/diagrams/communication-media-moderation-flow.puml), e os estados de aprovação/rejeição/publicação são formalizados em [docs/diagrams/state-accommodation-lifecycle.puml](docs/diagrams/state-accommodation-lifecycle.puml).
 
-#### 3.3.1 Entidades e Relações Principais
+#### 3.5.3 Dados pessoais e retenção
 
-A base de dados foi desenhada seguindo princípios de normalização relacional (3NF) com extensões geoespaciais. As 12 entidades principais são:
+O tratamento de dados pessoais foi documentado de forma explícita em [docs/diagrams/dataflow-pii-retention.puml](docs/diagrams/dataflow-pii-retention.puml), incluindo origens de dados, pontos de persistência e interação com serviços de email e armazenamento de imagens. Esta modelação apoia a discussão metodológica sobre minimização de dados, rastreabilidade de fluxos e responsabilidades de tratamento.
 
-**1. Entidade `account` (Utilizadores)**
-- PK: `id` (UUID)
-- Campos únicos: `email` (verificação dupla), `username` (opcional)
-- Campos críticos: `password_hash` (Bcrypt com salt), `email_verified_at` (nullable), `user_type` (enum: 'pilgrim' | 'host' | 'admin')
-- Timestamps: `created_at`, `updated_at` para auditoria
-- Índices: `idx_account_email`, `idx_account_user_type`
+### 3.6 Integração, Verificação e Qualidade
 
-**2. Entidade `place` (Alojamentos)**
-- FK: `account_id` → account (proprietário)
-- FK: `camino_id` → camino (qual Camino está associado)
-- Geolocalização: `latitude`, `longitude` (DECIMAL 10,8 para precisão de ~1.1mm)
-- Filtro: `is_approved` (moderação), `is_removed` (soft delete)
-- Índices: `idx_place_account_id`, `idx_place_camino_id` para queries rápidas por proprietário e Camino
-
-**3. Entidade `place_category` (Tipos de Alojamento)**
-- Catálogo: ['Albergue', 'Hotel', 'Hostel', 'Cama Privada', 'Flat']
-- Relação: 1-para-N com `place` (um alojamento pertence a 1 categoria)
+#### 3.6.1 Estratégia de verificação
 
-**4. Entidade `place_service` (Serviços - Catálogo)**
-- Catálogo: ['WiFi', 'Pequeno-almoço', 'Cozinha', 'Lavandaria', 'Estacionamento', 'Acessibilidade']
-- Entidade de transação (junction table): `place_has_service` (N-para-N com place)
-
-**5. Entidade `comment` (Avaliações e Comentários)**
-- FK: `place_id` → place
-- FK: `account_id` → account (avaliador)
-- Campos: `rating` (1-5), `text` (optional, até 5000 chars)
-- Moderação: `is_approved` (boolean, default false para UGC não confiável por padrão)
-- Índice: `idx_comment_place_id` para agregação rápida de rating médio
-
-**6. Entidade `gallery_photo` (Fotos de Utilizadores)**
-- FK: `place_id` → place
-- FK: `account_id` → account (uploader)
-- Armazenamento: `cloudinary_public_id` (referência única na CDN)
-- Moderação: `is_approved` (mesmo padrão que comentários)
-- Índice: `idx_gallery_photo_place_id` para ordenação por tempo
-
-**7. Entidade `favorite` (Marcações de Utilizador)**
-- Composite Key: `(account_id, place_id)` - cada utilizador marca um alojamento 1 única vez
-- FK: account_id → account, FK: place_id → place
-- Índice: `idx_favorite_account_id` para "My Favorites" queries rápidas
-
-**8. Entidade `place_removal_request` (Pedidos de Moderação)**
-- FK: `place_id` → place
-- FK: `account_id` → account (quem reportou)
-- Campos: `reason` (enum: 'incorrect_info', 'inappropriate', 'duplicate', 'closed')
-- Status: `status` (enum: 'pending', 'approved', 'rejected')
-- Índice: `idx_place_removal_request_status` para workflows de moderação
+A validação técnica foi efetuada com Jest e supertest, contemplando testes unitários e testes de integração/E2E para fluxos críticos do Stays4Pilgrims Backend. As execuções de teste são operacionalizadas por scripts dedicados para cenários gerais e cenários de integração por domínio.
 
-**9. Entidade `camino` (Rotas de Peregrinação)**
-- Dados de referência: `name` (ex: 'Camino Francés'), `description`, `difficulty_level`
-- Readonly após seeding (migração estática)
+Em termos metodológicos, a verificação concentrou-se em funcionalidades de maior criticidade operacional:
 
-**10. Entidade `stage` (Etapas de Camino)**
-- FK: `camino_id` → camino
-- Campos: `stage_number`, `start_point`, `end_point`, `distance_km`, `waypoints` (JSON array de coordinates)
-- Índice: `idx_stage_camino_id` para ordenação de etapas
+1. Autenticação e gestão de conta.
+2. Comentários e moderação.
+3. Upload de conteúdos.
+4. Sugestões e recomendação.
 
-**11. Entidade `place_price` (Preços)**
-- FK: `place_id` → place
-- Campos: `price_per_night` (DECIMAL 10,2), `currency` (default 'EUR'), `season` (enum: 'low', 'peak'), `valid_from`, `valid_to`
-- Índice: `idx_place_price_valid_dates` para queries de disponibilidade
-
-**12. Entidade `statistics_caminos` (Analytics Agregador)**
-- Agregações guardadas: `total_places_count`, `average_rating`, `most_commented_place_id`
-- Atualizado periodicamente (job agendado, ex: nightly) para manter stats frescas
-- Índice: `idx_statistics_caminos_camino_id` para dashboard analytics
+Esta estratégia permitiu validar o núcleo funcional do sistema e reduzir risco técnico nas operações de maior impacto para o utilizador final.
 
-#### 3.3.2 Estratégias de Índices e Query Performance
+#### 3.6.2 Coerência documental e rastreabilidade
 
-**Índices para Acesso Rápido**:
-- **B-tree em Foreign Keys**: `idx_place_camino_id`, `idx_place_account_id` para JOINs rápidos (alojamentos de um Camino em O(log n))
-- **Composite Index Seletivo**: `(place_id, is_approved)` em `comment` para listar apenas comentários aprovados sem scan completo
-- **Índice em is_approved**: Filtra resultados de UGC pendente de moderação
+Como critério metodológico adicional, o trabalho incluiu sincronização sistemática entre implementação e documentação UML. Após cada ciclo de alteração estrutural relevante, os diagramas PlantUML foram revistos e exportados para PNG, garantindo coerência entre artefactos de desenvolvimento e artefactos académicos apresentados na tese.
 
-**Query Patterns Otimizados**:
-1. **Filtro por Camino**: Query `SELECT * FROM place WHERE camino_id = ? AND is_approved = true` usa índice → rápido
-2. **Listar comentários aprovados**: Query `SELECT * FROM comment WHERE place_id = ? AND is_approved = true ORDER BY created_at DESC` com índice evita scan completo
-3. **Agregação de ratings**: Periodicamente, recalcula avg_rating e guarda em cache `statistics_caminos` → queries posteriores não fazem AVG(rating) repetido sobre 1000+ comments
-
-#### 3.3.3 Relacionamentos e Integridade Referencial
-
-PostgreSQL garante **integridade referencial** através de foreign keys:
-- Foreign key `comment.place_id → place.id` previne comentários órfãos
-- Foreign key `favorite.account_id → account.id` e `favorite.place_id → place.id` garante ambos existem
-- Sem isto, aplicação teria de validar manualmente (propensão a bugs)
-
-**Soft Deletes**: `place.is_removed = true` ou `comment.is_approved = false` em vez de DELETE físico permite:
-- Auditoria (logs de quem removeu, quando)
-- Recuperação acidental (admin pode reverter exclusão)
-- Separar "data deleted" de "data will never show to other users"
-
-#### 3.3.4 Geolocalização com Latitude/Longitude Simples
-
-A implementação usa `latitude` e `longitude` como DECIMAL campos simples (sem PostGIS extension).
-
-**Query de Proximidade**: A consulta de proximidade é implementada através de um algoritmo simples no backend. O frontend envia a latitude, longitude e raio desejado. O servidor filtra por Camino, status de aprovação, e depois aplica um filtro geográfico rectangular (bounding box) usando as coordenadas de entrada. Os resultados são ordenados por distância Euclidiana até à localização do utilizador, retornando os 50 alojamentos mais próximos.
-
-**Trade-off**: Sem PostGIS GiST spatial index, query com muitos places é O(n) scan. Mas:
-- 680 alojamentos totais → scan é <10ms em PostgreSQL
-- PostGIS seria overkill para escala atual (seria útil em 100k+)
-- Simpler deploy (sem PostGIS extension required)
-- Supabase managed handles isto bem
-
-#### 3.3.5 Migrações de Base de Dados com TypeORM
-
-O projeto utiliza TypeORM migrations para versionamento e evolução:
-- **Esquema inicial** (1705240000000-InitSchema.ts): Entidades core account, place, comment, camino com related entities
-- **Migrações incrementais**: Adição de colunas (`user_type` enum para roles, `is_approved` boolean para moderação, `is_removed` para soft deletes)
-- **Índices**: B-tree indices em foreign keys e campos de filtro adicionados em migrations quando dados crescem
-- **Rollback seguro**: Cada migration tem up() e down(), permitindo reverter mudanças se necessário
-- **Zero-downtime**: Migrações desenhadas para aplicar online sem locks longos (ex: índices criados concorrentemente)
-
-### 3.4 Padrões de Implementação e Segurança
-
-#### 3.4.1 Autenticação e Autorização
-
-**Fluxo de JWT (JSON Web Tokens)**:
-1. Utilizador regista-se com email + password
-2. Password é hashificado com Bcrypt (cost=10, sal aleatório per-utilizador, ~10ms por hash)
-3. Email verification email enviado via Resend API com link unique token
-4. Após verificação, utilizador pode fazer login
-5. Backend gera JWT access token (15 min expiry) + refresh token (7 dias no storage)
-6. Frontend armazena tokens em SharedPreferences (encrypted by OS)
-7. Cada request API inclui `Authorization: Bearer {access_token}` header
-8. Se token expirou, refresh token automático antes de 1 min de expiry
-9. Logout apaga refresh token, logout no servidor revoga token (blacklist opcional)
-
-**Segurança de Password**:
-- Mínimo 8 caracteres, alphanumeric + special
-- Bcrypt cost factor 10 (balanz between security e performance)
-- Nunca armazenar passwords em plaintext
-- Email verification obrigatória antes de login (previne register spam)
-
-#### 3.4.2 Autorização com Role-Based Access Control (RBAC)
-
-**Roles Implementadas**:
-- **Pilgrim** (padrão): Pode ler alojamentos, comentar, fazer uploads, marcar favoritos
-- **Host**: Pode criar/editar alojamentos próprios, responder a comentários
-- **Admin**: Aprovação de contribuições, remoção de conteúdo inapropriado, estatísticas
-
-**Guards no NestJS**: A autorização é implementada através de decoradores que verificam os tokens JWT e as roles do utilizador. Cada endpoint de alojamentos é protegido por um guard que valida a autenticação. Os endpoints são anotados com regras de role: criação de alojamentos requer role de host ou admin; comentários podem ser adicionados por qualquer utilizador autenticado; remoção é restrita a host/admin. O sistema rejeita automaticamente requests sem permissão com resposta HTTP 403.
-
-#### 3.4.3 Validação de Dados e Prevenção de Injection Attacks
-
-**DTOs (Data Transfer Objects) com Validação**: Os DTOs definem a forma esperada dos dados de entrada para cada endpoint. Cada campo tem decoradores que descrevem validações: strings têm limite de comprimento (ex: 200 caracteres para nome de alojamento); números têm ranges válidos (latitude/longitude dentro dos limites geográficos globais); emails são validados segundo o standard RFC 5322. A framework NestJS processa automaticamente estes decoradores e rejeita requests com dados inválidos, retornando mensagens de erro estruturadas ao cliente.
-
-**Proteção contra SQL Injection**:
-- TypeORM usa parameterized queries automaticamente
-- Nunca construir queries com string concatenation
-- Input sanitization no frontend (HTML escaping de user text)
-
-**Rate Limiting** (proteção contra abuso):
-- Max 5 logins falhados por IP/hora (block temporária)
-- Max 10 uploads/hora por utilizador (quota)
-- Max 100 comments/dia por utilizador
-
-#### 3.4.4 Encriptação e Segurança de Transmissão
-
-- **HTTPS obrigatório** em produção (TLS 1.3)
-- **Cloudinary uploads**: Via signed URLs (expiram em 1 hora)
-- **CORS** configurado para domínios específicos (whitelist)
-- **Headers de segurança**: X-Frame-Options, X-Content-Type-Options, Content-Security-Policy
-
-#### 3.4.5 Moderação de Conteúdo Gerado por Utilizador (UGC)
-
-**Estratégia Híbrida** (Doan et al. 2011):
-
-1. **Moderação Automática de Upload** (Filtros):
-   - Tamanho máx 50MB, apenas JPG/PNG/WebP
-   - NSFW detection via cloudinary (plug-in L-faces detection)
-   - Dimensões mínimas 640x480 (evita imagens de má qualidade)
-
-2. **Community Moderation** (Voting):
-   - Cada utilizador pode reagir (👍/👎) a comentários
-   - Comentários com score < -5 ocultados por default
-
-3. **Manual Moderation** (Admin):
-   - Admin painel que lista comentários/fotos pendentes de aprovação
-   - Flag reasoning (ex: "duplicate", "inappropriate", "spam")
-   - Aprovação ou rejeição com notificação ao uploader
-
-#### 3.4.6 Logging e Auditoria
-
-- **Logs estruturados** (Winston logger): Todos os logins, operações sensíveis (CRUD, moderação)
-- **Campo created_at** em cada entidade para rastreability
-- **Soft deletes** preservam histórico completo (ex: comentário removido pode ser recuperado)
-- **Dados PII mascarados** em logs (ex: email → "us***@example.com")
-
-#### 3.4.7 Padrões de Implementação Backend
-
-**Architecure Pattern - Layered + Modular**:
-- **Controller**: HTTP routing, validação de input
-- **Service**: Lógica de negócio isolada (testável)
-- **Repository**: Data access abstraction (TypeORM)
-- **DTO**: Data transfer objects (validação strict de tipos)
-
-**Error Handling Unificado**: A framework NestJS fornece um mecanismo de tratamento de erros centralizado. Quando um serviço lança uma excepção (ex: email já registado), esta é capturada automaticamente e convertida numa resposta HTTP apropriada. A resposta de erro inclui o código de status HTTP (ex: 400 para requisição inválida), uma mensagem descritiva em inglés, e metadados estruturados. Isto garante consistência nas respostas de erro em toda a API.
-
-**Consistência Transacional**: Para operações que envolvem múltiplas entidades (ex: criar um alojamento e simultaneamente guardar fotos), o sistema utiliza transações do banco de dados. A operação é de tipo "tudo ou nada": se algum passo falha (ex: salvar uma foto), toda a transação é desfeita e nenhuma alteração é persistida no banco. Isto previne estados inconsistentes onde um alojamento existe mas as suas fotos não foram guardadas.
-
-#### 3.4.8 Escalabilidade e Performance
-
-**Caching Strategy** (em produção):
-- Redis cache para `place.ratings_avg` (recompute via trigger a cada novo comentário)
-- LRU cache em memória para lista de `caminos` (dados static, recarreg 1x/dia)
-- Cloudinary CDN distribui imagens globalmente (não servir do backend)
-
-**Paginação Eficiente**:
-- Cursor-based pagination em vez de offset (offset lento para skip grande)
-- Max 50 items/página (quantidade razoável para mobile)
-
-**Monitoramento**:
-- Prometheus metrics: API latency, database query time, error rates
-- Alertas se latency > 500ms ou error rate > 1%
-
-### 3.5 Padrões de Implementação Frontend (Flutter)
-
-**Diagrama de Referência**: Ver `docs/diagrams/png/frontend-architecture.png`
-
-#### 3.5.1 Arquitetura em Camadas
-
-**UI Layer**:
-- Widgets reutilizáveis (PlaceCard, CommentTile, MapMarker)
-- Screens principais (HomeScreen, PlaceDetailScreen, ProfileScreen)
-- Tema consistente com Material Design 3
-- Responsive design para web/iOS/Android
-
-**State Management (Provider/Riverpod)**:
-- `AuthProvider` – Gerencia login, refresh token, logout
-- `PlaceProvider` – Cache de alojamentos fetchados, paginação
-- `FilterProvider` – Estado de filtros (Camino, category, radius)
-- `FavoriteProvider` – Lista local de favoritos sincronizada com servidor
-
-**API Client Layer**:
-- `ApiClient` abstrai HTTP (Dio package)
-- Retry logic automático (3 tentativas em caso de timeout)
-- Token refresh automático se 401 Unauthorized
-- Error handling centralizado
-
-**Local Storage**:
-- `SharedPreferences` para JWT token (encriptado pelo OS)
-- `Hive` para cache local de places (offline capability)
-- `sqflite` para histórico local (opcional, para analytics)
-
-#### 3.5.2 Fluxo de Autenticação
-
-**Sequência**: Ver `docs/diagrams/png/communication-auth-flow.png`
-
-**Registo + Email Verification**:
-1. Utilizador entra email + password + name
-2. App valida formato (email válido, password forte)
-3. POST `/auth/register` com credenciais
-4. Server hashifica password (Bcrypt), envia email verification
-5. App mostra "Check your email" screen
-6. Utilizador clica link no email (deep linking) → app abre com token
-7. App valida token localmente, faz POST `/auth/verify-email`
-8. Server marca email como verified
-9. App redireciona para login screen, utilizador faz login
-
-**Fluxo de Login**:
-1. Utilizador entra email + password
-2. POST `/auth/login`
-3. Server retorna `{ accessToken, refreshToken, expiresIn: 900 }`
-4. App armazena tokens em SharedPreferences
-5. Redireciona para HomeScreen
-6. Cada request HTTP inclui Bearer token
-7. Se 401 Unauthorized, usa refreshToken para obter novo accessToken
-
-**Token Refresh Automático**:
-- Interceptor Dio detecta 1 minuto antes de expiry
-- Faz POST `/auth/refresh` com refreshToken
-- Atualiza accessToken localmente
-- Retry do request original com novo token
-
-#### 3.5.3 Fluxo de Pesquisa e Filtro de Alojamentos
-
-**Sequência**: Ver `docs/diagrams/png/communication-accommodation-flow.png`
-
-**User Journey**:
-1. Utilizador abre app na HomeScreen (Map view)
-2. Mapa carrega com posição em tempo real (GPS)
-3. Seleciona filtro "Camino Francés" e "Raio: 5km"
-4. App calcula bounding box (latitude ± 5km)
-5. GET `/places?camino=frances&lat=40.27&lon=8.83&radius=5&limit=50`
-6. Backend:
-   - Valida coordenadas (dentro do Camino)
-   - Executa ST_DWithin query com índice GiST
-   - Retorna 50 places mais próximas (JSON array)
-7. App renderiza markers no mapa (clusters para > 10 pontos)
-8. Utilizador toca num marker → navega para PlaceDetailScreen
-9. GET `/places/{id}/with-comments`
-10. Backend retorna: O serviçor responde com um objeto JSON contendo dados do alojamento (identificador, nome, coordenadas, categoria), métricas de avaliação (rating médio, total de comentários), uma lista de comentários aprovados com metadados do autor, e uma galeria de fotos validadas.
-11. App renderiza interface com swipeable galeria de fotos, comentários paginados
-
-**Paginação eficiente**:
-- Cursor-based: `GET /places/{id}/comments?cursor=abc123&limit=10`
-- Próxima página: `?cursor=resultado_último_item`
-- Evita problema de offset (skip de todos os items anteriores)
-
-#### 3.5.4 Fluxo de Upload de Imagens
-
-**Sequência**: Ver `docs/diagrams/png/communication-media-moderation-flow.png`
-
-**Upload com Validação Cliente**:
-1. Utilizador seleciona imagem do galeria/câmara
-2. App valida:
-   - Tamanho < 50MB
-   - Formato JPG/PNG/WebP
-   - Dimensões ≥ 640x480
-3. App comprime se necessário (80% quality, max 2048x2048)
-4. Mostra preview com progresso
-5. Faz POST `/upload` multipart/form-data (Dio handles natively)
-6. Backend:
-   - Valida novamente (segurança, prevent bypasses)
-   - Faz upload para Cloudinary via SDK
-   - Recebe `cloudinary_public_id` + `secure_url`
-   - Cria DB record: `INSERT INTO gallery_photo (place_id, account_id, cloudinary_public_id, is_approved=false)`
-   - Envia notificação aos admins
-   - Retorna `{ id, url, status: "pending_approval" }`
-7. App mostra notificação "Photo uploaded, awaiting approval"
-8. Utilizador volta ao PlaceDetail
-9. Quando admin aprova, app webhook/polling mostra "approved" badge
-
-**Moderação (Admin Flow)**:
-- Admin abre painel
-- Vê lista de 10 uploaded photos com `is_approved=false`
-- Clica "Approve" ou "Reject + Reason"
-- Backend atualiza `is_approved` flag
-- Se aprovado, photo aparece na galeria pública
-- Se rejeitado, notificação ao uploader ("Your photo was rejected because...")
-
-#### 3.5.5 State Management com Riverpod
-
-A gestão de estado no Flutter usa a biblioteca Riverpod, que fornece um sistema reactivo de providers. Um provider para lista de alojamentos define como os dados são obtidos do servidor: o provider observa o filtro selecionado, chama a API com os parâmetros apropriados, e gerencia o estado de carregamento, erro e sucesso. Os widgets que consomem este provider atualizam automaticamente quando os dados mudam. Este padrão mantém a camada de apresentação e a lógica de dados separadas, melhorando testabilidade e reusabilidade.
-
-#### 3.5.6 Error Handling e Offline Capability
-
-**Network Error Handling**:
-- DioException catch (timeout, no connection, 500 error)
-- Mostrar user-friendly mensagem ("No internet connection, retrying...")
-- Retry automático com exponential backoff (1s, 2s, 4s)
-- Fallback para Hive cache data (stale data é melhor que erro)
-
-**Offline Mode**:
-- Ao fazer login, cache do último estado (places, favorites)
-- Se sem internet, app pode visualizar cached data em read-only
-- Quando conexão volta, sincroniza (ex: favorites adicionadas offline)
-
-### 3.6 Testing, CI/CD e DevOps
-
-#### 3.6.1 Estratégia de Testing e Qualidade de Código
-
-A validação e garantia de qualidade de código constitui um pilar fundamental na engenharia de software moderna. Esta subsecção descreve a estratégia de testes implementada, dividida em três níveis complementares: testes unitários (isolamento de componentes), testes de integração (validação de fluxos entre camadas) e testes end-to-end (verificação de cenários completos).
-
-**Filosofia de Testes**
-
-O projeto segue a abordagem de "testing pyramid" (Cohn, 2009): uma base robusta de testes unitários (rápidos, determinísticos), uma camada intermédia de testes de integração (validam interações entre módulos), e um topo reduzido de testes E2E (mais lentos, cobrem cenários críticos). Esta estratégia maximiza a eficiência de deteção de falhas mantendo tempos de execução aceitáveis em ciclos de desenvolvimento.
-
-**Testes Unitários (Jest Framework)**
-
-Os testes unitários utilizam o framework Jest (v29.7.0) com TypeScript via ts-jest (v29.2.5), permitindo validação de lógica isolada sem dependências externas. Os serviços são testados através de mocking de dependências (AuthService, CommentsService, UploadService).
-
-Suites de testes unitários implementadas:
-
-| Suite | Casos de Teste | Funcionalidade Validada |
-|-------|---|---|
-| `AuthService` | 5 | Login com validação de email/password; token JWT; refresh; rejeição de contas não verificadas |
-| `CommentsService` | 2 | Agregação de ratings; validação de moderação |
-| `UploadService` | 1 | Rejeição de pré-moderação; validação de tipos de ficheiro |
-| `AccommodationsService` | 2 | Criação com moderação; lookup de alojamentos inexistentes |
-| `SuggestionService` | 3 | Processamento de respostas de modelos LLM; fallback para highest-rated; coordinate line parsing |
-| `AppController` | 1 | Health check ("Hello World!") |
-| `AccountsController` | 1 | Injeção de dependências |
-| `AccountsService` | 1 | Definição de serviço |
-
-**Total: 8 suites, 16 casos de teste unitários.**
-
-Tempo de execução: ~28 segundos. Taxa de sucesso: 100% (16/16 casos passados).
-
-**Cobertura de Código (npm run test:cov)**
-
-A métrica de cobertura de código mensura a percentagem de instruções, branches, funções e linhas executadas pelos testes. Os resultados globais são:
-
-- **Statements (Instruções)**: 20.45% — De um total de ~2000 instruções no código-fonte, ~410 são exercitadas pelos testes.
-- **Branches (Caminhos Lógicos)**: 6.47% — De um total de ~400 branches condicionais, apenas ~26 são explorados.
-- **Functions (Funções)**: 12.53% — De um total de ~500 funções, ~63 são invocadas nos testes.
-- **Lines (Linhas)**: 19.86% — De um total de ~3000 linhas, ~595 são cobertas.
-
-Tendo em conta o caráter exploratório deste piloto e a necessidade de iteração célere sobre os requisitos, adotou-se uma estratégia de testes orientada ao núcleo funcional do sistema. Assim, a validação concentrou-se nos fluxos de maior criticidade e valor operacional para o utilizador — nomeadamente autenticação, moderação, sugestões e operações centrais de domínio — em detrimento de uma cobertura exaustiva de todo o código-fonte. Esta opção é consistente com a fase inicial do projeto, na qual o objetivo principal consiste em estabilizar o comportamento essencial, reduzir a incerteza técnica e consolidar uma base evolutiva para expansão futura.
-
-Em termos metodológicos, esta decisão traduz uma abordagem **pragmática e focalizada**: os testes incidem sobre a lógica crítica, deixando funções auxiliares, caminhos menos frequentes e alguns casos-limite para validação manual ou para iterações subsequentes. Módulos com maior cobertura:
-
-- `AuthService`: 72% statements (lógica crítica de autenticação)
-- `SuggestionService`: 69.23% statements (processamento de LLM)
-- `CommentsService`: 28.57% statements (validação de moderação)
-
-Módulos com baixa/zero cobertura:
-
-- `FavoritesService`: 0% (funcionalidade complementar, passível de reforço em iterações futuras)
-- `StatisticsCaminosService`: 0% (analytics descritiva, não crítica para o núcleo do piloto)
-- `UploadController`: 0% (cobertura dependente de testes de integração HTTP)
-
-**Nota para defesa oral:**
-
-> A cobertura de testes foi deliberadamente orientada para os fluxos críticos do piloto, privilegiando a validação funcional do núcleo do sistema em vez de uma medição exaustiva de todas as linhas de código. Numa fase exploratória, esta opção permite reduzir risco técnico, acelerar iterações e garantir confiança nos comportamentos essenciais, reservando a expansão da cobertura para fases posteriores de maturação do produto.
-**Cobertura de Código Atualizada (Após Implementação Completa)**
-
-A métrica de cobertura de código mensura a percentagem de instruções, branches, funções e linhas executadas pelos testes. Os resultados após implementação de testes para FavoritesService, StatisticsCaminosService e UploadController são:
-
-- **Statements (Instruções)**: 43.92% — De um total de ~2500 instruções no código-fonte, ~1098 são exercitadas pelos testes.
-- **Branches (Caminhos Lógicos)**: 31.05% — De um total de ~500 branches condicionais, ~155 são explorados.
-- **Functions (Funções)**: 40.36% — De um total de ~600 funções, ~242 são invocadas nos testes.
-- **Lines (Linhas)**: 43.7% — De um total de ~3500 linhas, ~1524 são cobertas.
-
-**Cobertura por Módulo (Após Implementação Completa de Testes):**
-
-Módulos com **maior cobertura** (lógica crítica testada):
-- `AuthService`: 72% statements (autenticação, validação de credentials)
-- `SuggestionService`: 69.23% statements (processamento de recomendações LLM)
-- `FavoritesService`: ~85% statements (CRUD de favoritos, toggle logic)
-- `FavoritesController`: cobertura direta dos fluxos `list/add/remove/exists/toggle`
-- `UploadController`: ~95% statements (validação de upload, error handling)
-- `StagesService` e `StagesController`: cobertura de delegação simples e fluxo de listagem
-- `CaminosService` e `CaminosController`: cobertura do query path de ranking e dispatch do endpoint handle
-- `AccommodationsService`: cobertura ampliada de branches de validação, cache e query path
-- `ContentModerationService`: cobertura de regras locais, fallback OpenAI e OCR em imagens
-- `AccommodationsService`: cobertura ampla de validações, pedidos e aprovações/rejeições
-- `CommentsService`: 28.57% statements (moderação de comentários)
-
-Módulos com **cobertura moderada**:
-- `StatisticsCaminosService`: ~70% statements (create, findAll, findByCamino)
-- `StatisticsCaminosController`: cobertura direta de `create`, `findAll` e `findByCamino`
-- `UploadService`: 22.22% statements (integração Cloudinary com mocking)
-- `AccommodationsService`: 15% statements (CRUD básico)
-
-**Análise de Impacto dos Novos Testes:**
-- **+11 casos de teste adicionais** (131 → 142 totais)
-- **18 suites de testes**, todas passando com 100% sucesso
-- **+23.47 pp em Statements** (20.45% → 43.92%)
-- **+27.83 pp em Functions** (12.53% → 40.36%)
-
-**Testes de Integração (HTTP Layer)**
-
-Para além de testes unitários, a suite inclui testes de integração que validam o comportamento dos controllers HTTP e sua delegação correta para serviços. Estes testes utilizam `supertest` (v7.0.0) para fazer requisições HTTP e mocks dos serviços subjacentes.
-
-Suites de integração implementadas (total: 10 casos de teste):
-
-**Suite: auth-comments.e2e-spec.ts** (5 casos de teste)
-- `POST /auth/register` → Criação de conta; validação de email duplicado; rejeição de passwords fracas
-- `POST /auth/login` → Login com credenciais válidas; return token + user object
-- `POST /comments/handle` → Adição e listagem de comentários; validação de ratings
-
-**Suite: upload-suggestions.e2e-spec.ts** (5 casos de teste)
-- `POST /upload` → Validação de tipo de ficheiro; rejeição de tipos não suportados
-- `POST /sugestoes/sugerir` → Delegação correta para LLM; formatação de resposta
-- `GET /sugestoes/best-hostel/best-accommodation` → Recomendação por ratings; fallback logic
-
-Tempo de execução: ~3 segundos por suite. Taxa de sucesso: 100% (10/10 casos passados).
-
-Mocking strategy: Para testes de integração, os serviços (AuthService, CommentsService, etc.) são substituídos por jest.Mock objects. Dependências externas (EmailService, HttpService para LLM) são também mockadas para garantir testes determinísticos e rápidos, sem dependências de rede ou terceiros.
-
-**Limitações Atuais e Roadmap**
-
-A cobertura global de 20.45% statements é consciente e estratégica para a fase inicial de desenvolvimento (MVP). As prioridades para iterações futuras incluem:
-
-1. **Testes para FavoritesService, StatisticsCaminosService**: Aumentar cobertura de funcionalidade de analytics e gestão de favoritos.
-2. **Testes de cenários de erro**: Expanded test cases para network timeouts, invalid input, database constraints.
-3. **Performance tests**: Validação de latência de queries geoespaciais com índices PostgreSQL/PostGIS.
-4. **E2E com banco de dados real**: Testes end-to-end com PostgreSQL em vez de in-memory sqlite.
-
-**Ferramentas e Configuração**
-
-- **Jest v29.7.0**: Framework de testes. Configuração em `jest.config.js`.
-- **ts-jest v29.2.5**: Compilador TypeScript para Jest.
-- **@nestjs/testing v11.0.1**: Módulo de teste NestJS para criar TestingModule com providers mockados.
-- **supertest v7.0.0**: Biblioteca para testes HTTP (requisições a endpoints).
-- **Coverage reporting**: Jest gera relatório HTML em `coverage/` acessível via navegador.
-
-**Resultado de Qualidade Geral**
-
-Os 16 testes unitários + 10 testes de integração (26 testes totais) validam funcionalidades críticas do MVP: fluxo de autenticação, moderação de conteúdo, recomendações de alojamentos. Embora a cobertura de linhas de código seja 20.45%, a cobertura de **lógica crítica** é significativamente superior (72% em AuthService, 69% em SuggestionService). Esta estratégia é consistente com melhores práticas de TDD para MVPs, onde a velocidade de iteração é priorizada mantendo garantias de qualidade em caminhos críticos.
-
-
-
-#### 3.6.2 Qualidade de Código
-
-**Lint & Format**:
-- ESLint + Prettier (backend TypeScript)
-- Dart Analyzer + dartfmt (frontend)
-- Pre-commit hook: lint must pass before commit
-
-**Code Review**:
-- PRs obrigam revisão antes de merge
-- Checklist: tests passed, coverage validada em `src/`, sem breaking changes
-
-**Documentation**:
-- Comments em código complexo (ex: ST_DWithin PostgreSQL query)
-- Swagger/OpenAPI docs automático via NestJS decorators
-- README detalhado em docs/
-
-#### 3.6.3 Deployment e CI/CD Pipeline
-
-**GitHub Actions Pipeline (Automatizado)**: O pipeline de CI/CD é executado em cada push e pull request. O fluxo é: (1) checkout do código, (2) instalação de dependências (Node.js 18), (3) execução de linting (verificação de estética de código), (4) execução da suite de testes do backend com coverage sobre `src/`, (5) upload do relatório de cobertura para ferramentas de analytics. Se todos os passos passarem, o pipeline constrói uma imagem Docker e a envia para o registro. Em pushes para a branch principal, o deploy automático é acionado.
-
-**Deployment em Produção**:
-1. Tag na git (v1.0.0)
-2. GitHub Actions constrói Docker image
-3. Imagem pushed para Docker Hub
-4. Deploy automático para Kubernetes/Railway (webhook)
-5. Rollout gradual (canary: 10% → 50% → 100%)
-6. Health check: se 3 erros em 5 mins, rollback automático
-
-**Database Migrations em Produção**:
-- TypeORM migrations executadas antes de deploy (no pod init container)
-- Schema versioning garante backward compatibility
-- Rollback preparado (migration with down())
-
-#### 3.6.4 Monitoramento e Alertas
-
-**Métricas de Produção**:
-- Prometheus: API latency, request count, error rate
-- Grafana dashboards: Visualização de trends
-- Error tracking: Sentry (logs de exceptions com stack traces)
-
-**Alertas**:
-- Latency > 500ms → notificação Slack
-- Error rate > 1% → page on-call engineer
-- Database conexões > 80% pool → scale up warning
-
-**Logs Estruturados**:
-- Winston logger: JSON structured logs (timestamp, level, service, message, context)
-- ELK stack (Elasticsearch, Logstash, Kibana) para análise centralizada
-- Retenção: 30 dias logs quentes, 1 ano cold storage
+No contexto da redação metodológica, esta prática é relevante porque assegura que as descrições textuais, a nomenclatura de entidades e os fluxos representados correspondem ao estado real do sistema, reduzindo divergências entre documento e implementação.
 
 ---
 
@@ -949,15 +351,15 @@ Os 16 testes unitários + 10 testes de integração (26 testes totais) validam f
 
 **Database Optimizations**:
 1. GiST index no campo `geom` → proximidade queries 80% mais rápidas
-2. B-tree index em `place.camino_id` → filtro Camino 40% mais rápido
-3. Composite index `(place_id, is_approved)` em comments → agregação ratings 50% mais rápida
+2. B-tree index em `accomodations.camino_id` → filtro Camino 40% mais rápido
+3. Composite index `(accomodation_id, is_approved)` em comments → agregação ratings 50% mais rápida
 4. Statistics caching via trigger (lugar que tem novo comentário, atualiza avg_rating em background)
 
 **API Optimizations**:
 1. **Connection pooling**: 20 conexões DB, reusadas entre requests
 2. **Query pagination**: Cursor-based em vez de offset (para 50+ items)
 3. **Response compression**: Gzip ativa em backend (80% compression em JSON arrays)
-4. **Client-side caching**: Hive cache persist de places por 24h
+4. **Client-side caching**: Hive cache persist de accommodations por 24h
 
 **Frontend Optimizations**:
 1. **Lazy loading de imagens**: Gallery carrega max 5 imagens concurrentes
@@ -1001,8 +403,8 @@ Os 16 testes unitários + 10 testes de integração (26 testes totais) validam f
 **Testes de Integração Complementares**: Foram também adicionados testes HTTP para upload e sugestões, verificando a passagem correta de ficheiros, parâmetros de busca e seleção de recomendações pelos controladores correspondentes.
 
 **Frontend (Flutter)**:
-- **Widget Tests**: 45 testes (PlaceCard, CommentTile, MapWidget)
-- **Integration Tests**: 12 testes (auth flow, place search, upload)
+- **Widget Tests**: 45 testes (AccommodationCard, CommentTile, MapWidget)
+- **Integration Tests**: 12 testes (auth flow, accommodation search, upload)
 - **Coverage**: não validada nesta execução do backend
 
 #### 4.3.2 Testes Unitários
@@ -1060,7 +462,7 @@ Esta decisão é coerente com o estado atual do projeto: a maior parte da lógic
 - ✓ Frontend architecture `docs/diagrams/png/frontend-architecture.png`
 - ✓ Communication flows (3 diagramas)
 - ✓ Database ER diagram `docs/diagrams/png/database-er-diagram.png`
-- ✓ State machine `docs/diagrams/png/state-place-lifecycle.png`
+- ✓ State machine `docs/diagrams/png/state-accommodation-lifecycle.png`
 - ✓ Dataflow PII/retention `docs/diagrams/png/dataflow-pii-retention.png`
 - ✓ Auth & sessions `docs/diagrams/png/component-auth-sessions.png`
 - ✓ Deployment diagram
@@ -1100,7 +502,7 @@ Esta decisão é coerente com o estado atual do projeto: a maior parte da lógic
 - [ ] Sistema de reviews detalhadas (Booking.com-like)
 - [ ] Chat entre peregrino e host (real-time WebSocket)
 - [ ] Offline first mode (service worker + PWA)
-- [ ] Social sharing (share place on Twitter/WhatsApp)
+- [ ] Social sharing (share accommodation on Twitter/WhatsApp)
 - [ ] Analytics dashboard (peregrino vs host trends)
 
 **Razões de não-implementação**:
@@ -1121,7 +523,7 @@ Esta decisão é coerente com o estado atual do projeto: a maior parte da lógic
 
 **Análise de Trade-offs**:
 - **REST advantages**: Simplicidade, caching HTTP nativo, ferramental maduro (Swagger, Postman)
-- **REST disadvantages**: Over-fetching (ex: GET /places retorna muitos campos desnecessários)
+- **REST disadvantages**: Over-fetching (ex: GET /accommodations/handle pode retornar campos desnecessários)
 - **GraphQL advantages**: Permite cliente requisitar apenas campos necessários, single endpoint
 - **GraphQL disadvantages**: Complexidade (validação, autorização complexa), caching mais difícil, learning curve
 
@@ -1187,7 +589,7 @@ Esta decisão é coerente com o estado atual do projeto: a maior parte da lógic
 **Impacto**: Peregrino em vale sem sinal não consegue usar app
 
 **Mitigações implementadas**:
-- Cache local de últimas 50 places visitadas (Hive)
+- Cache local de últimas 50 accommodations visitadas (Hive)
 - Offline mode read-only (pode ver cached data)
 - Quando conecta, sync automático
 
@@ -1641,7 +1043,7 @@ O setup do frontend Flutter incluí: (1) clonar o repositório da aplicação, (
 
 O backend NestJS (repositório cookbook-be) organiza-se em módulos especializados: pasta src contém subpastas para autenticação (Auth), gestão de contas de utilizador (Accounts), alojamentos (Accommodations, core do projeto), comentários/avaliações (Comments), upload de ficheiros (Upload), marcações de favoritos (Favorites), dados de Caminhos de Santiago (Caminos), etapas de caminhos (Stages), e moderação de conteúdo (Moderation). Ficheiros raiz incluem configuração de migrations para versionamento de database, datasource de conexão, entry point (main.ts), typescript config, e gerenciador de dependências.
 
-O frontend Flutter (repositório camino_places_app) organiza-se em: pasta lib com subpastas para screens (páginas completas como mapa, detalhes de alojamento, perfil), widgets (componentes reutilizáveis como cards e tiles), serviços (API client, autenticação), e models (definições de estruturas de dados). Pastas de plataforma (web, android, ios) contêm configurações específicas para cada target. Ficheiro pubspec.yaml define dependências Dart.
+O frontend Flutter organiza-se em: pasta lib com subpastas para screens (páginas completas como mapa, detalhes de alojamento, perfil), widgets (componentes reutilizáveis como cards e tiles), serviços (API client, autenticação), e models (definições de estruturas de dados). Pastas de plataforma (web, android, ios) contêm configurações específicas para cada target. Ficheiro pubspec.yaml define dependências Dart.
 
 ---
 

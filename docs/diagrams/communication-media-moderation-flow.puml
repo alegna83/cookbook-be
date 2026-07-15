@@ -9,8 +9,10 @@ participant "UploadService" as UploadService
 participant "AccommodationsController" as AccommodationsController
 participant "AccountsController" as AccountsController
 participant "AccommodationsService" as AccommodationsService
+participant "CommentsService" as CommentsService
 database "PostgreSQL" as DB
 participant "Cloudinary" as Cloudinary
+participant "Email service" as Email
 
 User -> FE : select photo(s)
 FE -> BE : POST /upload {type: main-photo|gallery-photos|avatar}
@@ -29,10 +31,22 @@ alt avatar upload
 else accommodation media contribution
   FE -> BE : POST /accommodations/handle {action:addphotos}
   BE -> AccommodationsController : handle(addphotos)
-  AccommodationsController -> AccommodationsService : addGalleryPhotos(placeId, accountId, urls)
+  AccommodationsController -> AccommodationsService : addGalleryPhotos(accomodationId, accountId, urls)
   AccommodationsService -> DB : save pending / approved photos
+  AccommodationsService -> Email : notify admins about pending photo moderation
   BE --> FE : contribution accepted
 end
+
+User -> FE : submit comment or edit/removal request
+FE -> BE : POST /comments/handle {action:add} or /accommodations/handle {action:requestedit|requestremoval}
+BE -> CommentsService : add(comment)
+CommentsService -> DB : save pending comment
+CommentsService -> Email : notify admins about pending comment review
+BE -> AccommodationsController : handle(requestedit|requestremoval)
+AccommodationsController -> AccommodationsService : requestEdit / requestRemoval
+AccommodationsService -> DB : save pending request
+AccommodationsService -> Email : notify admins about pending request
+BE --> FE : pending moderation acknowledgement
 
 User -> FE : owner/admin checks moderation queue
 FE -> BE : POST /accommodations/handle {action:getpendingphotos|getpendingphotosadmin}
@@ -46,6 +60,18 @@ FE -> BE : POST /accommodations/handle {action:approvephoto|rejectphoto}
 BE -> AccommodationsController : handle(approvephoto/rejectphoto)
 AccommodationsController -> AccommodationsService : approvePhoto / rejectPhoto
 AccommodationsService -> DB : update moderation state
+AccommodationsService -> Email : notify requester about decision
+BE --> FE : moderation result
+
+User -> FE : approve / reject comment or accommodation request
+FE -> BE : POST /comments/handle {action:approve} or /accommodations/handle {action:approve|reject|approveedit|rejectedit|approveremoval|rejectremoval}
+BE -> CommentsService : approveComment(...)
+CommentsService -> DB : update comment status
+CommentsService -> Email : notify commenter about decision
+BE -> AccommodationsController : handle(admin moderation action)
+AccommodationsController -> AccommodationsService : approve/reject request
+AccommodationsService -> DB : update request or accommodation status
+AccommodationsService -> Email : notify requester about decision
 BE --> FE : moderation result
 
 @enduml

@@ -9,15 +9,19 @@ component "Stays4Pilgrims Backend" as BE
 FE --> BE : Auth
 FE --> BE : Accommodation browsing
 FE --> BE : Comments
+FE --> BE : Favorites / Suggestions
 FE --> BE : Uploads
 FE --> BE : Account updates
+FE --> BE : Contact form
 FE --> BE : Moderation actions
 
 note bottom of FE
   Detailed flows:
   - communication-auth-flow.puml
   - communication-accommodation-flow.puml
+  - communication-suggestions-flow.puml
   - communication-media-moderation-flow.puml
+  - communication-contact-flow.puml
 end note
 
 note bottom of BE
@@ -26,7 +30,10 @@ note bottom of BE
   /accounts
   /accommodations
   /comments
+  /favorites
+  /suggestions
   /upload
+  /contact
 end note
 
 @enduml

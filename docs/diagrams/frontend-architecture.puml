@@ -1,12 +1,14 @@
 @startuml
 ' Frontend architecture
 actor User
-node "Stays4Pilgrims Frontend\n(/Users/angelaantunes/Documents/tese/camino_places_app)" as FE
-component "UI" as UI
-component "State (Redux / Context)" as State
-component "API Client" as Client
+node "Stays4Pilgrims Frontend" as FE
+component "UI Screens and Widgets" as UI
+component "State (flutter_bloc / Cubit)" as State
+component "Services and API Client" as Client
+component "Local Storage\n(auth + consent)" as Storage
 User -> UI : clicks/interacts
 UI -> State : updates
 UI -> Client : fetch/update
-Client -> "Backend API" : HTTP/REST
+State -> Storage : persist session / preferences
+Client -> "Stays4Pilgrims Backend API" : HTTP/REST
 @enduml

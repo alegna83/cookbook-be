@@ -2,6 +2,8 @@
 
 This backend now supports a user-driven workflow where any logged-in user can propose edits to an accommodation from the accommodation details screen. The admin later reviews and approves or rejects those edits.
 
+Note: the payload keys shown below (`placeId`, `place_name`, `place_category`) are part of the current backend API contract and should not be renamed on the client side.
+
 ## What the backend accepts
 
 All requests go through `POST /accommodations/handle`.
