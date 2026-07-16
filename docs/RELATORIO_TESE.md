@@ -183,6 +183,8 @@ No segundo nível, os fluxos foram decompostos por domínio:
 4. Upload e moderação de media: [docs/diagrams/communication-media-moderation-flow.puml](docs/diagrams/communication-media-moderation-flow.puml).
 5. Contacto e encaminhamento de mensagens: [docs/diagrams/communication-contact-flow.puml](docs/diagrams/communication-contact-flow.puml).
 
+No Stays4Pilgrims Frontend, o ponto de entrada para recomendação automática de melhor alojamento (best accommodation) é apresentado apenas quando a sessão do utilizador se encontra autenticada.
+
 No terceiro nível, foram documentadas sequências técnicas de operações críticas:
 
 1. Adição de comentário: [docs/diagrams/sequence-add-comment.puml](docs/diagrams/sequence-add-comment.puml).

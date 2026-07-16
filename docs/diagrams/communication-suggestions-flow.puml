@@ -25,6 +25,10 @@ BE --> FE : suggestions response
 FE --> User : show suggestions notification and dialog
 
 User -> FE : request best accommodation recommendation
+note over FE
+Best accommodation recommendation trigger
+is shown only for authenticated users.
+end note
 FE -> BE : GET /sugestoes/best-accommodation?lat&lon&radius&category
 BE -> SuggestionController : bestAccommodation(lat, lon, radius, category)
 SuggestionController -> SuggestionService : suggestBestAccommodation(...)

@@ -1,5 +1,6 @@
-import { Controller, Post, Body, Query, Get } from '@nestjs/common';
+import { Controller, Post, Body, Query, Get, UseGuards } from '@nestjs/common';
 import { SuggestionService } from './suggestion.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('sugestoes')
 export class SuggestionController {
@@ -30,6 +31,7 @@ export class SuggestionController {
    * Example: GET /suggestions/best-accommodation?lat=40.123&lon=-8.456&category=Hostel
    */
   @Get('best-accommodation')
+  @UseGuards(JwtAuthGuard)
   async bestAccommodation(
     @Query('lat') lat: number,
     @Query('lon') lon: number,
