@@ -28,7 +28,8 @@
     "migration:run:prod": "npx typeorm migration:run -d typeorm.config.js",
     "migration:revert": "npm run build && npx typeorm migration:revert -d typeorm.config.js",
     "migration:show": "npm run build && npx typeorm migration:show -d typeorm.config.js",
-    "db:health": "node scripts/db-health-check.js"
+    "db:health": "node scripts/db-health-check.js",
+    "db:apply-search-indexes": "node scripts/db-apply-search-indexes.js"
   },
   "dependencies": {
     "@nestjs/axios": "4.0.0",

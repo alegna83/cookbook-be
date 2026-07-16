@@ -39,6 +39,7 @@ Guia rápido dos comandos mais úteis do backend NestJS.
 - `npm run migration:revert` - reverte a última migration.
 - `npm run migration:show` - lista as migrations pendentes/aplicadas.
 - `npm run db:health` - executa o healthcheck da base de dados.
+- `npm run db:apply-search-indexes` - aplica apenas os índices de pesquisa/latência (sem correr migrations pendentes de RLS).
 
 ## Notas
 

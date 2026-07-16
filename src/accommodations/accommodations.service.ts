@@ -125,7 +125,8 @@ export class AccommodationsService {
   }
 
   private normalizeBoundsValue(value: number): number {
-    return Number(value.toFixed(4));
+    // 3 decimals (~110m) improves cache hit rate for map pan/zoom requests.
+    return Number(value.toFixed(3));
   }
 
   private buildBoundsCacheKey(bounds: {
@@ -835,7 +836,22 @@ export class AccommodationsService {
       // joining gallery photos here causes row explosion and larger payloads.
       const places = await this.placeRepository
         .createQueryBuilder('place')
-        .leftJoinAndSelect('place.place_category', 'place_category')
+        .leftJoin('place.place_category', 'place_category')
+        .select([
+          'place.id',
+          'place.place_name',
+          'place.address',
+          'place.region',
+          'place.phone',
+          'place.email',
+          'place.website',
+          'place.main_photo',
+          'place.latitude',
+          'place.longitude',
+          'place.location_help',
+          'place.status',
+        ])
+        .addSelect(['place_category.id', 'place_category.name'])
         .where('place.latitude BETWEEN :south AND :north', { south, north })
         .andWhere('place.longitude BETWEEN :west AND :east', { west, east })
         .andWhere('place.status = :status', { status: 'approved' })
