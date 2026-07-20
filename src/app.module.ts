@@ -70,6 +70,14 @@ import { join } from 'path';
           PlacePrice,
         ],*/
         ssl: sslEnabled ? { rejectUnauthorized: sslStrict } : false,
+        extra: {
+          // Keep at least 2 connections open so the first requests after a
+          // cold start don't pay the connection-establishment overhead.
+          min: 2,
+          max: 10,
+          idleTimeoutMillis: 600000,
+          connectionTimeoutMillis: 10000,
+        },
         };
       },
       inject: [ConfigService],
