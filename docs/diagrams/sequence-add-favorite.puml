@@ -8,12 +8,12 @@ database "FavoritesRepo / DB" as DB
 
 User -> FE: Click heart icon on accommodation
 alt already favorited
-  FE -> API: POST /favorites/handle { action: 'toggle', payload: {accomodationId, accountId} }
+  FE -> API: POST /favorites/handle { action: 'toggle', payload: {accommodationId, accountId} }
 else not favorited
-  FE -> API: POST /favorites/handle { action: 'toggle', payload: {accomodationId, accountId} }
+  FE -> API: POST /favorites/handle { action: 'toggle', payload: {accommodationId, accountId} }
 end
 activate API
-API -> SVC: toggle(accountId, accomodationId)
+API -> SVC: toggle(accountId, accommodationId)
 activate SVC
 SVC -> DB: find Favorite {account, accommodation}
 activate DB
@@ -26,7 +26,7 @@ alt exists
   deactivate DB
   SVC --> API: {action: 'removed', ok: true}
 else not exists
-  SVC -> DB: create new Favorite {accountId, accomodationId}
+  SVC -> DB: create new Favorite {accountId, accommodationId}
   activate DB
   DB --> SVC: saved favorite entity
   deactivate DB

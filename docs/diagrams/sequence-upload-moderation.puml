@@ -8,8 +8,8 @@ participant "Storage (S3/local)" as STORAGE
 participant "ContentModerationService" as MOD
 participant "GalleryPhotoRepo / DB" as GDB
 
-User -> FE: Select image and submit (accomodationId, accountId)
-FE -> API: POST /upload (multipart) {file, accomodationId, accountId}
+User -> FE: Select image and submit (accommodationId, accountId)
+FE -> API: POST /upload (multipart) {file, accommodationId, accountId}
 activate API
 API -> UP: handleUpload(file, folder='accommodations/gallery')
 activate UP

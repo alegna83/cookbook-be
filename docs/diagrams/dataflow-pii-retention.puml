@@ -17,9 +17,9 @@ package "Stays4Pilgrims System" {
 
   database "PostgreSQL" as DB {
     entity "accounts\n(id, email, password_hash,\nname, phone, isEmailVerified,\ncreatedAt)" as TBL_ACC
-    entity "accommodations\n(id, accomodation_name, address,\nphone, email, website,\naccount_id)" as TBL_ACCOMMODATIONS
-    entity "comments\n(id, text, rating,\naccountId, accomodationId,\nstatus, createdAt)" as TBL_COMMENTS
-    entity "gallery_photos\n(id, url, accountId,\naccomodationId, status)" as TBL_GALLERY
+    entity "accommodations\n(id, accommodation_name, address,\nphone, email, website,\naccount_id)" as TBL_ACCOMMODATIONS
+    entity "comments\n(id, text, rating,\naccountId, accommodationId,\nstatus, createdAt)" as TBL_COMMENTS
+    entity "gallery_photos\n(id, url, accountId,\naccommodationId, status)" as TBL_GALLERY
   }
 
   package "External Services" {

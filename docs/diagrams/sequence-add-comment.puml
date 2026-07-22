@@ -8,9 +8,9 @@ participant "ContentModerationService" as MOD
 database "CommentsRepo / DB" as DB
 
 User -> FE: Write comment + rating for accommodation, submit
-FE -> API: POST /comments/handle { action: 'add', payload: {accomodationId, accountId, comment, rating} }
+FE -> API: POST /comments/handle { action: 'add', payload: {accommodationId, accountId, comment, rating} }
 activate API
-API -> SVC: add({accomodationId, accountId, comment, rating})
+API -> SVC: add({accommodationId, accountId, comment, rating})
 activate SVC
 SVC -> MOD: moderateComment(comment)
 activate MOD
@@ -31,7 +31,7 @@ SVC -> DB: check accommodation exists & is approved
 activate DB
 DB --> SVC: accommodation or not found
 deactivate DB
-SVC -> DB: create new Comment {accountId, accomodationId, comment, rating, status: 'pending'}
+SVC -> DB: create new Comment {accountId, accommodationId, comment, rating, status: 'pending'}
 activate DB
 DB --> SVC: saved comment entity
 deactivate DB

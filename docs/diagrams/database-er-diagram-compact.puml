@@ -1,0 +1,195 @@
+@startuml
+title Stays4Pilgrims - Compact Database ER Diagram
+
+left to right direction
+
+hide methods
+hide stereotypes
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ranksep 25
+skinparam nodesep 20
+skinparam entity {
+  BackgroundColor #FCFCFC
+  BorderColor #4B5563
+}
+
+legend right
+  == Legend ==
+  [PK] Primary key
+  [FK] Foreign key
+endlegend
+
+entity "Account (accounts)" as account {
+  [PK] id
+  email
+  password
+  pilgrim_reason
+  pilgrim_reason_other
+  --
+  name
+  user_type
+  avatar
+  is_email_verified
+  email_verification_token
+  email_verification_token_expiry
+  password_reset_token
+  password_reset_token_expiry
+}
+
+entity "Accommodation" as accommodation {
+  [PK] id
+  place_name
+  address
+  region
+  phone
+  email
+  website
+  link
+  reservation_link
+  --
+  location_help
+  pilgrim_exclusive
+  allow_reservation
+  dates_open
+  time_open
+  time_checkin
+  time_checkout
+  place_room_notes
+  place_observations
+  place_created_date
+  place_management
+  place_manager
+  --
+  main_photo
+  latitude
+  longitude
+  services
+  nearbyActivities
+  status
+  approved_at
+  rejection_reason
+  --
+  [FK] account_id
+  [FK] place_category_id
+  [FK] camino_id
+  [FK] stage_id
+}
+
+entity "AccommodationCategory (place_categories)" as accommodation_category {
+  [PK] id
+  name
+}
+
+entity "Comment" as comment {
+  [PK] id
+  [FK] place_id
+  [FK] account_id
+  --
+  rating
+  comment
+  created_at
+  updated_at
+  --
+  status
+  approved_at
+  rejection_reason
+}
+
+entity "GalleryPhoto" as gallery_photo {
+  [PK] id
+  photo_url
+  created_at
+  --
+  status
+  approved_at
+  rejection_reason
+  [FK] account_id
+  [FK] place_id
+}
+
+entity "Favorite" as favorite {
+  [PK] id
+  [FK] place_id
+  [FK] account_id
+  created_at
+}
+
+entity "AccommodationPrice" as accommodation_price {
+  [PK] id
+  description
+  price
+  [FK] place_id
+}
+
+entity "AccommodationRemovalRequest" as accommodation_removal_request {
+  [PK] id
+  [FK] place_id
+  [FK] account_id
+  --
+  place_name
+  requester_name
+  requester_email
+  reason
+  --
+  status
+  created_at
+  updated_at
+  reviewed_at
+  rejection_reason
+}
+
+entity "AccommodationEditRequest" as accommodation_edit_request {
+  [PK] id
+  [FK] place_id
+  [FK] account_id
+  --
+  requester_name
+  requester_email
+  payload
+  --
+  status
+  created_at
+  updated_at
+  reviewed_at
+  rejection_reason
+}
+
+entity "Camino (caminos)" as camino {
+  [PK] id
+  name
+  ranking
+  is_popular
+  active
+  [FK] parent_camino_id
+}
+
+entity "Stage (stages)" as stage {
+  [PK] id
+  name
+  [FK] camino_id
+}
+
+account ||--o{ accommodation
+account ||--o{ comment
+account ||--o{ gallery_photo
+account ||--o{ favorite
+account ||--o{ accommodation_removal_request
+account ||--o{ accommodation_edit_request
+
+accommodation_category ||--o{ accommodation
+accommodation ||--o{ comment
+accommodation ||--o{ gallery_photo
+accommodation ||--o{ favorite
+accommodation ||--o{ accommodation_price
+accommodation ||--o{ accommodation_removal_request
+accommodation ||--o{ accommodation_edit_request
+accommodation }o--|| camino
+accommodation }o--|| stage
+
+camino ||--o{ stage
+
+@enduml

@@ -28,7 +28,7 @@ alt gallery_photos present
   end
 end
 
-alt accomodation_category provided
+alt accommodation_category provided
   SVC -> CATDB: find category by id or name
   activate CATDB
   CATDB --> SVC: category or not found

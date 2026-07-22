@@ -31,7 +31,7 @@ alt avatar upload
 else accommodation media contribution
   FE -> BE : POST /accommodations/handle {action:addphotos}
   BE -> AccommodationsController : handle(addphotos)
-  AccommodationsController -> AccommodationsService : addGalleryPhotos(accomodationId, accountId, urls)
+  AccommodationsController -> AccommodationsService : addGalleryPhotos(accommodationId, accountId, urls)
   AccommodationsService -> DB : save pending / approved photos
   AccommodationsService -> Email : notify admins about pending photo moderation
   BE --> FE : contribution accepted
