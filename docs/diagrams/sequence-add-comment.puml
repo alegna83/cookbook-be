@@ -1,4 +1,4 @@
-@startuml
+﻿@startuml
 title Add Comment sequence
 actor User
 participant "Stays4Pilgrims Frontend" as FE
@@ -7,10 +7,10 @@ participant "CommentsService" as SVC
 participant "ContentModerationService" as MOD
 database "CommentsRepo / DB" as DB
 
-User -> FE: Write comment + rating for accommodation, submit
-FE -> API: POST /comments/handle { action: 'add', payload: {accommodationId, accountId, comment, rating} }
+User -> FE: Write comment + rating for Accomodation, submit
+FE -> API: POST /comments/handle { action: 'add', payload: {AccomodationId, accountId, comment, rating} }
 activate API
-API -> SVC: add({accommodationId, accountId, comment, rating})
+API -> SVC: add({AccomodationId, accountId, comment, rating})
 activate SVC
 SVC -> MOD: moderateComment(comment)
 activate MOD
@@ -27,11 +27,11 @@ SVC -> DB: check account exists
 activate DB
 DB --> SVC: account or not found
 deactivate DB
-SVC -> DB: check accommodation exists & is approved
+SVC -> DB: check Accomodation exists & is approved
 activate DB
-DB --> SVC: accommodation or not found
+DB --> SVC: Accomodation or not found
 deactivate DB
-SVC -> DB: create new Comment {accountId, accommodationId, comment, rating, status: 'pending'}
+SVC -> DB: create new Comment {accountId, AccomodationId, comment, rating, status: 'pending'}
 activate DB
 DB --> SVC: saved comment entity
 deactivate DB
@@ -42,6 +42,7 @@ deactivate API
 FE --> User: Show comment in list (pending approval)
 
 note over SVC,MOD: Comments are moderated for spam, hate speech, etc.
-note over DB: Status: pending → admin approves/rejects
+note over DB: Status: pending â†’ admin approves/rejects
 
 @enduml
+

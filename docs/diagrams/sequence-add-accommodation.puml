@@ -1,18 +1,18 @@
-@startuml
-title Add Accommodation (create) sequence
+﻿@startuml
+title Add Accomodation (create) sequence
 actor User
 participant "Stays4Pilgrims Frontend" as FE
-participant "Stays4Pilgrims Backend - AccommodationsController" as API
-participant "AccommodationsService" as SVC
+participant "Stays4Pilgrims Backend - AccomodationsController" as API
+participant "AccomodationsService" as SVC
 participant "ContentModerationService" as MOD
 participant "CategoryRepo / DB" as CATDB
-participant "AccommodationRepo / DB" as ADB
+participant "AccomodationRepo / DB" as ADB
 participant "GalleryPhotoRepo / DB" as GDB
 
-User -> FE: Fill "Add accommodation" form (data + main_photo + gallery_photos)
-FE -> API: POST /accommodations/handle { action: 'create', payload: CreateAccommodationDto }
+User -> FE: Fill "Add Accomodation" form (data + main_photo + gallery_photos)
+FE -> API: POST /Accomodations/handle { action: 'create', payload: CreateAccomodationDto }
 activate API
-API -> SVC: create(CreateAccommodationDto)
+API -> SVC: create(CreateAccomodationDto)
 activate SVC
 alt gallery_photos present
   SVC -> MOD: moderateImageUrls(galleryPhotoUrls)
@@ -28,16 +28,16 @@ alt gallery_photos present
   end
 end
 
-alt accommodation_category provided
+alt Accomodation_category provided
   SVC -> CATDB: find category by id or name
   activate CATDB
   CATDB --> SVC: category or not found
   deactivate CATDB
 end
 
-SVC -> ADB: save new Accommodation (main_photo normalized)
+SVC -> ADB: save new Accomodation (main_photo normalized)
 activate ADB
-ADB --> SVC: saved accommodation id
+ADB --> SVC: saved Accomodation id
 deactivate ADB
 
 alt gallery_photos present
@@ -52,11 +52,12 @@ activate ADB
 ADB --> SVC: full saved entity
 deactivate ADB
 
-SVC --> API: return created AccommodationDto
+SVC --> API: return created AccomodationDto
 deactivate SVC
-API --> FE: 200 OK {AccommodationDto}
+API --> FE: 200 OK {AccomodationDto}
 deactivate API
 
 note over FE,GDB: Gallery photos are created pending moderation; approved later by admin or moderation pipeline
 
 @enduml
+

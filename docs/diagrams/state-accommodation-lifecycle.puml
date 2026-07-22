@@ -1,5 +1,5 @@
-@startuml Accommodation Lifecycle State Machine
-title Accommodation Lifecycle
+﻿@startuml Accomodation Lifecycle State Machine
+title Accomodation Lifecycle
 
 [*] --> Draft
 
@@ -8,7 +8,7 @@ Draft --> Draft: Edit (allowed during draft)
 
 PendingModeration --> Approved: Admin/moderator approves
 PendingModeration --> Rejected: Admin/moderator rejects
-PendingModeration --> Draft: Rejected → user can re-edit
+PendingModeration --> Draft: Rejected â†’ user can re-edit
 
 Approved --> Published: Admin publishes or auto-publish
 Published --> Archived: Admin archives or user requests removal (approved)
@@ -58,3 +58,4 @@ note right of Flagged
 end note
 
 @enduml
+

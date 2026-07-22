@@ -1,4 +1,4 @@
-@startuml
+﻿@startuml
 title Stays4Pilgrims - Suggestions and recommendation communication
 
 actor User
@@ -6,7 +6,7 @@ participant "Stays4Pilgrims Frontend" as FE
 participant "Stays4Pilgrims Backend" as BE
 participant "SuggestionController" as SuggestionController
 participant "SuggestionService" as SuggestionService
-participant "AccommodationsService" as AccommodationsService
+participant "AccomodationsService" as AccomodationsService
 participant "CommentsService" as CommentsService
 database "PostgreSQL" as DB
 participant "OpenRouter / OpenAI" as AI
@@ -24,16 +24,16 @@ SuggestionService --> BE : text list
 BE --> FE : suggestions response
 FE --> User : show suggestions notification and dialog
 
-User -> FE : request best accommodation recommendation
+User -> FE : request best Accomodation recommendation
 note over FE
-Best accommodation recommendation trigger
+Best Accomodation recommendation trigger
 is shown only for authenticated users.
 end note
-FE -> BE : GET /sugestoes/best-accommodation?lat&lon&radius&category
-BE -> SuggestionController : bestAccommodation(lat, lon, radius, category)
-SuggestionController -> SuggestionService : suggestBestAccommodation(...)
-SuggestionService -> AccommodationsService : getByBounds(bounds)
-AccommodationsService -> DB : fetch approved accommodations in area
+FE -> BE : GET /sugestoes/best-Accomodation?lat&lon&radius&category
+BE -> SuggestionController : bestAccomodation(lat, lon, radius, category)
+SuggestionController -> SuggestionService : suggestBestAccomodation(...)
+SuggestionService -> AccomodationsService : getByBounds(bounds)
+AccomodationsService -> DB : fetch approved Accomodations in area
 SuggestionService -> CommentsService : use ratings and review counts
 CommentsService -> DB : aggregate comment statistics
 alt enough local rating data
@@ -44,6 +44,6 @@ else fallback to best local option
 end
 SuggestionService --> BE : recommendation + reasoning + alternatives
 BE --> FE : JSON recommendation payload
-FE --> User : show best accommodation popup
+FE --> User : show best Accomodation popup
 
 @enduml

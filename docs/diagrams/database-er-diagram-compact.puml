@@ -1,4 +1,4 @@
-@startuml
+﻿@startuml
 title Stays4Pilgrims - Compact Database ER Diagram
 
 left to right direction
@@ -40,7 +40,7 @@ entity "Account (accounts)" as account {
   password_reset_token_expiry
 }
 
-entity "Accommodation" as accommodation {
+entity "Accomodation" as Accomodation {
   [PK] id
   place_name
   address
@@ -79,7 +79,7 @@ entity "Accommodation" as accommodation {
   [FK] stage_id
 }
 
-entity "AccommodationCategory (place_categories)" as accommodation_category {
+entity "AccomodationCategory (place_categories)" as Accomodation_category {
   [PK] id
   name
 }
@@ -118,14 +118,14 @@ entity "Favorite" as favorite {
   created_at
 }
 
-entity "AccommodationPrice" as accommodation_price {
+entity "AccomodationPrice" as Accomodation_price {
   [PK] id
   description
   price
   [FK] place_id
 }
 
-entity "AccommodationRemovalRequest" as accommodation_removal_request {
+entity "AccomodationRemovalRequest" as Accomodation_removal_request {
   [PK] id
   [FK] place_id
   [FK] account_id
@@ -142,7 +142,7 @@ entity "AccommodationRemovalRequest" as accommodation_removal_request {
   rejection_reason
 }
 
-entity "AccommodationEditRequest" as accommodation_edit_request {
+entity "AccomodationEditRequest" as Accomodation_edit_request {
   [PK] id
   [FK] place_id
   [FK] account_id
@@ -173,22 +173,22 @@ entity "Stage (stages)" as stage {
   [FK] camino_id
 }
 
-account ||--o{ accommodation
+account ||--o{ Accomodation
 account ||--o{ comment
 account ||--o{ gallery_photo
 account ||--o{ favorite
-account ||--o{ accommodation_removal_request
-account ||--o{ accommodation_edit_request
+account ||--o{ Accomodation_removal_request
+account ||--o{ Accomodation_edit_request
 
-accommodation_category ||--o{ accommodation
-accommodation ||--o{ comment
-accommodation ||--o{ gallery_photo
-accommodation ||--o{ favorite
-accommodation ||--o{ accommodation_price
-accommodation ||--o{ accommodation_removal_request
-accommodation ||--o{ accommodation_edit_request
-accommodation }o--|| camino
-accommodation }o--|| stage
+Accomodation_category ||--o{ Accomodation
+Accomodation ||--o{ comment
+Accomodation ||--o{ gallery_photo
+Accomodation ||--o{ favorite
+Accomodation ||--o{ Accomodation_price
+Accomodation ||--o{ Accomodation_removal_request
+Accomodation ||--o{ Accomodation_edit_request
+Accomodation }o--|| camino
+Accomodation }o--|| stage
 
 camino ||--o{ stage
 

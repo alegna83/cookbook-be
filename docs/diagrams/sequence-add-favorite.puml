@@ -1,4 +1,4 @@
-@startuml
+﻿@startuml
 title Add to Favorites sequence
 actor User
 participant "Stays4Pilgrims Frontend" as FE
@@ -6,16 +6,16 @@ participant "Stays4Pilgrims Backend - FavoritesController" as API
 participant "FavoritesService" as SVC
 database "FavoritesRepo / DB" as DB
 
-User -> FE: Click heart icon on accommodation
+User -> FE: Click heart icon on Accomodation
 alt already favorited
-  FE -> API: POST /favorites/handle { action: 'toggle', payload: {accommodationId, accountId} }
+  FE -> API: POST /favorites/handle { action: 'toggle', payload: {AccomodationId, accountId} }
 else not favorited
-  FE -> API: POST /favorites/handle { action: 'toggle', payload: {accommodationId, accountId} }
+  FE -> API: POST /favorites/handle { action: 'toggle', payload: {AccomodationId, accountId} }
 end
 activate API
-API -> SVC: toggle(accountId, accommodationId)
+API -> SVC: toggle(accountId, AccomodationId)
 activate SVC
-SVC -> DB: find Favorite {account, accommodation}
+SVC -> DB: find Favorite {account, Accomodation}
 activate DB
 DB --> SVC: existing or null
 deactivate DB
@@ -26,7 +26,7 @@ alt exists
   deactivate DB
   SVC --> API: {action: 'removed', ok: true}
 else not exists
-  SVC -> DB: create new Favorite {accountId, accommodationId}
+  SVC -> DB: create new Favorite {accountId, AccomodationId}
   activate DB
   DB --> SVC: saved favorite entity
   deactivate DB
@@ -37,6 +37,7 @@ API --> FE: 200 OK {action, favoriteId?}
 deactivate API
 FE --> User: Update heart icon UI (filled/empty)
 
-note over SVC,DB: Favorite is a M-to-M relationship between Account and Accommodation
+note over SVC,DB: Favorite is a M-to-M relationship between Account and Accomodation
 
 @enduml
+

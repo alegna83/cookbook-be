@@ -1,5 +1,5 @@
-@startuml
-title Upload → Moderation sequence
+﻿@startuml
+title Upload â†’ Moderation sequence
 actor User
 participant "Stays4Pilgrims Frontend" as FE
 participant "Stays4Pilgrims Backend - UploadController" as API
@@ -8,10 +8,10 @@ participant "Storage (S3/local)" as STORAGE
 participant "ContentModerationService" as MOD
 participant "GalleryPhotoRepo / DB" as GDB
 
-User -> FE: Select image and submit (accommodationId, accountId)
-FE -> API: POST /upload (multipart) {file, accommodationId, accountId}
+User -> FE: Select image and submit (AccomodationId, accountId)
+FE -> API: POST /upload (multipart) {file, AccomodationId, accountId}
 activate API
-API -> UP: handleUpload(file, folder='accommodations/gallery')
+API -> UP: handleUpload(file, folder='Accomodations/gallery')
 activate UP
 UP -> STORAGE: store file -> returns public URL/path
 activate STORAGE
@@ -22,7 +22,7 @@ activate MOD
 MOD --> UP: decision {allow | reject}
 deactivate MOD
 alt allow
-  UP -> GDB: create GalleryPhoto {url, accommodation, account, status: 'pending'}
+  UP -> GDB: create GalleryPhoto {url, Accomodation, account, status: 'pending'}
   activate GDB
   GDB --> UP: saved photo entity
   deactivate GDB
@@ -34,6 +34,7 @@ deactivate UP
 API --> FE: 200 OK {url, status} or 400 Bad Request
 deactivate API
 
-note over GDB,MOD: Admin can later approve/reject via `accommodations/handle` actions
+note over GDB,MOD: Admin can later approve/reject via `Accomodations/handle` actions
 
 @enduml
+

@@ -1,51 +1,51 @@
-@startuml
-title Stays4Pilgrims - Accommodation browsing and comments communication
+﻿@startuml
+title Stays4Pilgrims - Accomodation browsing and comments communication
 
 actor User
 participant "Stays4Pilgrims Frontend" as FE
 participant "Stays4Pilgrims Backend" as BE
-participant "AccommodationsController" as AccommodationsController
-participant "AccommodationsService" as AccommodationsService
+participant "AccomodationsController" as AccomodationsController
+participant "AccomodationsService" as AccomodationsService
 participant "CommentsController" as CommentsController
 participant "CommentsService" as CommentsService
 database "PostgreSQL" as DB
 
-User -> FE : open home / Camino / accommodation detail
-FE -> BE : POST /accommodations/handle {action:getall}
-BE -> AccommodationsController : handle(getall)
-AccommodationsController -> AccommodationsService : findAll(page, limit)
-AccommodationsService -> DB : fetch list of accommodations
-BE --> FE : list of accommodations
+User -> FE : open home / Camino / Accomodation detail
+FE -> BE : POST /Accomodations/handle {action:getall}
+BE -> AccomodationsController : handle(getall)
+AccomodationsController -> AccomodationsService : findAll(page, limit)
+AccomodationsService -> DB : fetch list of Accomodations
+BE --> FE : list of Accomodations
 
 User -> FE : filter by Camino
-FE -> BE : POST /accommodations/handle {action:getbycamino}
-BE -> AccommodationsController : handle(getbycamino)
-AccommodationsController -> AccommodationsService : findByCamino(name)
-AccommodationsService -> DB : fetch filtered list
-BE --> FE : filtered accommodations
+FE -> BE : POST /Accomodations/handle {action:getbycamino}
+BE -> AccomodationsController : handle(getbycamino)
+AccomodationsController -> AccomodationsService : findByCamino(name)
+AccomodationsService -> DB : fetch filtered list
+BE --> FE : filtered Accomodations
 
-User -> FE : open accommodation detail
-FE -> BE : POST /accommodations/handle {action:getone}
-BE -> AccommodationsController : handle(getone)
-AccommodationsController -> AccommodationsService : findOne(id, accountId)
-AccommodationsService -> DB : fetch accommodation + relations
-BE --> FE : accommodation detail + gallery + services
+User -> FE : open Accomodation detail
+FE -> BE : POST /Accomodations/handle {action:getone}
+BE -> AccomodationsController : handle(getone)
+AccomodationsController -> AccomodationsService : findOne(id, accountId)
+AccomodationsService -> DB : fetch Accomodation + relations
+BE --> FE : Accomodation detail + gallery + services
 
 FE -> BE : POST /comments/handle {action:list}
 BE -> CommentsController : handle(list)
-CommentsController -> CommentsService : listByAccommodation(accommodationId, page, limit)
-CommentsService -> DB : fetch comments for accommodation
+CommentsController -> CommentsService : listByAccomodation(AccomodationId, page, limit)
+CommentsService -> DB : fetch comments for Accomodation
 BE --> FE : comments + pagination
 
 FE -> BE : POST /comments/handle {action:exists}
 BE -> CommentsController : handle(exists)
-CommentsController -> CommentsService : exists(accountId, accommodationId)
+CommentsController -> CommentsService : exists(accountId, AccomodationId)
 CommentsService -> DB : check if user already commented
 BE --> FE : { exists: true/false }
 
 FE -> BE : POST /comments/handle {action:getStats}
 BE -> CommentsController : handle(getStats)
-CommentsController -> CommentsService : getStats(accommodationId)
+CommentsController -> CommentsService : getStats(AccomodationId)
 CommentsService -> DB : aggregate ratings
 BE --> FE : rating summary
 

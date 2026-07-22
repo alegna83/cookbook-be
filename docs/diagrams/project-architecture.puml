@@ -1,4 +1,4 @@
-@startuml
+﻿@startuml
 title Stays4Pilgrims - Project Architecture Overview
 
 left to right direction
@@ -12,7 +12,7 @@ component "Stays4Pilgrims Frontend\n(Web / Mobile)" as FE
 
 package "Stays4Pilgrims Backend (NestJS)" as BE {
   component "Auth + Accounts" as AUTH
-  component "Accommodations" as ACC
+  component "Accomodations" as ACC
   component "Caminos / Stages / Statistics" as ROUTES
   component "Comments / Favorites / Suggestions" as SOCIAL
   component "Upload" as UPLOAD
@@ -29,7 +29,7 @@ User --> FE : browse / submit content
 FE --> BE : HTTPS REST API
 
 AUTH --> DB : users, sessions, tokens
-ACC --> DB : accommodations, categories, requests
+ACC --> DB : Accomodations, categories, requests
 ROUTES --> DB : caminos, stages, statistics
 SOCIAL --> DB : comments, favorites
 UPLOAD --> CLOUDINARY : upload / delete media
@@ -45,7 +45,7 @@ note right of BE
   Main modules registered in AppModule:
   - AuthModule
   - AccountsModule
-  - AccommodationsModule
+  - AccomodationsModule
   - CaminosModule
   - StagesModule
   - StatisticsCaminosModule

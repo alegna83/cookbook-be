@@ -1,4 +1,4 @@
-@startuml
+﻿@startuml
 title Sequence: Authentication & JWT Flow
 
 participant "Stays4Pilgrims Frontend" as FE
@@ -22,7 +22,7 @@ JWT ->> CACHE: store refreshToken (7d)
 JWT -->> ROUTES: tokens
 ROUTES -->> FE: {accessToken, refreshToken}
 
-FE ->> ROUTES: GET /accommodations\nHeader: Authorization: Bearer <token>
+FE ->> ROUTES: GET /Accomodations\nHeader: Authorization: Bearer <token>
 ROUTES ->> JWT: validateToken(token)
 JWT ->> CACHE: getToken()
 CACHE -->> JWT: token data
@@ -48,3 +48,4 @@ note right of CACHE
 end note
 
 @enduml
+
