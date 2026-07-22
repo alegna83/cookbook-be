@@ -42,7 +42,7 @@ entity "Account (accounts)" as account {
 
 entity "Accomodation" as Accomodation {
   [PK] id
-  place_name
+  accomodation_name
   address
   region
   phone
@@ -58,11 +58,11 @@ entity "Accomodation" as Accomodation {
   time_open
   time_checkin
   time_checkout
-  place_room_notes
-  place_observations
-  place_created_date
-  place_management
-  place_manager
+  accomodation_room_notes
+  accomodation_observations
+  accomodation_created_date
+  accomodation_management
+  accomodation_manager
   --
   main_photo
   latitude
@@ -74,19 +74,19 @@ entity "Accomodation" as Accomodation {
   rejection_reason
   --
   [FK] account_id
-  [FK] place_category_id
+  [FK] accomodation_category_id
   [FK] camino_id
   [FK] stage_id
 }
 
-entity "AccomodationCategory (place_categories)" as Accomodation_category {
+entity "AccomodationCategory (accomodation_categories)" as Accomodation_category {
   [PK] id
   name
 }
 
 entity "Comment" as comment {
   [PK] id
-  [FK] place_id
+  [FK] accomodation_id
   [FK] account_id
   --
   rating
@@ -108,12 +108,12 @@ entity "GalleryPhoto" as gallery_photo {
   approved_at
   rejection_reason
   [FK] account_id
-  [FK] place_id
+  [FK] accomodation_id
 }
 
 entity "Favorite" as favorite {
   [PK] id
-  [FK] place_id
+  [FK] accomodation_id
   [FK] account_id
   created_at
 }
@@ -122,15 +122,15 @@ entity "AccomodationPrice" as Accomodation_price {
   [PK] id
   description
   price
-  [FK] place_id
+  [FK] accomodation_id
 }
 
 entity "AccomodationRemovalRequest" as Accomodation_removal_request {
   [PK] id
-  [FK] place_id
+  [FK] accomodation_id
   [FK] account_id
   --
-  place_name
+  accomodation_name
   requester_name
   requester_email
   reason
@@ -144,7 +144,7 @@ entity "AccomodationRemovalRequest" as Accomodation_removal_request {
 
 entity "AccomodationEditRequest" as Accomodation_edit_request {
   [PK] id
-  [FK] place_id
+  [FK] accomodation_id
   [FK] account_id
   --
   requester_name
