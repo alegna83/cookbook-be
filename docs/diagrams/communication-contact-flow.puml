@@ -1,5 +1,16 @@
 @startuml
 title Stays4Pilgrims - Contact form communication
+scale 0.82
+hide footbox
+skinparam defaultFontName Arial
+skinparam defaultFontSize 10
+skinparam maxMessageSize 48
+skinparam sequence {
+  ParticipantPadding 10
+  BoxPadding 8
+  MessageAlign center
+  ArrowThickness 1
+}
 
 actor User
 participant "Stays4Pilgrims Frontend" as FE
@@ -9,13 +20,13 @@ participant "ContactService" as ContactService
 participant "Email service" as Email
 
 User -> FE : open Contact Us page and fill form
-FE -> BE : POST /contact/send {name, email, phone?, title, message}
+FE -> BE : POST /contact/send\n{name, email, phone?, title, message}
 BE -> ContactController : send(dto)
 ContactController -> ContactService : sendContactMessage(dto)
-ContactService -> ContactService : validate required fields and lengths
+ContactService -> ContactService : validate required fields + lengths
 
 alt email delivery enabled
-  ContactService -> Email : sendCustomEmail(receiverEmail, subject, html)
+  ContactService -> Email : sendCustomEmail\n(receiverEmail, subject, html)
   Email --> ContactService : delivery result
   ContactService --> BE : { message: success }
   BE --> FE : 200 OK

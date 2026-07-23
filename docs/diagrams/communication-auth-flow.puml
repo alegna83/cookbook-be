@@ -1,5 +1,16 @@
 @startuml
 title Stays4Pilgrims - Authentication and account communication
+scale 0.82
+hide footbox
+skinparam defaultFontName Arial
+skinparam defaultFontSize 10
+skinparam maxMessageSize 48
+skinparam sequence {
+	ParticipantPadding 10
+	BoxPadding 8
+	MessageAlign center
+	ArrowThickness 1
+}
 
 actor User
 participant "Stays4Pilgrims Frontend" as FE
@@ -9,7 +20,7 @@ participant "AccountsService" as AccountsService
 database "PostgreSQL" as DB
 participant "Email service" as Email
 
-User -> FE : register / login / reset password
+User -> FE : register / login / reset
 FE -> BE : POST /auth/register
 BE -> AuthController : register(dto)
 AuthController -> AccountsService : register(...)

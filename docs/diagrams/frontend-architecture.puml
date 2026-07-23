@@ -1,14 +1,44 @@
 @startuml
-' Frontend architecture
+title Stays4Pilgrims Frontend Architecture
+top to bottom direction
+scale 0.92
+
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam linetype ortho
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam package {
+	Padding 10
+}
+skinparam componentStyle rectangle
+
 actor User
-node "Stays4Pilgrims Frontend" as FE
-component "UI Screens and Widgets" as UI
-component "State (flutter_bloc / Cubit)" as State
-component "Services and API Client" as Client
-component "Local Storage\n(auth + consent)" as Storage
-User -> UI : clicks/interacts
-UI -> State : updates
-UI -> Client : fetch/update
-State -> Storage : persist session / preferences
-Client -> "Stays4Pilgrims Backend API" : HTTP/REST
+
+package "Presentation Layer" as L1 {
+	component "UI Screens\nMap, Detail, Account, Auth" as UI
+}
+
+package "State Layer" as L2 {
+	component "State Management\nflutter_bloc / Cubit" as State
+}
+
+package "Data Layer" as L3 {
+	component "Services and API Client" as Client
+	component "Local Storage\nAuth + Consent" as Storage
+}
+
+component "Stays4Pilgrims Backend API" as API
+
+User --> UI : interacts
+UI --> State : user actions
+State --> UI : state updates
+State --> Client : load / submit data
+State --> Storage : persist session
+Client --> API : HTTP/REST
+
+note right of L3
+Storage keeps session and consent locally.
+Network communication is centralized in Client.
+end note
 @enduml

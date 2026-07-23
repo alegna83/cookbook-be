@@ -1,77 +1,80 @@
 ﻿@startuml
 title Stays4Pilgrims - Media upload, contribution and moderation communication
+scale 0.95
+hide footbox
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam maxMessageSize 52
+skinparam sequence {
+  ParticipantPadding 12
+  BoxPadding 10
+  MessageAlign center
+  ArrowThickness 1
+}
 
 actor User
 participant "Stays4Pilgrims Frontend" as FE
-participant "Stays4Pilgrims Backend" as BE
-participant "UploadController" as UploadController
-participant "UploadService" as UploadService
-participant "AccomodationsController" as AccomodationsController
-participant "AccountsController" as AccountsController
-participant "AccomodationsService" as AccomodationsService
-participant "CommentsService" as CommentsService
+participant "Backend API" as API
+participant "Upload Service" as UploadSvc
+participant "Moderation Service" as ModSvc
 database "PostgreSQL" as DB
 participant "Cloudinary" as Cloudinary
-participant "Email service" as Email
+participant "Email Service" as Email
 
-User -> FE : select photo(s)
-FE -> BE : POST /upload {type: main-photo|gallery-photos|avatar}
-BE -> UploadController : uploadMedia(type, files)
-UploadController -> UploadService : uploadMedia(files, type)
-UploadService -> Cloudinary : store media files
-Cloudinary --> UploadService : public URLs
-UploadService --> BE : uploaded URLs
-BE --> FE : upload response
-
-alt avatar upload
-  FE -> BE : POST /accounts/update { avatar }
-  BE -> AccountsController : update(accountId, avatar)
-  AccountsController -> DB : persist avatar URL
-  BE --> FE : updated account
-else Accomodation media contribution
-  FE -> BE : POST /Accomodations/handle {action:addphotos}
-  BE -> AccomodationsController : handle(addphotos)
-  AccomodationsController -> AccomodationsService : addGalleryPhotos(AccomodationId, accountId, urls)
-  AccomodationsService -> DB : save pending / approved photos
-  AccomodationsService -> Email : notify admins about pending photo moderation
-  BE --> FE : contribution accepted
+group 1) Media upload
+  User -> FE : Select image/file
+  FE -> API : POST /upload
+  API -> UploadSvc : validate and process upload
+  UploadSvc -> Cloudinary : store file
+  Cloudinary --> UploadSvc : public URL
+  UploadSvc --> API : media metadata
+  API --> FE : upload response
 end
 
-User -> FE : submit comment or edit/removal request
-FE -> BE : POST /comments/handle {action:add} or /Accomodations/handle {action:requestedit|requestremoval}
-BE -> CommentsService : add(comment)
-CommentsService -> DB : save pending comment
-CommentsService -> Email : notify admins about pending comment review
-BE -> AccomodationsController : handle(requestedit|requestremoval)
-AccomodationsController -> AccomodationsService : requestEdit / requestRemoval
-AccomodationsService -> DB : save pending request
-AccomodationsService -> Email : notify admins about pending request
-BE --> FE : pending moderation acknowledgement
+group 2) Content contribution
+  alt Avatar
+    FE -> API : POST /accounts/update
+    API -> DB : update user avatar
+    API --> FE : account updated
+  else Accommodation photo
+    FE -> API : POST /Accomodations/handle {action:addphotos}
+    API -> ModSvc : create moderation item
+    ModSvc -> DB : state = pending
+    ModSvc -> Email : notify admins
+    API --> FE : contribution accepted
+  end
+end
 
-User -> FE : owner/admin checks moderation queue
-FE -> BE : POST /Accomodations/handle {action:getpendingphotos|getpendingphotosadmin}
-BE -> AccomodationsController : handle(getpendingphotos*)
-AccomodationsController -> AccomodationsService : getPendingPhotos(...)
-AccomodationsService -> DB : fetch pending photos
-BE --> FE : pending photos list
+group 3) Moderation queue
+  FE -> API : comments / edit requests
+  API -> ModSvc : validate and enqueue
+  ModSvc -> DB : save pending request
+  ModSvc -> Email : notify moderators
+  API --> FE : pending status
+end
 
-User -> FE : approve / reject photo
-FE -> BE : POST /Accomodations/handle {action:approvephoto|rejectphoto}
-BE -> AccomodationsController : handle(approvephoto/rejectphoto)
-AccomodationsController -> AccomodationsService : approvePhoto / rejectPhoto
-AccomodationsService -> DB : update moderation state
-AccomodationsService -> Email : notify requester about decision
-BE --> FE : moderation result
+group 4) Review and decision
+  User -> FE : Admin opens moderation queue
+  FE -> API : list pending items
+  API -> DB : load pending items
+  API --> FE : pending list
+  FE -> API : approve or reject
+  API -> ModSvc : apply decision
+  ModSvc -> DB : update final state
+end
 
-User -> FE : approve / reject comment or Accomodation request
-FE -> BE : POST /comments/handle {action:approve} or /Accomodations/handle {action:approve|reject|approveedit|rejectedit|approveremoval|rejectremoval}
-BE -> CommentsService : approveComment(...)
-CommentsService -> DB : update comment status
-CommentsService -> Email : notify commenter about decision
-BE -> AccomodationsController : handle(admin moderation action)
-AccomodationsController -> AccomodationsService : approve/reject request
-AccomodationsService -> DB : update request or Accomodation status
-AccomodationsService -> Email : notify requester about decision
-BE --> FE : moderation result
+group 5) User notification
+  ModSvc -> Email : send decision result
+  API --> FE : moderation result
+  FE --> User : final feedback
+end
+
+note over FE,API
+Communication diagram at macro level.
+Technical details in:
+- sequence-upload-moderation
+- sequence-add-comment
+- sequence-add-accommodation
+end note
 
 @enduml

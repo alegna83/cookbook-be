@@ -1,5 +1,16 @@
 ﻿@startuml
-title Upload â†’ Moderation sequence
+title Upload to Moderation sequence
+scale 0.85
+hide footbox
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam maxMessageSize 55
+skinparam sequence {
+  ParticipantPadding 10
+  BoxPadding 8
+  MessageAlign center
+  ArrowThickness 1
+}
 actor User
 participant "Stays4Pilgrims Frontend" as FE
 participant "Stays4Pilgrims Backend - UploadController" as API
@@ -8,8 +19,8 @@ participant "Storage (S3/local)" as STORAGE
 participant "ContentModerationService" as MOD
 participant "GalleryPhotoRepo / DB" as GDB
 
-User -> FE: Select image and submit (AccomodationId, accountId)
-FE -> API: POST /upload (multipart) {file, AccomodationId, accountId}
+User -> FE: Select image and submit\n(AccomodationId, accountId)
+FE -> API: POST /upload (multipart)\n{file, AccomodationId, accountId}
 activate API
 API -> UP: handleUpload(file, folder='Accomodations/gallery')
 activate UP
@@ -34,7 +45,7 @@ deactivate UP
 API --> FE: 200 OK {url, status} or 400 Bad Request
 deactivate API
 
-note over GDB,MOD: Admin can later approve/reject via `Accomodations/handle` actions
+note over GDB,MOD: Admin can later approve/reject\nvia Accomodations/handle actions
 
 @enduml
 

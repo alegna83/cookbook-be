@@ -1,6 +1,27 @@
 ﻿@startuml
 title Dataflow - PII and Data Retention
 
+left to right direction
+scale 0.82
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam linetype ortho
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam packageTitleFontSize 12
+skinparam componentStyle rectangle
+skinparam nodesep 28
+skinparam ranksep 38
+
+skinparam package {
+  Padding 10
+}
+
+skinparam note {
+  FontSize 10
+  Padding 6
+}
+
 package "Stays4Pilgrims System" {
   package "Stays4Pilgrims Frontend (Flutter/Web)" as Frontend {
     queue "User Input\nCredentials, Profile, Reviews" as FE_INPUT

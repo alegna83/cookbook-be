@@ -1,5 +1,16 @@
 ﻿@startuml
 title Stays4Pilgrims - Suggestions and recommendation communication
+scale 0.80
+hide footbox
+skinparam defaultFontName Arial
+skinparam defaultFontSize 10
+skinparam maxMessageSize 46
+skinparam sequence {
+  ParticipantPadding 10
+  BoxPadding 8
+  MessageAlign center
+  ArrowThickness 1
+}
 
 actor User
 participant "Stays4Pilgrims Frontend" as FE
@@ -12,10 +23,10 @@ database "PostgreSQL" as DB
 participant "OpenRouter / OpenAI" as AI
 
 User -> FE : open home near current location
-FE -> FE : obtain current coordinates and user interest
+FE -> FE : read current coordinates + user interest
 
 User -> FE : open nearby suggestions
-FE -> BE : POST /sugestoes/sugerir {lat, lon, interesse}
+FE -> BE : POST /sugestoes/sugerir\n{lat, lon, interesse}
 BE -> SuggestionController : sugerir(body)
 SuggestionController -> SuggestionService : sugerirLugares(prompt)
 SuggestionService -> AI : chat completion with nearby-interest prompt
@@ -29,12 +40,12 @@ note over FE
 Best Accomodation recommendation trigger
 is shown only for authenticated users.
 end note
-FE -> BE : GET /sugestoes/best-Accomodation?lat&lon&radius&category
+FE -> BE : GET /sugestoes/best-Accomodation\n?lat&lon&radius&category
 BE -> SuggestionController : bestAccomodation(lat, lon, radius, category)
 SuggestionController -> SuggestionService : suggestBestAccomodation(...)
 SuggestionService -> AccomodationsService : getByBounds(bounds)
 AccomodationsService -> DB : fetch approved Accomodations in area
-SuggestionService -> CommentsService : use ratings and review counts
+SuggestionService -> CommentsService : use ratings + review counts
 CommentsService -> DB : aggregate comment statistics
 alt enough local rating data
   SuggestionService -> AI : optional ranking analysis with local options

@@ -2,9 +2,18 @@
 title Stays4Pilgrims - Project Architecture Overview
 
 left to right direction
+scale 0.88
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam linetype ortho
 skinparam componentStyle rectangle
 skinparam shadowing false
 skinparam packageStyle rectangle
+skinparam package {
+  Padding 12
+}
+skinparam nodesep 28
+skinparam ranksep 32
 
 actor User
 
@@ -21,45 +30,33 @@ package "Stays4Pilgrims Backend (NestJS)" as BE {
 }
 
 database "PostgreSQL\n(managed / Supabase)" as DB
-cloud "Cloudinary" as CLOUDINARY
-cloud "Email provider\n(Resend or SMTP)" as EMAIL
-cloud "OpenAI\n(optional moderation)" as OPENAI
+cloud "Media Storage\n(Cloudinary)" as CLOUDINARY
+cloud "Email Provider\n(Resend/SMTP)" as EMAIL
+cloud "AI Moderation\n(optional)" as OPENAI
 
 User --> FE : browse / submit content
 FE --> BE : HTTPS REST API
 
-AUTH --> DB : users, sessions, tokens
-ACC --> DB : Accomodations, categories, requests
-ROUTES --> DB : caminos, stages, statistics
+AUTH --> DB : accounts, sessions
+ACC --> DB : places, categories, requests
+ROUTES --> DB : caminos, stages, stats
 SOCIAL --> DB : comments, favorites
-UPLOAD --> CLOUDINARY : upload / delete media
-UPLOAD --> MOD : pre-check and post-check
-MOD --> OPENAI : optional image/comment moderation
-AUTH --> EMAIL : verification / reset / welcome emails
-ACC --> EMAIL : moderation decision / queue emails
-SOCIAL --> EMAIL : comment moderation emails
-CONTACT --> EMAIL : contact form delivery
-BE --> DB : TypeORM / SQL
+UPLOAD --> CLOUDINARY : media upload/delete
+MOD --> OPENAI : moderation checks
+AUTH --> EMAIL : auth emails
+ACC --> EMAIL : moderation emails
+SOCIAL --> EMAIL : review notifications
+CONTACT --> EMAIL : contact delivery
 
 note right of BE
-  Main modules registered in AppModule:
-  - AuthModule
-  - AccountsModule
-  - AccomodationsModule
-  - CaminosModule
-  - StagesModule
-  - StatisticsCaminosModule
-  - FavoritesModule
-  - CommentsModule
-  - SuggestionsModule
-  - UploadModule
-  - ContactModule
-  - ContentModerationModule
+  Core backend domains in AppModule.
+  Each module encapsulates controllers,
+  services and data access.
 end note
 
 note bottom of FE
-  Stays4Pilgrims Frontend is the client for all user interactions.
-  It consumes the NestJS API and renders the UI.
+  Single client for all user interactions.
+  Consumes API and renders map-driven UI.
 end note
 
 @enduml

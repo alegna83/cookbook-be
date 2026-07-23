@@ -1,5 +1,16 @@
 ﻿@startuml
 title Add Accomodation (create) sequence
+scale 0.85
+hide footbox
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam maxMessageSize 55
+skinparam sequence {
+  ParticipantPadding 10
+  BoxPadding 8
+  MessageAlign center
+  ArrowThickness 1
+}
 actor User
 participant "Stays4Pilgrims Frontend" as FE
 participant "Stays4Pilgrims Backend - AccomodationsController" as API
@@ -9,8 +20,8 @@ participant "CategoryRepo / DB" as CATDB
 participant "AccomodationRepo / DB" as ADB
 participant "GalleryPhotoRepo / DB" as GDB
 
-User -> FE: Fill "Add Accomodation" form (data + main_photo + gallery_photos)
-FE -> API: POST /Accomodations/handle { action: 'create', payload: CreateAccomodationDto }
+User -> FE: Fill "Add Accomodation" form\n(data + main_photo + gallery_photos)
+FE -> API: POST /Accomodations/handle\n{action:'create', payload:CreateAccomodationDto}
 activate API
 API -> SVC: create(CreateAccomodationDto)
 activate SVC
@@ -35,7 +46,7 @@ alt Accomodation_category provided
   deactivate CATDB
 end
 
-SVC -> ADB: save new Accomodation (main_photo normalized)
+SVC -> ADB: save new Accomodation\n(main_photo normalized)
 activate ADB
 ADB --> SVC: saved Accomodation id
 deactivate ADB
@@ -47,7 +58,7 @@ alt gallery_photos present
   deactivate GDB
 end
 
-SVC -> ADB: findOne with relations (gallery_photos, category, prices...)
+SVC -> ADB: findOne with relations\n(gallery_photos, category, prices)
 activate ADB
 ADB --> SVC: full saved entity
 deactivate ADB
@@ -57,7 +68,7 @@ deactivate SVC
 API --> FE: 200 OK {AccomodationDto}
 deactivate API
 
-note over FE,GDB: Gallery photos are created pending moderation; approved later by admin or moderation pipeline
+note over FE,GDB: Gallery photos start as pending\nand are approved/rejected later
 
 @enduml
 

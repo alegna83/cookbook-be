@@ -1,7 +1,14 @@
 ﻿@startuml
 title Stays4Pilgrims - Frontend and backend communication overview
-
+scale 0.85
+left to right direction
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
 skinparam componentStyle rectangle
+skinparam component {
+  Padding 8
+}
+skinparam ArrowThickness 1
 
 component "Stays4Pilgrims Frontend" as FE
 component "Stays4Pilgrims Backend" as BE
@@ -17,11 +24,11 @@ FE --> BE : Moderation actions
 
 note bottom of FE
   Detailed flows:
-  - communication-auth-flow.puml
-  - communication-Accomodation-flow.puml
-  - communication-suggestions-flow.puml
-  - communication-media-moderation-flow.puml
-  - communication-contact-flow.puml
+  - communication-auth-flow
+  - communication-accommodation-flow
+  - communication-suggestions-flow
+  - communication-media-moderation-flow
+  - communication-contact-flow
 end note
 
 note bottom of BE

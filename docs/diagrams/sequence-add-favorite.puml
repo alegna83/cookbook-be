@@ -1,5 +1,16 @@
 ﻿@startuml
 title Add to Favorites sequence
+scale 0.85
+hide footbox
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam maxMessageSize 55
+skinparam sequence {
+  ParticipantPadding 10
+  BoxPadding 8
+  MessageAlign center
+  ArrowThickness 1
+}
 actor User
 participant "Stays4Pilgrims Frontend" as FE
 participant "Stays4Pilgrims Backend - FavoritesController" as API
@@ -8,9 +19,9 @@ database "FavoritesRepo / DB" as DB
 
 User -> FE: Click heart icon on Accomodation
 alt already favorited
-  FE -> API: POST /favorites/handle { action: 'toggle', payload: {AccomodationId, accountId} }
+  FE -> API: POST /favorites/handle\n{action:'toggle', payload:{AccomodationId, accountId}}
 else not favorited
-  FE -> API: POST /favorites/handle { action: 'toggle', payload: {AccomodationId, accountId} }
+  FE -> API: POST /favorites/handle\n{action:'toggle', payload:{AccomodationId, accountId}}
 end
 activate API
 API -> SVC: toggle(accountId, AccomodationId)
@@ -37,7 +48,7 @@ API --> FE: 200 OK {action, favoriteId?}
 deactivate API
 FE --> User: Update heart icon UI (filled/empty)
 
-note over SVC,DB: Favorite is a M-to-M relationship between Account and Accomodation
+note over SVC,DB: Favorite is an M:N relation\nbetween Account and Accomodation
 
 @enduml
 
