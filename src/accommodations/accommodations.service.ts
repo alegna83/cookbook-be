@@ -624,9 +624,18 @@ export class AccommodationsService {
       .map((url) => url.trim())
       .filter((url) => url.length > 0)
       .map((url) => this.toPublicImageUrl(url));
-    const accountId = (data as any).account_id
-      ? Number((data as any).account_id)
-      : undefined;
+    const rawAccountId = (data as any).account_id ?? (data as any).accountId;
+    let accountId: number | undefined;
+
+    if (rawAccountId !== undefined && rawAccountId !== null && rawAccountId !== '') {
+      const normalizedAccountId = Number(rawAccountId);
+
+      if (!Number.isInteger(normalizedAccountId)) {
+        throw new BadRequestException('accountId/account_id inválido.');
+      }
+
+      accountId = normalizedAccountId;
+    }
 
     if (galleryPhotoUrls.length > 0) {
       const moderation = await this.moderationService.moderateImageUrls(
@@ -695,8 +704,8 @@ export class AccommodationsService {
       gallery_photos: undefined,
     });
 
-    if ((data as any).account_id) {
-      (novo as any).account = { id: Number((data as any).account_id) } as any;
+    if (accountId !== undefined) {
+      (novo as any).account = { id: accountId } as any;
     }
 
     const saved: Accommodation = await this.placeRepository.save(novo);

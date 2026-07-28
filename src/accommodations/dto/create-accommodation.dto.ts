@@ -71,4 +71,8 @@ export class CreateAccommodationDto {
   @IsOptional()
   @IsNumber()
   account_id?: number;
+
+  @IsOptional()
+  @IsNumber()
+  accountId?: number;
 }
