@@ -12,6 +12,21 @@ import { HandleCommentDto } from './dto/handle-comment.dto';
 export class CommentsController {
   constructor(private readonly svc: CommentsService) {}
 
+  private extractAccountId(payload?: Record<string, any>): number | undefined {
+    const rawAccountId =
+      payload?.accountId ??
+      payload?.account_id ??
+      payload?.userId ??
+      payload?.ownerId;
+
+    if (rawAccountId === undefined || rawAccountId === null || rawAccountId === '') {
+      return undefined;
+    }
+
+    const accountId = Number(rawAccountId);
+    return Number.isInteger(accountId) ? accountId : undefined;
+  }
+
   @Post('handle')
   @HttpCode(200)
   async handle(@Body() data: HandleCommentDto): Promise<any> {
@@ -27,55 +42,70 @@ export class CommentsController {
         );
 
       case 'listByAccount':
-        if (!data.payload?.accountId) {
+        {
+        const accountId = this.extractAccountId(data.payload);
+        if (!accountId) {
           throw new BadRequestException('accountId é obrigatório.');
         }
-        return this.svc.listByAccount(Number(data.payload.accountId));
+        return this.svc.listByAccount(accountId);
+        }
 
       case 'add':
-        if (!data.payload?.placeId || !data.payload?.accountId) {
+        {
+        const accountId = this.extractAccountId(data.payload);
+        if (!data.payload?.placeId || !accountId) {
           throw new BadRequestException('placeId e accountId são obrigatórios.');
         }
         return this.svc.add({
           placeId: Number(data.payload.placeId),
-          accountId: Number(data.payload.accountId),
+          accountId,
           rating: data.payload.rating ? Number(data.payload.rating) : undefined,
           comment: data.payload.comment,
         });
+        }
 
       case 'update':
         if (!data.payload?.id) {
           throw new BadRequestException('id do comentário é obrigatório.');
         }
+        {
+        const accountId = this.extractAccountId(data.payload);
         return this.svc.update(
           Number(data.payload.id),
           {
             rating: data.payload.rating ? Number(data.payload.rating) : undefined,
             comment: data.payload.comment,
           },
-          data.payload.accountId ? Number(data.payload.accountId) : undefined,
+          accountId,
         );
+        }
 
       case 'remove':
         if (!data.payload?.id) {
           throw new BadRequestException('id do comentário é obrigatório.');
         }
+        {
+        const accountId = this.extractAccountId(data.payload);
         await this.svc.remove(
           Number(data.payload.id),
-          data.payload.accountId ? Number(data.payload.accountId) : undefined,
+          accountId,
         );
         return { ok: true };
+        }
 
       case 'exists':
-        if (!data.payload?.placeId || !data.payload?.accountId) {
+        {
+        const accountId = this.extractAccountId(data.payload);
+        if (!data.payload?.placeId || !accountId) {
           throw new BadRequestException('placeId e accountId são obrigatórios.');
         }
         return {
           exists: await this.svc.exists(
-            Number(data.payload.accountId),
+            accountId,
             Number(data.payload.placeId),
           ),
         };
+        }
 
       case 'getStats':
         if (!data.payload?.placeId) {

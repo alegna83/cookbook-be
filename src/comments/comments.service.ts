@@ -95,6 +95,17 @@ export class CommentsService {
         return;
       }
 
+      const escapeHtml = (value: string) =>
+        value
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
+      const requesterName = comment.account?.name?.trim() || 'Unknown';
+      const requesterEmail = comment.account?.email?.trim() || 'Unknown';
+
       const subject = 'Pending comment review - Stays4Pilgrims';
       const html = `
         <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
@@ -104,11 +115,19 @@ export class CommentsService {
             <tbody>
               <tr>
                 <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Accommodation</td>
-                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${placeName || `Accommodation #${comment.placeId}`}</td>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(placeName || `Accommodation #${comment.placeId}`)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Requester</td>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(requesterName)}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Requester email</td>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml(requesterEmail)}</td>
               </tr>
               <tr>
                 <td style="padding: 10px 12px; border: 1px solid #e5e7eb; font-weight: 700; background: #f8fafc; width: 180px;">Comment</td>
-                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${(comment.comment ?? '').toString().replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string))}</td>
+                <td style="padding: 10px 12px; border: 1px solid #e5e7eb;">${escapeHtml((comment.comment ?? '').toString())}</td>
               </tr>
             </tbody>
           </table>
@@ -142,7 +161,15 @@ export class CommentsService {
     comment.approvedAt = null;
     comment.rejectionReason = null;
     const saved = await this.commentRepo.save(comment);
-    await this.notifyAdminsAboutPendingComment(saved, place.place_name ?? '');
+    const savedWithRelations = await this.commentRepo.findOne({
+      where: { id: saved.id },
+      relations: ['account'],
+    });
+
+    await this.notifyAdminsAboutPendingComment(
+      savedWithRelations ?? saved,
+      place.place_name ?? '',
+    );
     return saved;
   }
 
@@ -177,7 +204,15 @@ export class CommentsService {
 
     if (shouldNotifyAdmins) {
       const place = await this.placeRepo.findOne({ where: { id: comment.placeId } });
-      await this.notifyAdminsAboutPendingComment(saved, place?.place_name ?? '');
+      const savedWithRelations = await this.commentRepo.findOne({
+        where: { id: saved.id },
+        relations: ['account'],
+      });
+
+      await this.notifyAdminsAboutPendingComment(
+        savedWithRelations ?? saved,
+        place?.place_name ?? '',
+      );
     }
 
     return saved;
