@@ -9,12 +9,29 @@ import { JwtService } from '@nestjs/jwt';
 describe('AuthService (unit)', () => {
   let service: AuthService;
   let accountsMock: { findByEmail: jest.Mock };
-  let commentsMock: { getPendingComments: jest.Mock };
+  let accommodationsMock: Record<string, jest.Mock>;
+  let commentsMock: Record<string, jest.Mock>;
   let jwtMock: { sign: jest.Mock; verifyAsync: jest.Mock };
 
   beforeEach(async () => {
     accountsMock = { findByEmail: jest.fn() };
-    commentsMock = { getPendingComments: jest.fn() };
+    accommodationsMock = {
+      approveAccommodation: jest.fn(),
+      approvePhoto: jest.fn(),
+      rejectPhoto: jest.fn(),
+      approveRemovalRequest: jest.fn(),
+      approveEditRequest: jest.fn(),
+      rejectEditRequest: jest.fn(),
+      rejectRemovalRequest: jest.fn(),
+      getPendingAccommodations: jest.fn(),
+      getPendingRemovalRequests: jest.fn(),
+      getPendingPhotos: jest.fn(),
+      getPendingEditRequests: jest.fn(),
+    };
+    commentsMock = {
+      getPendingComments: jest.fn(),
+      approveComment: jest.fn(),
+    };
     jwtMock = {
       sign: jest.fn().mockReturnValue('signed-token'),
       verifyAsync: jest.fn().mockResolvedValue({ id: 1, email: 'a@b' }),
@@ -24,7 +41,7 @@ describe('AuthService (unit)', () => {
       providers: [
         AuthService,
         { provide: AccountsService, useValue: accountsMock },
-        { provide: AccommodationsService, useValue: {} },
+        { provide: AccommodationsService, useValue: accommodationsMock },
         { provide: CommentsService, useValue: commentsMock },
         { provide: JwtService, useValue: jwtMock },
       ],
@@ -73,5 +90,27 @@ describe('AuthService (unit)', () => {
     accountsMock.findByEmail = jest.fn().mockResolvedValue({ id: 1, email: 'u@ex', password: passwordHash, name: 'User', isEmailVerified: true });
 
     await expect(service.login('u@ex', 'wrong')).rejects.toThrow('Invalid password');
+  });
+
+  it('handleAdminAction should approve accommodations using accommodationId payload', async () => {
+    accommodationsMock.approveAccommodation.mockResolvedValue({ ok: true });
+
+    await service.handleAdminAction({
+      action: 'approveaccommodation',
+      payload: { accommodationId: 77 },
+    } as any);
+
+    expect(accommodationsMock.approveAccommodation).toHaveBeenCalledWith(77);
+  });
+
+  it('handleAdminAction should reject comments using alternate payload fields', async () => {
+    commentsMock.approveComment.mockResolvedValue({ ok: true });
+
+    await service.handleAdminAction({
+      action: 'rejectcomment',
+      payload: { commentId: 12, reason: 'Too rude' },
+    } as any);
+
+    expect(commentsMock.approveComment).toHaveBeenCalledWith(12, 'Too rude');
   });
 });

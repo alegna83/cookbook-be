@@ -97,6 +97,24 @@ export class AuthService {
     return this.tokenBlacklist.has(token);
   }
 
+  private extractAdminEntityId(payload?: Record<string, any>): number | null {
+    const rawId =
+      payload?.id ??
+      payload?.commentId ??
+      payload?.photoId ??
+      payload?.requestId ??
+      payload?.accommodationId ??
+      payload?.placeId;
+
+    const id = Number(rawId);
+    return Number.isInteger(id) ? id : null;
+  }
+
+  private extractRejectionReason(payload?: Record<string, any>): string {
+    const reason = payload?.rejectionReason ?? payload?.reason;
+    return reason?.toString().trim() || 'Rejected by admin.';
+  }
+
   // 🔐 Admin actions handler
   async handleAdminAction(data: HandleAdminDto): Promise<any> {
     const normalizedAction = (data.action ?? '')
@@ -121,26 +139,32 @@ export class AuthService {
         return this.accommodationsService.getPendingPhotos();
 
       case 'approveaccommodation':
-        if (!data.payload?.id) {
+        {
+        const accommodationId = this.extractAdminEntityId(data.payload);
+        if (!accommodationId) {
           throw new BadRequestException('ID é obrigatório.');
         }
         return this.accommodationsService.approveAccommodation(
-          data.payload.id,
+          accommodationId,
         );
+        }
 
       case 'rejectaccommodation':
-        if (!data.payload?.id) {
+        {
+        const accommodationId = this.extractAdminEntityId(data.payload);
+        if (!accommodationId) {
           throw new BadRequestException('ID é obrigatório.');
         }
         return this.accommodationsService.approveAccommodation(
-          data.payload.id,
-          data.payload.rejectionReason,
+          accommodationId,
+          this.extractRejectionReason(data.payload),
         );
+        }
 
       case 'approvecomment':
         {
-        const commentId = Number(data.payload?.id ?? data.payload?.commentId);
-        if (!Number.isInteger(commentId)) {
+        const commentId = this.extractAdminEntityId(data.payload);
+        if (!commentId) {
           throw new BadRequestException('ID é obrigatório.');
         }
         return this.commentsService.approveComment(commentId);
@@ -148,75 +172,88 @@ export class AuthService {
 
       case 'rejectcomment':
         {
-        const commentId = Number(data.payload?.id ?? data.payload?.commentId);
-        if (!Number.isInteger(commentId)) {
+        const commentId = this.extractAdminEntityId(data.payload);
+        if (!commentId) {
           throw new BadRequestException('ID é obrigatório.');
         }
 
-        const rejectionReason =
-          data.payload?.rejectionReason?.trim() ||
-          data.payload?.reason?.trim() ||
-          'Rejected by admin.';
-
         return this.commentsService.approveComment(
           commentId,
-          rejectionReason,
+          this.extractRejectionReason(data.payload),
         );
         }
 
       case 'approvephoto':
-        if (!data.payload?.id) {
+        {
+        const photoId = this.extractAdminEntityId(data.payload);
+        if (!photoId) {
           throw new BadRequestException('ID é obrigatório.');
         }
-        return this.accommodationsService.approvePhoto(data.payload.id);
+        return this.accommodationsService.approvePhoto(photoId);
+        }
 
       case 'rejectphoto':
-        if (!data.payload?.id) {
+        {
+        const photoId = this.extractAdminEntityId(data.payload);
+        if (!photoId) {
           throw new BadRequestException('ID é obrigatório.');
         }
         return this.accommodationsService.rejectPhoto(
-          data.payload.id,
-          data.payload.rejectionReason,
+          photoId,
+          this.extractRejectionReason(data.payload),
         );
+        }
 
       case 'approveremovalrequest':
-        if (!data.payload?.id) {
+        {
+        const requestId = this.extractAdminEntityId(data.payload);
+        if (!requestId) {
           throw new BadRequestException('ID é obrigatório.');
         }
         try {
-          return await this.accommodationsService.approveRemovalRequest(data.payload.id);
+          return await this.accommodationsService.approveRemovalRequest(requestId);
         } catch (e) {
           console.error('Error approving removal request:', e);
           throw e;
+        }
         }
 
       case 'getpendingedits':
         return this.accommodationsService.getPendingEditRequests();
 
       case 'approveedit':
-        if (!data.payload?.id) {
+        {
+        const requestId = this.extractAdminEntityId(data.payload);
+        if (!requestId) {
           throw new BadRequestException('ID é obrigatório.');
         }
-        return this.accommodationsService.approveEditRequest(data.payload.id);
+        return this.accommodationsService.approveEditRequest(requestId);
+        }
 
       case 'rejectedit':
-        if (!data.payload?.id) {
+        {
+        const requestId = this.extractAdminEntityId(data.payload);
+        if (!requestId) {
           throw new BadRequestException('ID é obrigatório.');
         }
         return this.accommodationsService.rejectEditRequest(
-          data.payload.id,
-          data.payload.rejectionReason,
+          requestId,
+          this.extractRejectionReason(data.payload),
         );
+        }
 
       case 'rejectremovalrequest':
       case 'rejectremoval':
-        if (!data.payload?.id) {
+        {
+        const requestId = this.extractAdminEntityId(data.payload);
+        if (!requestId) {
           throw new BadRequestException('ID é obrigatório.');
         }
         return this.accommodationsService.rejectRemovalRequest(
-          data.payload.id,
-          data.payload.rejectionReason,
+          requestId,
+          this.extractRejectionReason(data.payload),
         );
+        }
 
       default:
         throw new BadRequestException('Ação desconhecida.');
