@@ -147,6 +147,30 @@ export class AccommodationsService {
     console.log(`[ACCOMMODATIONS_TIMING] ${step}: ${elapsedMs.toFixed(2)}ms`);
   }
 
+  private normalizeAccountIdFromPayload(data: Record<string, any>): number | undefined {
+    const candidates = [
+      data?.account_id,
+      data?.accountId,
+      data?.userId,
+      data?.ownerId,
+      data?.account?.id,
+    ];
+
+    for (const candidate of candidates) {
+      if (candidate === undefined || candidate === null || candidate === '') {
+        continue;
+      }
+
+      const normalized = Number(candidate);
+
+      if (Number.isInteger(normalized)) {
+        return normalized;
+      }
+    }
+
+    return undefined;
+  }
+
   private async getAdminEmails(): Promise<string[]> {
     const admins = await this.accountRepo.find({ where: { userType: 'admin' } });
 
@@ -624,17 +648,15 @@ export class AccommodationsService {
       .map((url) => url.trim())
       .filter((url) => url.length > 0)
       .map((url) => this.toPublicImageUrl(url));
-    const rawAccountId = (data as any).account_id ?? (data as any).accountId;
-    let accountId: number | undefined;
+    const accountId = this.normalizeAccountIdFromPayload(data as Record<string, any>);
 
-    if (rawAccountId !== undefined && rawAccountId !== null && rawAccountId !== '') {
-      const normalizedAccountId = Number(rawAccountId);
-
-      if (!Number.isInteger(normalizedAccountId)) {
+    if (
+      ((data as any).account_id !== undefined && (data as any).account_id !== null && (data as any).account_id !== '') ||
+      ((data as any).accountId !== undefined && (data as any).accountId !== null && (data as any).accountId !== '')
+    ) {
+      if (!accountId) {
         throw new BadRequestException('accountId/account_id inválido.');
       }
-
-      accountId = normalizedAccountId;
     }
 
     if (galleryPhotoUrls.length > 0) {
@@ -749,8 +771,18 @@ export class AccommodationsService {
     });
     await this.attachServices([dto]);
 
-    (dto as any).ownerId = savedWithRelations.account?.id ?? null;
-    (dto as any).ownerName = savedWithRelations.account?.name ?? null;
+    const fallbackAccount =
+      !savedWithRelations.account && accountId
+        ? await this.accountRepo.findOne({ where: { id: accountId } })
+        : null;
+
+    const requesterName =
+      savedWithRelations.account?.name ?? fallbackAccount?.name ?? null;
+    const requesterEmail =
+      savedWithRelations.account?.email ?? fallbackAccount?.email ?? null;
+
+    (dto as any).ownerId = savedWithRelations.account?.id ?? fallbackAccount?.id ?? null;
+    (dto as any).ownerName = requesterName;
     (dto as any).submissionStatus = 'pending';
     (dto as any).submissionMessage = 'Accommodation submitted for review. The admin team will review it shortly.';
     (dto as any).message = (dto as any).submissionMessage;
@@ -763,8 +795,8 @@ export class AccommodationsService {
       summary: 'A new accommodation was submitted and is waiting for admin approval.',
       itemLabel: 'Accommodation',
       itemValue: savedWithRelations.place_name ?? `Accommodation #${saved.id}`,
-      requesterName: savedWithRelations.account?.name ?? null,
-      requesterEmail: savedWithRelations.account?.email ?? null,
+      requesterName,
+      requesterEmail,
     });
     return dto;
   }

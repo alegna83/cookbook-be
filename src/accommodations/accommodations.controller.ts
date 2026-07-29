@@ -48,9 +48,17 @@ export class AccommodationsController {
           if (!data.payload) {
             throw new BadRequestException('Dados para criação em falta.');
           }
+          const createAccountId =
+            data.accountId ??
+            (data as any).account_id ??
+            data.payload?.accountId ??
+            (data.payload as any)?.account_id ??
+            (data.payload as any)?.userId ??
+            (data.payload as any)?.ownerId;
+
           return this.accommodationsService.create({
             ...data.payload,
-            accountId: data.accountId ?? data.payload?.accountId,
+            accountId: createAccountId,
           } as CreateAccommodationDto);
 
         case 'getbycamino':
