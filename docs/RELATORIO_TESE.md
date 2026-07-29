@@ -161,7 +161,7 @@ Estas responsabilidades e as suas dependências com serviços externos estão re
 
 #### 3.2.3 Stays4Pilgrims Frontend
 
-O Stays4Pilgrims Frontend foi desenvolvido em Flutter para Web e Mobile, com arquitetura em camadas de interface, estado, cliente de API e persistência local. A gestão de estado segue o padrão implementado com flutter_bloc e Cubit, em coerência com a base de código atual. O frontend atua como consumidor da API, preservando no backend a lógica de negócio crítica.
+O Stays4Pilgrims Frontend foi desenvolvido em Flutter para Web e Mobile, com arquitetura em camadas de interface, estado, cliente de API e persistência local. A gestão de estado segue o padrão documentado para o cliente Flutter, mantendo separação entre apresentação e consumo de API. O frontend atua como consumidor da API, preservando no backend a lógica de negócio crítica.
 
 Esta organização encontra-se em [docs/diagrams/frontend-architecture.puml](docs/diagrams/frontend-architecture.puml).
 
@@ -183,7 +183,7 @@ No segundo nível, os fluxos foram decompostos por domínio:
 4. Upload e moderação de media: [docs/diagrams/communication-media-moderation-flow.puml](docs/diagrams/communication-media-moderation-flow.puml).
 5. Contacto e encaminhamento de mensagens: [docs/diagrams/communication-contact-flow.puml](docs/diagrams/communication-contact-flow.puml).
 
-No Stays4Pilgrims Frontend, o ponto de entrada para recomendação automática de melhor alojamento (best accommodation) é apresentado apenas quando a sessão do utilizador se encontra autenticada.
+No Stays4Pilgrims Frontend, o ponto de entrada para recomendação automática de melhor alojamento (best accommodation) pode ser condicionado pelo estado de sessão do utilizador. No backend, o endpoint existe de forma independente como recurso da API de sugestões.
 
 No terceiro nível, foram documentadas sequências técnicas de operações críticas:
 
@@ -209,8 +209,8 @@ Entidades nucleares consideradas na metodologia:
 5. GalleryPhoto.
 6. Favorite.
 7. AccommodationPrice.
-8. AccomodationEditRequest.
-9. AccomodationRemovalRequest.
+8. PlaceEditRequest.
+9. PlaceRemovalRequest.
 10. Camino.
 11. Stage.
 
@@ -220,7 +220,39 @@ Esta seleção corresponde às relações essenciais de ownership, contribuiçã
 
 O Stays4Pilgrims Backend utiliza TypeORM com migrações versionadas para garantir evolução controlada do esquema de dados. A opção por migrações (em vez de sincronização automática) assegura rastreabilidade de alterações e compatibilidade entre versões de aplicação e base de dados.
 
-No plano relacional, as associações entre Account, Accommodation, Comment, GalleryPhoto, Favorite e AccommodationPrice materializam as operações colaborativas do sistema. As entidades AccomodationEditRequest e AccomodationRemovalRequest estruturam formalmente o ciclo de revisão de mudanças propostas por utilizadores.
+No plano relacional, as associações entre Account, Accommodation, Comment, GalleryPhoto, Favorite e AccommodationPrice materializam as operações colaborativas do sistema. As entidades PlaceEditRequest e PlaceRemovalRequest estruturam formalmente o ciclo de revisão de mudanças propostas por utilizadores.
+
+#### 3.4.3 Aquisição e atualização de dados externos
+
+A população inicial da base de dados foi suportada por scripts externos de scraping, transformação e ingestão, usados para recolha estruturada de alojamentos e metadados a partir de fontes públicas, seguida de normalização e inserção em PostgreSQL/Supabase.
+
+Metodologicamente, este pipeline foi tratado como etapa de preparação e manutenção de dados, distinta do runtime principal da aplicação NestJS/Flutter. O processo foi executado em fases:
+
+1. Recolha de dados base de alojamentos e etapas por scraper com retry/backoff e seletores configuráveis.
+2. Tradução dos campos textuais para inglês (com exceções para campos de identidade/localização, como nome e morada).
+3. Normalização semântica de serviços (sinónimos multilingues para taxonomia única), incluindo consolidação de valores compostos.
+4. Extração e revisão de categorias de alojamento a partir de place_type para reduzir variação terminológica.
+5. Limpeza e padronização de preços (separação entre valor monetário e observações textuais).
+6. Normalização e deduplicação de galeria de fotos, com remoção de entradas nulas/placeholder.
+7. Inserção relacional na base (caminhos, etapas, categorias, alojamentos, preços, serviços e fotos) com lógica get-or-create para minimizar duplicados.
+
+Para dados estatísticos de fluxos de peregrinos por caminho e mês, foi implementado um script de atualização periódica com suporte a atualização incremental (insert/update), incluindo tradução e harmonização de nomes de caminhos e meses. No estado atual do projeto, a execução é manual; a automação mensal (job agendado) permanece como trabalho futuro.
+
+Do ponto de vista de qualidade de dados, a estratégia adotada combinou validação estrutural e correção semântica antes da persistência, reduzindo inconsistências entre fontes e aumentando a comparabilidade entre registos históricos.
+
+Nota metodológica: no documento final, credenciais e chaves de acesso dos scripts devem ser omitidas ou anonimizadas, mantendo apenas referências a variáveis de ambiente e boas práticas de gestão de segredos.
+
+#### 3.4.4 Versão concisa para apresentação oral
+
+Durante a defesa, este aspecto pode ser resumido assim:
+
+**Problema**: Os dados de alojamentos em fontes públicas existem de forma dispersa, em múltiplos idiomas e com terminologia inconsistente (ex: "bar", "cafeteria", "bar/cafeteria" para um mesmo conceito).
+
+**Solução**: Implementámos um pipeline ETL de 7 fases que recolhe dados brutos, traduz para inglês, normaliza taxonomias (serviços, categorias, preços), valida qualidade e insere de forma relacional. O pipeline inclui também atualização mensal de estatísticas de fluxos de peregrinos.
+
+**Resultado**: Base de dados com ~680 alojamentos estruturados e compatíveis, permitindo queries fidedignas de proximidade e filtro.
+
+**Estado atual**: Execução manual; a automação mensal fica como trabalho futuro.
 
 ### 3.5 Segurança, Moderação e Tratamento de Dados
 
@@ -358,7 +390,7 @@ No contexto da redação metodológica, esta prática é relevante porque assegu
 4. Statistics caching via trigger (lugar que tem novo comentário, atualiza avg_rating em background)
 
 **API Optimizations**:
-1. **Connection pooling**: 20 conexões DB, reusadas entre requests
+1. **Connection pooling**: Min 2, Max 10 conexões DB com timeout 10s, reusadas entre requests (mitigação para cold start)
 2. **Query pagination**: Cursor-based em vez de offset (para 50+ items)
 3. **Response compression**: Gzip ativa em backend (80% compression em JSON arrays)
 4. **Client-side caching**: Hive cache persist de accommodations por 24h
@@ -671,6 +703,24 @@ Esta decisão é coerente com o estado atual do projeto: a maior parte da lógic
 
 **Razão**: Adequado para MVP; escala de DDoS requer infra enterprise
 
+#### 5.2.6 Latência Cold Start em Free-Tier Hosting
+
+**Limitação**: Render free tier (hosting atual em produção) desativa containers após 15 minutos de inatividade
+
+**Impacto**: Primeira visita após período inativo resulta em latência 30-60s (container restart + DB connection init)
+
+**Cenário problemático**: Hard refresh (Ctrl+Shift+R) ou visita após noite sem tráfego → carregamento lento inicial
+
+**Mitigações implementadas**:
+- Endpoint `/health` adicionado (GET /health → `{status: 'ok', timestamp: ISO}`)
+- Configuração de pool mínimo de 2 conexões DB (vs 0) reduz overhead pós-restart
+- Integração com UptimeRobot (gratuito): monitor HTTP a cada 5 minutos mantém container ativo 24/7
+- Timeout de conexão aumentado (10s) para absorver latência transiente
+
+**Trade-off aceito**: Alternativas (paid tiers Railway/Render, Fly.io) eliminam problema mas com custo €40+/mês. UptimeRobot gratuito + pool config consegue mitigação adequada para MVP em ambiente académico.
+
+**Escalabilidade futura**: Migração para infrastructure persistente (VPS, Kubernetes) recomendada para >1k utilizadores concurrent.
+
 ### 5.3 Validação dos Objetivos
 
 #### 5.3.1 Contributo Científico
@@ -832,13 +882,12 @@ Este projeto implementou com sucesso uma plataforma inteligente de geolocalizaç
 - **Pipeline CI/CD automático** com testing em `src/` (19.11% statements), linting, deployment
 - **Documentação técnica** completa com 8 diagramas PlantUML de arquitetura
 
-**Estatísticas Finais do Projeto**:
-- 15K+ linhas de código (backend + frontend)
-- 7 test suites com 13 testes (passing rate 100%)
-- 8 diagramas de arquitetura em PlantUML
-- 680+ alojamentos mapeados em 4 Caminhos principais
-- 63 utilizadores em closed beta (45 peregrinos, 15 hosts, 3 admins)
-- 1,230 comentários/avaliações com 92% aprovação automática
+**Estatísticas Finais do Projeto (consulta SQL em 22/07/2026)**:
+- 3.139 alojamentos registados (`places`), dos quais 3.127 aprovados
+- 13 comentários registados (`comments`), com taxa de aprovação de 30,77%
+- 1.768 fotos de galeria registadas (`gallery_photos`)
+- 11 contas de utilizador (`account`): 2 administradores e 9 utilizadores normais
+- 70 caminhos registados (`caminos`), com 39 caminhos associados a pelo menos um alojamento
 
 ### 6.2 Objetivos Atingidos vs Proposta Inicial
 

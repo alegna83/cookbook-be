@@ -1,30 +1,32 @@
 @startuml
 title Stays4Pilgrims - Authentication and account communication
-scale 0.82
 hide footbox
 skinparam defaultFontName Arial
-skinparam defaultFontSize 10
-skinparam maxMessageSize 48
+skinparam defaultFontSize 12
+skinparam dpi 190
+skinparam maxMessageSize 24
 skinparam sequence {
-	ParticipantPadding 10
-	BoxPadding 8
+	ParticipantPadding 18
+	BoxPadding 12
 	MessageAlign center
 	ArrowThickness 1
 }
 
 actor User
-participant "Stays4Pilgrims Frontend" as FE
-participant "Stays4Pilgrims Backend" as BE
-participant "AuthController" as AuthController
-participant "AccountsService" as AccountsService
+participant "Frontend" as FE
+participant "Backend API" as BE
+participant "Auth Ctrl" as AuthController
+participant "Acct Svc" as AccountsService
 database "PostgreSQL" as DB
-participant "Email service" as Email
+participant "Email Svc" as Email
 
-User -> FE : register / login / reset
+== Registration and verification ==
+
+User -> FE : register/login/reset
 FE -> BE : POST /auth/register
-BE -> AuthController : register(dto)
+BE -> AuthController : register(...)
 AuthController -> AccountsService : register(...)
-AccountsService -> DB : insert account + hash password
+AccountsService -> DB : create account + hash
 AccountsService -> Email : send verification email
 BE --> FE : 201 Created + account payload
 
@@ -32,20 +34,24 @@ User -> FE : verify email token
 FE -> BE : POST /auth/verify-email
 BE -> AuthController : verifyEmail(token)
 AuthController -> AccountsService : verifyEmail(token)
-AccountsService -> DB : mark email_verified = true
+AccountsService -> DB : set email_verified
 BE --> FE : 200 OK
+
+== Login ==
 
 User -> FE : login
 FE -> BE : POST /auth/login
 BE -> AuthController : login(email, password)
-AuthController -> AccountsService : login(email, password)
+AuthController -> AccountsService : login(...)
 AccountsService -> DB : validate credentials
 BE --> FE : JWT / session data
+
+== Password reset ==
 
 User -> FE : request password reset
 FE -> BE : POST /auth/request-password-reset
 BE -> AuthController : requestPasswordReset(email)
-AuthController -> AccountsService : requestPasswordReset(email)
+AuthController -> AccountsService : requestReset(email)
 AccountsService -> DB : create reset token
 AccountsService -> Email : send reset email
 BE --> FE : 200 OK

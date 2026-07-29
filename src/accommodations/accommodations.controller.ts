@@ -48,7 +48,10 @@ export class AccommodationsController {
           if (!data.payload) {
             throw new BadRequestException('Dados para criação em falta.');
           }
-          return this.accommodationsService.create(data.payload as CreateAccommodationDto);
+          return this.accommodationsService.create({
+            ...data.payload,
+            accountId: data.accountId ?? data.payload?.accountId,
+          } as CreateAccommodationDto);
 
         case 'getbycamino':
           if (!data.payload?.byCamino) {

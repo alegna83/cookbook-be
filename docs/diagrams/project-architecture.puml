@@ -1,32 +1,32 @@
 ﻿@startuml
 title Stays4Pilgrims - Project Architecture Overview
 
-left to right direction
-scale 0.88
+top to bottom direction
 skinparam defaultFontName Arial
-skinparam defaultFontSize 11
+skinparam defaultFontSize 12
 skinparam linetype ortho
 skinparam componentStyle rectangle
 skinparam shadowing false
 skinparam packageStyle rectangle
+skinparam dpi 180
 skinparam package {
-  Padding 12
+  Padding 20
 }
-skinparam nodesep 28
-skinparam ranksep 32
+skinparam nodesep 55
+skinparam ranksep 70
 
 actor User
 
 component "Stays4Pilgrims Frontend\n(Web / Mobile)" as FE
 
 package "Stays4Pilgrims Backend (NestJS)" as BE {
-  component "Auth + Accounts" as AUTH
+  component "Auth\nAccounts" as AUTH
   component "Accomodations" as ACC
-  component "Caminos / Stages / Statistics" as ROUTES
-  component "Comments / Favorites / Suggestions" as SOCIAL
+  component "Caminos\nStages\nStatistics" as ROUTES
+  component "Comments\nFavorites\nSuggestions" as SOCIAL
   component "Upload" as UPLOAD
+  component "Content\nModeration" as MOD
   component "Contact" as CONTACT
-  component "Content Moderation" as MOD
 }
 
 database "PostgreSQL\n(managed / Supabase)" as DB
@@ -36,6 +36,13 @@ cloud "AI Moderation\n(optional)" as OPENAI
 
 User --> FE : browse / submit content
 FE --> BE : HTTPS REST API
+
+AUTH -[hidden]down-> ACC
+ACC -[hidden]down-> ROUTES
+ROUTES -[hidden]down-> SOCIAL
+SOCIAL -[hidden]down-> UPLOAD
+UPLOAD -[hidden]down-> MOD
+MOD -[hidden]down-> CONTACT
 
 AUTH --> DB : accounts, sessions
 ACC --> DB : places, categories, requests

@@ -26,6 +26,7 @@ export class HandleAccommodationDto {
     reason?: string;
     [key: string]: any;
   };
+  accountId?: number;
   page?: number;
   limit?: number;
 }

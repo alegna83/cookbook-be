@@ -751,6 +751,10 @@ export class AccommodationsService {
 
     (dto as any).ownerId = savedWithRelations.account?.id ?? null;
     (dto as any).ownerName = savedWithRelations.account?.name ?? null;
+    (dto as any).submissionStatus = 'pending';
+    (dto as any).submissionMessage = 'Accommodation submitted for review. The admin team will review it shortly.';
+    (dto as any).message = (dto as any).submissionMessage;
+    (dto as any).shouldCloseModal = true;
 
     this.invalidateReadCache();
     await this.notifyAdminsAboutPendingItem({

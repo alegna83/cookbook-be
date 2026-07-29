@@ -1,10 +1,39 @@
 @startuml
-' System overview
-actor "User" as User
-component "Stays4Pilgrims Frontend (Web/Mobile)" as Frontend
-component "Stays4Pilgrims Backend (NestJS)" as Backend
-database "PostgreSQL" as DB
-User -> Frontend : Interacts
-Frontend -> Backend : HTTPS REST API
-Backend -> DB : SQL queries
+title Stays4Pilgrims - System Overview
+
+top to bottom direction
+skinparam shadowing false
+skinparam linetype ortho
+skinparam defaultTextAlignment center
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam wrapWidth 180
+skinparam dpi 180
+
+actor "Pilgrim / Host / Admin" as User
+
+rectangle "Client Layer" as CLIENT {
+	component "Stays4Pilgrims Frontend\n(Flutter Web / Mobile)" as Frontend
+}
+
+rectangle "Application Layer" as APP {
+	component "Stays4Pilgrims Backend\n(NestJS REST API)" as Backend
+}
+
+rectangle "Data Layer" as DATA {
+	database "PostgreSQL" as DB
+}
+
+User --> Frontend : Browse, authenticate\ncontribute content
+Frontend --> Backend : HTTPS requests\n(JSON REST)
+Backend --> DB : SQL queries\n(transactions)
+
+note right of Backend
+Core domains:
+- Auth and Accounts
+- Accommodations and Comments
+- Upload and Moderation
+- Suggestions and Contact
+end note
+
 @enduml

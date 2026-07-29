@@ -1,60 +1,59 @@
 ﻿@startuml
 title Stays4Pilgrims - Suggestions and recommendation communication
-scale 0.80
 hide footbox
 skinparam defaultFontName Arial
-skinparam defaultFontSize 10
-skinparam maxMessageSize 46
+skinparam defaultFontSize 12
+skinparam dpi 190
+skinparam maxMessageSize 22
 skinparam sequence {
-  ParticipantPadding 10
-  BoxPadding 8
+  ParticipantPadding 18
+  BoxPadding 12
   MessageAlign center
   ArrowThickness 1
 }
 
 actor User
-participant "Stays4Pilgrims Frontend" as FE
-participant "Stays4Pilgrims Backend" as BE
-participant "SuggestionController" as SuggestionController
-participant "SuggestionService" as SuggestionService
-participant "AccomodationsService" as AccomodationsService
-participant "CommentsService" as CommentsService
+participant "Frontend" as FE
+participant "Sug Ctrl" as SuggestionController
+participant "Sug Svc" as SuggestionService
+participant "Accomm Svc" as AccomodationsService
+participant "Com Svc" as CommentsService
 database "PostgreSQL" as DB
 participant "OpenRouter / OpenAI" as AI
 
-User -> FE : open home near current location
-FE -> FE : read current coordinates + user interest
+== Nearby text suggestions ==
+
+User -> FE : open home near location
+FE -> FE : read coordinates + interest
 
 User -> FE : open nearby suggestions
-FE -> BE : POST /sugestoes/sugerir\n{lat, lon, interesse}
-BE -> SuggestionController : sugerir(body)
-SuggestionController -> SuggestionService : sugerirLugares(prompt)
-SuggestionService -> AI : chat completion with nearby-interest prompt
+FE -> SuggestionController : sugerir(body)
+SuggestionController -> SuggestionService : sugerirLugares(...)
+SuggestionService -> AI : chat completion\n(nearby + interest)
 AI --> SuggestionService : 3 text suggestions
-SuggestionService --> BE : text list
-BE --> FE : suggestions response
+SuggestionController --> FE : suggestions response
 FE --> User : show suggestions notification and dialog
+
+== Best accommodation recommendation ==
 
 User -> FE : request best Accomodation recommendation
 note over FE
-Best Accomodation recommendation trigger
+Best accommodation trigger
 is shown only for authenticated users.
 end note
-FE -> BE : GET /sugestoes/best-Accomodation\n?lat&lon&radius&category
-BE -> SuggestionController : bestAccomodation(lat, lon, radius, category)
+FE -> SuggestionController : bestAccomodation(lat, lon, radius, category)
 SuggestionController -> SuggestionService : suggestBestAccomodation(...)
 SuggestionService -> AccomodationsService : getByBounds(bounds)
-AccomodationsService -> DB : fetch approved Accomodations in area
-SuggestionService -> CommentsService : use ratings + review counts
+AccomodationsService -> DB : fetch approved in area
+SuggestionService -> CommentsService : use ratings + counts
 CommentsService -> DB : aggregate comment statistics
 alt enough local rating data
-  SuggestionService -> AI : optional ranking analysis with local options
+  SuggestionService -> AI : optional ranking analysis
   AI --> SuggestionService : recommended option or reasoning
 else fallback to best local option
-  SuggestionService -> SuggestionService : rank by available reviews and ratings
+  SuggestionService -> SuggestionService : rank by reviews + ratings
 end
-SuggestionService --> BE : recommendation + reasoning + alternatives
-BE --> FE : JSON recommendation payload
+SuggestionController --> FE : JSON recommendation payload
 FE --> User : show best Accomodation popup
 
 @enduml

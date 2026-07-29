@@ -1,63 +1,60 @@
 ﻿@startuml
 title Stays4Pilgrims - Accomodation browsing and comments communication
-scale 0.80
 hide footbox
 skinparam defaultFontName Arial
-skinparam defaultFontSize 10
-skinparam maxMessageSize 46
+skinparam defaultFontSize 12
+skinparam dpi 190
+skinparam maxMessageSize 22
 skinparam sequence {
-	ParticipantPadding 10
-	BoxPadding 8
+	ParticipantPadding 18
+	BoxPadding 12
 	MessageAlign center
 	ArrowThickness 1
 }
 
 actor User
-participant "Stays4Pilgrims Frontend" as FE
-participant "Stays4Pilgrims Backend" as BE
-participant "AccomodationsController" as AccomodationsController
-participant "AccomodationsService" as AccomodationsService
-participant "CommentsController" as CommentsController
-participant "CommentsService" as CommentsService
+participant "Frontend" as FE
+participant "Accomm Ctrl" as AccomodationsController
+participant "Accomm Svc" as AccomodationsService
+participant "Comments Ctrl" as CommentsController
+participant "Comments Svc" as CommentsService
 database "PostgreSQL" as DB
 
+== Accommodation discovery ==
+
 User -> FE : open home / Camino / detail
-FE -> BE : POST /Accomodations/handle\n{action:getall}
-BE -> AccomodationsController : handle(getall)
+FE -> AccomodationsController : handle(getall)
 AccomodationsController -> AccomodationsService : findAll(page, limit)
-AccomodationsService -> DB : fetch Accomodations list
-BE --> FE : list of Accomodations
+AccomodationsService -> DB : fetch accommodations
+AccomodationsController --> FE : accommodation list
 
 User -> FE : filter by Camino
-FE -> BE : POST /Accomodations/handle\n{action:getbycamino}
-BE -> AccomodationsController : handle(getbycamino)
+FE -> AccomodationsController : handle(getbycamino)
 AccomodationsController -> AccomodationsService : findByCamino(name)
 AccomodationsService -> DB : fetch filtered list
-BE --> FE : filtered Accomodations
+AccomodationsController --> FE : filtered list
 
 User -> FE : open Accomodation detail
-FE -> BE : POST /Accomodations/handle\n{action:getone}
-BE -> AccomodationsController : handle(getone)
+FE -> AccomodationsController : handle(getone)
 AccomodationsController -> AccomodationsService : findOne(id, accountId)
-AccomodationsService -> DB : fetch Accomodation + relations
-BE --> FE : Accomodation detail + gallery + services
+AccomodationsService -> DB : fetch detail + relations
+AccomodationsController --> FE : detail + gallery + services
 
-FE -> BE : POST /comments/handle\n{action:list}
-BE -> CommentsController : handle(list)
-CommentsController -> CommentsService : listByAccomodation\n(AccomodationId, page, limit)
-CommentsService -> DB : fetch comments for Accomodation
-BE --> FE : comments + pagination
+== Comments and ratings ==
 
-FE -> BE : POST /comments/handle\n{action:exists}
-BE -> CommentsController : handle(exists)
-CommentsController -> CommentsService : exists\n(accountId, AccomodationId)
+FE -> CommentsController : handle(list)
+CommentsController -> CommentsService : listByAccommodation\n(id, page, limit)
+CommentsService -> DB : fetch comments
+CommentsController --> FE : comments + pagination
+
+FE -> CommentsController : handle(exists)
+CommentsController -> CommentsService : exists(accountId, id)
 CommentsService -> DB : check if user already commented
-BE --> FE : { exists: true/false }
+CommentsController --> FE : { exists: true/false }
 
-FE -> BE : POST /comments/handle\n{action:getStats}
-BE -> CommentsController : handle(getStats)
-CommentsController -> CommentsService : getStats(AccomodationId)
+FE -> CommentsController : handle(getStats)
+CommentsController -> CommentsService : getStats(id)
 CommentsService -> DB : aggregate ratings
-BE --> FE : rating summary
+CommentsController --> FE : rating summary
 
 @enduml

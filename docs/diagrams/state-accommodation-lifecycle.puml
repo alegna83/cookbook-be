@@ -8,7 +8,7 @@ Draft --> Draft: Edit (allowed during draft)
 
 PendingModeration --> Approved: Admin/moderator approves
 PendingModeration --> Rejected: Admin/moderator rejects
-PendingModeration --> Draft: Rejected â†’ user can re-edit
+PendingModeration --> Draft: Rejected -> user can re-edit
 
 Approved --> Published: Admin publishes or auto-publish
 Published --> Archived: Admin archives or user requests removal (approved)
