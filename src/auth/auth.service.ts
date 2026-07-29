@@ -138,19 +138,31 @@ export class AuthService {
         );
 
       case 'approvecomment':
-        if (!data.payload?.id) {
+        {
+        const commentId = Number(data.payload?.id ?? data.payload?.commentId);
+        if (!Number.isInteger(commentId)) {
           throw new BadRequestException('ID é obrigatório.');
         }
-        return this.commentsService.approveComment(data.payload.id);
+        return this.commentsService.approveComment(commentId);
+        }
 
       case 'rejectcomment':
-        if (!data.payload?.id) {
+        {
+        const commentId = Number(data.payload?.id ?? data.payload?.commentId);
+        if (!Number.isInteger(commentId)) {
           throw new BadRequestException('ID é obrigatório.');
         }
+
+        const rejectionReason =
+          data.payload?.rejectionReason?.trim() ||
+          data.payload?.reason?.trim() ||
+          'Rejected by admin.';
+
         return this.commentsService.approveComment(
-          data.payload.id,
-          data.payload.rejectionReason,
+          commentId,
+          rejectionReason,
         );
+        }
 
       case 'approvephoto':
         if (!data.payload?.id) {
