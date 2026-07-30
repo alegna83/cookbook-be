@@ -71,7 +71,8 @@ export class ContentModerationService {
   private readonly openAiModel =
     process.env.CONTENT_MODERATION_MODEL?.trim() || 'gpt-4o-mini';
 
-  private ocrWorkerPromise: Promise<any> | null = null;
+  private readonly ocrEnabled =
+    process.env.CONTENT_MODERATION_OCR_ENABLED?.trim().toLowerCase() !== 'false';
 
   private get usesOpenAi(): boolean {
     return this.provider === 'openai' && !!this.openAiApiKey;
@@ -406,34 +407,40 @@ export class ContentModerationService {
   }
 
   private async tryExtractVisibleText(url: string): Promise<string> {
+    if (!this.ocrEnabled) {
+      return '';
+    }
+
     try {
-      const worker = await this.getOcrWorker();
-      const result = await worker.recognize(url);
-      return (result?.data?.text ?? '').trim();
+      return await this.runOcr(url);
     } catch {
       return '';
     }
   }
 
   private async tryExtractVisibleTextFromBuffer(buffer: Buffer): Promise<string> {
+    if (!this.ocrEnabled) {
+      return '';
+    }
+
     try {
-      const worker = await this.getOcrWorker();
-      const result = await worker.recognize(buffer);
-      return (result?.data?.text ?? '').trim();
+      return await this.runOcr(buffer);
     } catch {
       return '';
     }
   }
 
-  private async getOcrWorker(): Promise<any> {
-    if (!this.ocrWorkerPromise) {
-      this.ocrWorkerPromise = (async () => {
-        const worker = await createWorker('eng');
-        return worker;
-      })();
-    }
+  private async runOcr(input: string | Buffer): Promise<string> {
+    const worker = await createWorker('eng');
 
-    return this.ocrWorkerPromise;
+    try {
+      const result = await worker.recognize(input);
+      return (result?.data?.text ?? '').trim();
+    } finally {
+      if (typeof worker.terminate === 'function') {
+        await worker.terminate();
+      }
+    }
   }
 
   private evaluateVisibleText(

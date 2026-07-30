@@ -11,13 +11,26 @@ import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
 import { UploadResponseDto, UploadMultipleResponseDto } from './dto/upload-response.dto';
 
+const MAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_UPLOAD_FILES = 10;
+
 @Controller('upload')
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   @Post()
   @HttpCode(200)
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      limits: {
+        fileSize: MAX_UPLOAD_FILE_SIZE_BYTES,
+        files: MAX_UPLOAD_FILES,
+      },
+      fileFilter: (_req, file, callback) => {
+        callback(null, file.mimetype?.startsWith('image/') ?? false);
+      },
+    }),
+  )
   async uploadMedia(
     @Body('type') type: 'main-photo' | 'gallery-photos' | 'avatar',
     @UploadedFiles() files: any[],

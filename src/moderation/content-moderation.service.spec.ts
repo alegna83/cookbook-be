@@ -9,6 +9,7 @@ describe('ContentModerationService (unit)', () => {
   const originalEnv = { ...process.env };
   const fetchMock = jest.fn();
   const recognizeMock = jest.fn();
+  const terminateMock = jest.fn();
 
   const setFetchMock = () => {
     (global as any).fetch = fetchMock;
@@ -24,8 +25,12 @@ describe('ContentModerationService (unit)', () => {
 
     fetchMock.mockReset();
     recognizeMock.mockReset();
+    terminateMock.mockReset();
     (createWorker as jest.Mock).mockReset();
-    (createWorker as jest.Mock).mockResolvedValue({ recognize: recognizeMock });
+    (createWorker as jest.Mock).mockResolvedValue({
+      recognize: recognizeMock,
+      terminate: terminateMock,
+    });
     setFetchMock();
   });
 
@@ -399,5 +404,14 @@ describe('ContentModerationService (unit)', () => {
 
     expect(result.decision).toBe('review');
     expect(result.provider).toBe('local');
+  });
+
+  it('should terminate OCR worker after recognition', async () => {
+    const service = createService();
+    recognizeMock.mockResolvedValue({ data: { text: 'clean text' } });
+
+    await service.moderateImageBuffers([Buffer.from('image-data')]);
+
+    expect(terminateMock).toHaveBeenCalledTimes(1);
   });
 });

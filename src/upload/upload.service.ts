@@ -141,11 +141,12 @@ export class UploadService {
       );
     }
 
-    const uploadPromises = files.map((file) =>
-      this.uploadImage(file, folder),
-    );
+    const uploaded: UploadResponseDto[] = [];
+    for (const file of files) {
+      uploaded.push(await this.uploadImage(file, folder));
+    }
 
-    return Promise.all(uploadPromises);
+    return uploaded;
   }
 
   async uploadMedia(
