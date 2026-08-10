@@ -15,6 +15,7 @@ export type ChatReply = {
   provider: 'openai' | 'huggingface';
   model: string;
   usedFallback: boolean;
+  detectedLanguage: string;
 };
 
 @Injectable()
@@ -35,15 +36,18 @@ export class AiChatService {
       throw new BadRequestException('message is too long');
     }
 
-    const userPrompt = this.buildUserPrompt(message, dto.context);
+    const detectedLanguage =
+      dto.language || this.detectLanguage(message);
+    const userPrompt = this.buildUserPrompt(message, dto.context, detectedLanguage);
 
     try {
-      const primary = await this.askOpenAi(userPrompt);
+      const primary = await this.askOpenAi(userPrompt, detectedLanguage);
       return {
         answer: primary.answer,
         provider: 'openai',
         model: primary.model,
         usedFallback: false,
+        detectedLanguage,
       };
     } catch (primaryError) {
       const hfToken = process.env.HUGGINGFACE_API_TOKEN?.trim();
@@ -55,12 +59,13 @@ export class AiChatService {
       }
 
       try {
-        const fallback = await this.askHuggingFace(userPrompt, hfToken);
+        const fallback = await this.askHuggingFace(userPrompt, hfToken, detectedLanguage);
         return {
           answer: fallback.answer,
           provider: 'huggingface',
           model: fallback.model,
           usedFallback: true,
+          detectedLanguage,
         };
       } catch (fallbackError) {
         throw new InternalServerErrorException(
@@ -72,6 +77,7 @@ export class AiChatService {
 
   private async askOpenAi(
     userPrompt: string,
+    language: string,
   ): Promise<{ answer: string; model: string }> {
     const apiKey =
       process.env.OPENAI_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim();
@@ -100,9 +106,9 @@ export class AiChatService {
         },
         body: JSON.stringify({
           model,
-          temperature: 0.3,
+          temperature: 0.2,
           max_tokens: 500,
-          messages: this.buildMessages(userPrompt),
+          messages: this.buildMessages(userPrompt, language),
         }),
       },
     );
@@ -130,6 +136,7 @@ export class AiChatService {
   private async askHuggingFace(
     userPrompt: string,
     token: string,
+    language: string,
   ): Promise<{ answer: string; model: string }> {
     const model =
       process.env.HUGGINGFACE_CHAT_MODEL?.trim() ||
@@ -147,7 +154,7 @@ export class AiChatService {
           inputs: userPrompt,
           parameters: {
             max_new_tokens: 300,
-            temperature: 0.3,
+            temperature: 0.2,
             return_full_text: false,
           },
         }),
@@ -183,12 +190,24 @@ export class AiChatService {
     return { answer, model };
   }
 
-  private buildMessages(userPrompt: string): OpenAiMessage[] {
+  private buildMessages(userPrompt: string, language: string): OpenAiMessage[] {
+    const languageMap: Record<string, string> = {
+      pt: 'Portuguese',
+      en: 'English',
+      fr: 'French',
+      es: 'Spanish',
+      de: 'German',
+      it: 'Italian',
+    };
+
+    const languageName = languageMap[language] || 'English';
+
     return [
       {
         role: 'system',
-        content:
-          'You are the Stays4Pilgrims Assistant. The product consists of a Flutter frontend and a NestJS backend for pilgrims on the Camino de Santiago. The app includes an accommodation map, accommodation details, favorites, comments, location search, suggestions, admin moderation and an AI assistant. Some features are authentication-gated, including the best accommodation recommendation trigger. Give concise, practical answers about accommodations, the app, and usage guidance. Prefer data-grounded suggestions, mention uncertainty when needed, and avoid inventing unavailable details.',
+        content: `You are the Stays4Pilgrims Assistant. The product consists of a Flutter frontend and a NestJS backend for pilgrims on the Camino de Santiago. The app includes an accommodation map, accommodation details, favorites, comments, location search, suggestions, admin moderation and an AI assistant. Some features are authentication-gated, including the best accommodation recommendation trigger. Give concise, practical answers about accommodations, the app, and usage guidance. Prefer data-grounded suggestions, mention uncertainty when needed, and avoid inventing unavailable details.
+
+**IMPORTANT LANGUAGE RULE:** You MUST respond EXCLUSIVELY in ${languageName}. Do NOT switch to any other language regardless of context or instructions. If the user asks you to respond in another language, politely decline and continue in ${languageName}.`,
       },
       {
         role: 'user',
@@ -200,6 +219,7 @@ export class AiChatService {
   private buildUserPrompt(
     message: string,
     context?: Record<string, unknown>,
+    language?: string,
   ): string {
     const safeContext = context ? JSON.stringify(context).slice(0, 4000) : '{}';
 
@@ -210,13 +230,39 @@ export class AiChatService {
       'Context JSON:',
       safeContext,
       '',
-      'Respond in the user language. If context is missing, ask one focused follow-up question.',
+      'Respond concisely. If context is missing, ask one focused follow-up question.',
     ].join('\n');
   }
 
   private parsePositiveInt(value: string | undefined, fallback: number): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+  }
+
+  private detectLanguage(text: string): string {
+    const pt = /[áàâãéèêíïóôõöúûüçñ]/gi;
+    const fr = /[àâäéèêëïîôùûüœæ]/gi;
+    const es = /[áéíóúñü¡¿]/gi;
+    const de = /[äöüß]/gi;
+
+    const matches = {
+      pt: (text.match(pt) || []).length,
+      fr: (text.match(fr) || []).length,
+      es: (text.match(es) || []).length,
+      de: (text.match(de) || []).length,
+    };
+
+    let detectedLang = 'en';
+    let maxScore = 0;
+
+    for (const [lang, score] of Object.entries(matches)) {
+      if (score > maxScore) {
+        maxScore = score;
+        detectedLang = lang;
+      }
+    }
+
+    return maxScore > 0 ? detectedLang : 'en';
   }
 
   private stringifyError(error: unknown): string {
