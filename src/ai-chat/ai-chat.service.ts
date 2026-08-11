@@ -292,6 +292,15 @@ STYLE
           model,
           messages,
           retrievalContext,
+          (() => {
+            for (let index = messages.length - 1; index >= 0; index--) {
+              const item = messages[index];
+              if (item.role === 'user') {
+                return item.content;
+              }
+            }
+            return '';
+          })(),
         );
         return { ...run, provider: 'openai', model, usedFallback: false };
       } catch (error) {
@@ -352,6 +361,7 @@ STYLE
     model: string,
     messages: ChatMessage[],
     retrievalContext: RetrievalContext,
+    userMessage: string,
   ): Promise<{ answer: string; usedTools: string[]; groundedOn: number }> {
     const tools = this.retrievers.map((retriever) => ({
       type: 'function' as const,
@@ -392,9 +402,151 @@ STYLE
         if (result.domain) usedTools.push(result.domain);
         working.push(result.message);
       }
+
+      if (groundedOn === 0) {
+        const webFallback = await this.tryWebFallback(
+          baseUrl,
+          apiKey,
+          model,
+          working,
+          retrievalContext,
+          userMessage,
+          usedTools,
+        );
+
+        if (webFallback) {
+          return webFallback;
+        }
+      }
     }
 
     throw new Error('Tool loop did not converge');
+  }
+
+  private async tryWebFallback(
+    baseUrl: string,
+    apiKey: string,
+    model: string,
+    working: ChatMessage[],
+    retrievalContext: RetrievalContext,
+    userMessage: string,
+    usedTools: string[],
+  ): Promise<{ answer: string; usedTools: string[]; groundedOn: number } | null> {
+    if (usedTools.includes('web')) {
+      return null;
+    }
+
+    const webRetriever = this.retrievers.find((retriever) => retriever.domain === 'web');
+    if (!webRetriever) {
+      return null;
+    }
+
+    const searchQuery = await this.buildWebSearchQuery(
+      baseUrl,
+      apiKey,
+      model,
+      userMessage,
+      retrievalContext,
+    );
+
+    const query = searchQuery || this.buildHeuristicWebQuery(userMessage, retrievalContext);
+    if (!query) {
+      return null;
+    }
+
+    const items = await webRetriever.search({ query, limit: 5 }, retrievalContext);
+    if (items.length === 0) {
+      return null;
+    }
+
+    const webContext = [
+      'WEB SEARCH RESULTS (use these as facts and keep the answer concise):',
+      ...items.map(
+        (item, index) =>
+          `${index + 1}. ${item.title} — ${item.summary}${item.url ? `\n   ${item.url}` : ''}`,
+      ),
+      '',
+      'Use the web results if they answer the user. If they only partially answer, say what was confirmed and give one practical next step.',
+    ].join('\n');
+
+    const assistant = await this.callChatCompletions(
+      baseUrl,
+      apiKey,
+      model,
+      [...working, { role: 'user', content: webContext }],
+      undefined,
+      700,
+    );
+
+    const answer = assistant.content?.trim();
+    if (!answer) {
+      return null;
+    }
+
+    return {
+      answer,
+      usedTools: [...usedTools, 'web'],
+      groundedOn: items.length,
+    };
+  }
+
+  private async buildWebSearchQuery(
+    baseUrl: string,
+    apiKey: string,
+    model: string,
+    userMessage: string,
+    retrievalContext: RetrievalContext,
+  ): Promise<string | null> {
+    try {
+      const assistant = await this.callChatCompletions(
+        baseUrl,
+        apiKey,
+        model,
+        [
+          {
+            role: 'system',
+            content:
+              'Rewrite the user request into one short web search query in the same language as the request. Include location, service, and useful synonyms. Return only the query text, no bullet points, no quotes.',
+          },
+          {
+            role: 'user',
+            content: [
+              `User message: ${userMessage}`,
+              retrievalContext.userContext.locality ? `Known locality: ${retrievalContext.userContext.locality}` : '',
+              retrievalContext.userContext.route ? `Known route: ${retrievalContext.userContext.route}` : '',
+              retrievalContext.userContext.stage ? `Known stage: ${retrievalContext.userContext.stage}` : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+          },
+        ],
+        undefined,
+        120,
+      );
+
+      const query = assistant.content?.trim().replace(/^['"`]+|['"`]+$/g, '');
+      return query || null;
+    } catch (error) {
+      this.logger.warn(`Web query planner failed: ${this.stringifyError(error)}`);
+      return null;
+    }
+  }
+
+  private buildHeuristicWebQuery(
+    userMessage: string,
+    retrievalContext: RetrievalContext,
+  ): string | null {
+    const parts = [
+      retrievalContext.userContext.locality,
+      retrievalContext.userContext.route,
+      retrievalContext.userContext.stage,
+      userMessage,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+
+    return parts ? parts.slice(0, 200) : null;
   }
 
   private async executeToolCall(
@@ -452,6 +604,7 @@ STYLE
     model: string,
     messages: ChatMessage[],
     tools?: Array<{ type: 'function'; function: unknown }>,
+    maxTokens = 500,
   ): Promise<AssistantMessage> {
     const response = await this.fetchWithTimeout(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -462,7 +615,7 @@ STYLE
       body: JSON.stringify({
         model,
         temperature: 0.2,
-        max_tokens: 500,
+        max_tokens: maxTokens,
         messages,
         ...(tools?.length ? { tools, tool_choice: 'auto' } : {}),
       }),
