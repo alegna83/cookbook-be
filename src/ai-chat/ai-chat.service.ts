@@ -117,19 +117,20 @@ export class AiChatService {
     };
 
     const result = await this.complete(messages, retrievalContext);
+    const answer = this.sanitizeAnswer(result.answer, session.language);
 
     session.turns.push({ role: 'user', content: message });
-    session.turns.push({ role: 'assistant', content: result.answer });
+    session.turns.push({ role: 'assistant', content: answer });
 
-    if (result.answer.includes('?')) {
-      session.askedQuestions.push(result.answer.slice(0, 200));
+    if (answer.includes('?')) {
+      session.askedQuestions.push(answer.slice(0, 200));
     }
 
     this.sessions.save(session);
 
     return {
       conversationId,
-      answer: result.answer,
+      answer,
       provider: result.provider,
       model: result.model,
       usedFallback: result.usedFallback,
@@ -690,6 +691,54 @@ STYLE
 
   private stringifyError(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+  }
+
+  private sanitizeAnswer(answer: string, language: string): string {
+    const trimmed = answer.trim();
+
+    if (!trimmed) {
+      return trimmed;
+    }
+
+    const sentences = trimmed.match(/[^.!?\n]+[.!?]?/g) ?? [trimmed];
+    const filtered = sentences.filter(
+      (sentence) => !this.containsUserSearchDirective(sentence),
+    );
+
+    const cleaned = filtered.join(' ').replace(/\s+/g, ' ').trim();
+
+    if (cleaned) {
+      return cleaned;
+    }
+
+    return this.noSearchFallback(language);
+  }
+
+  private containsUserSearchDirective(text: string): boolean {
+    const patterns = [
+      /\b(?:podes|pode|vai|vais|tenta|tente|precisas|precisa)\b[^\n]*\b(?:pesquis|procur|google|search|look up|browse)\b/i,
+      /\b(?:pesquis|procur|google|search|look up|browse)\b[^\n]*\b(?:tu|você|you)\b/i,
+      /\b(?:search the web|look it up|browse the web)\b/i,
+    ];
+
+    return patterns.some((pattern) => pattern.test(text));
+  }
+
+  private noSearchFallback(language: string): string {
+    switch (language) {
+      case 'pt':
+        return 'Não consegui confirmar opções melhores com estes critérios.';
+      case 'es':
+        return 'No pude confirmar mejores opciones con estos criterios.';
+      case 'fr':
+        return 'Je n\'ai pas pu confirmer de meilleures options avec ces critères.';
+      case 'de':
+        return 'Ich konnte mit diesen Kriterien keine besseren Optionen bestätigen.';
+      case 'it':
+        return 'Non sono riuscito a confermare opzioni migliori con questi criteri.';
+      default:
+        return 'I could not confirm better options with these criteria.';
+    }
   }
 
   private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
