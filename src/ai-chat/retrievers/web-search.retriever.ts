@@ -18,6 +18,29 @@ export type WebSearchResult = {
 export class WebSearchRetriever implements KnowledgeRetriever {
   readonly domain = 'web';
 
+  private readonly genericAccommodationHosts = [
+    'booking.com',
+    'www.booking.com',
+    'tripadvisor.com',
+    'www.tripadvisor.com',
+    'trivago.com',
+    'www.trivago.com',
+    'agoda.com',
+    'www.agoda.com',
+    'expedia.com',
+    'www.expedia.com',
+    'hostelworld.com',
+    'www.hostelworld.com',
+    'airbnb.com',
+    'www.airbnb.com',
+    'hotels.com',
+    'www.hotels.com',
+    'kayak.com',
+    'www.kayak.com',
+    'momondo.com',
+    'www.momondo.com',
+  ];
+
   readonly tool: ToolSpec = {
     name: 'search_web',
     description:
@@ -47,8 +70,9 @@ export class WebSearchRetriever implements KnowledgeRetriever {
 
     const limit = Math.min(Math.max(Number(args.limit ?? 5) || 5, 1), 8);
     const results = await this.searchDuckDuckGo(query, limit);
+    const directResults = this.prioritizeDirectAccommodationResults(query, results);
 
-    return results.map((result, index) => ({
+    return directResults.map((result, index) => ({
       kind: 'web',
       id: `${index}-${result.url}`,
       title: result.title,
@@ -97,6 +121,40 @@ export class WebSearchRetriever implements KnowledgeRetriever {
     }
 
     return results;
+  }
+
+  private prioritizeDirectAccommodationResults(
+    query: string,
+    results: WebSearchResult[],
+  ): WebSearchResult[] {
+    if (!this.looksLikeAccommodationQuery(query)) {
+      return results;
+    }
+
+    const direct = results.filter((result) => !this.isGenericAccommodationHost(result.url));
+
+    if (direct.length > 0) {
+      return direct;
+    }
+
+    return [];
+  }
+
+  private looksLikeAccommodationQuery(query: string): boolean {
+    return /\b(aloj|accommodation|accommodations|hotel|hostel|pensão|pensao|guesthouse|booking|reservation|reserve|stay|overnight)\b/i.test(
+      query,
+    );
+  }
+
+  private isGenericAccommodationHost(url: string): boolean {
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return this.genericAccommodationHosts.some((genericHost) =>
+        host === genericHost || host.endsWith(`.${genericHost}`),
+      );
+    } catch {
+      return false;
+    }
   }
 
   private cleanDuckDuckGoUrl(rawUrl: string): string {

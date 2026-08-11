@@ -127,6 +127,7 @@ export class AccommodationsService {
   private normalizeBoundsValue(value: number): number {
     // 3 decimals (~110m) improves cache hit rate for map pan/zoom requests.
     return Number(value.toFixed(3));
+
   }
 
   private buildBoundsCacheKey(bounds: {
@@ -170,7 +171,6 @@ export class AccommodationsService {
 
     return undefined;
   }
-
   private async getAdminEmails(): Promise<string[]> {
     const admins = await this.accountRepo.find({ where: { userType: 'admin' } });
 

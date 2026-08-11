@@ -18,6 +18,8 @@ export const ACCOMMODATIONS_PORT = 'ACCOMMODATIONS_PORT';
 export type AccommodationChatRow = {
   id: string | number;
   name: string;
+  url?: string | null;
+  reservationUrl?: string | null;
   type?: string | null;
   locality?: string | null;
   priceFrom?: number | null;
@@ -135,11 +137,13 @@ export class AccommodationsRetriever implements KnowledgeRetriever {
       id: row.id,
       title: row.name,
       summary: bits.join(' · '),
+      url: row.url ?? row.reservationUrl ?? undefined,
       locality: row.locality ?? undefined,
       distanceKm: row.distanceKm ?? undefined,
       extra: {
         priceFrom: row.priceFrom ?? undefined,
         rating: row.rating ?? undefined,
+        reservationUrl: row.reservationUrl ?? undefined,
       },
     };
   }
