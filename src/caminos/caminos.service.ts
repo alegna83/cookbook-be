@@ -124,4 +124,52 @@ export class CaminosService {
       return (await this.caminoRepository.query(query)) as Camino[];
     });
   }
+
+  async findForChat(params: {
+    nameContains?: string;
+    limit: number;
+  }): Promise<
+    Array<{
+      id: number;
+      name: string;
+      startLocality?: string | null;
+      endLocality?: string | null;
+      totalDistanceKm?: number | null;
+      stagesCount?: number | null;
+      description?: string | null;
+    }>
+  > {
+    const limit = Math.min(Math.max(Math.floor(params.limit || 10), 1), 20);
+    const rows = await this.caminoRepository
+      .createQueryBuilder('camino')
+      .leftJoin('camino.children', 'child')
+      .select([
+        'camino.id AS id',
+        'camino.name AS name',
+        'COUNT(DISTINCT child.id) AS stagesCount',
+      ])
+      .where('camino.active = true')
+      .groupBy('camino.id')
+      .addGroupBy('camino.name')
+      .orderBy('camino.name', 'ASC')
+      .take(limit);
+
+    if (params.nameContains) {
+      rows.andWhere('LOWER(BTRIM(camino.name)) LIKE LOWER(:nameContains)', {
+        nameContains: `%${params.nameContains}%`,
+      });
+    }
+
+    const result = await rows.getRawMany();
+
+    return result.map((row: Record<string, unknown>) => ({
+      id: Number(row.id),
+      name: String(row.name ?? ''),
+      startLocality: null,
+      endLocality: null,
+      totalDistanceKm: null,
+      stagesCount: row.stagescount != null ? Number(row.stagescount) : row.stagesCount != null ? Number(row.stagesCount) : null,
+      description: row.stagescount != null ? `${Number(row.stagescount)} stages linked to this route` : null,
+    }));
+  }
 }

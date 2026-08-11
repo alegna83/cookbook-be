@@ -1,29 +1,90 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
+  Logger,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { AskChatDto } from './ask-chat.dto';
+import { ChatSession, ChatSessionStore } from './chat-session.store';
+import {
+  KNOWLEDGE_RETRIEVERS,
+  KnowledgeRetriever,
+  RetrievalContext,
+} from './knowledge-retriever';
+import {
+  describeUserContext,
+  mergeUserContext,
+  parseUserContext,
+} from './user-context';
 
-type OpenAiMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
+type ToolCall = {
+  id: string;
+  type: 'function';
+  function: { name: string; arguments: string };
 };
 
+type AssistantMessage = {
+  role: 'assistant';
+  content: string | null;
+  tool_calls?: ToolCall[];
+};
+
+type ChatMessage =
+  | { role: 'system' | 'user'; content: string }
+  | AssistantMessage
+  | { role: 'tool'; tool_call_id: string; content: string };
+
 export type ChatReply = {
+  conversationId: string;
   answer: string;
   provider: 'openai' | 'huggingface';
   model: string;
   usedFallback: boolean;
-  detectedLanguage: string;
+  language: string;
+  /** Domains actually queried, e.g. ['accommodations']. Useful for debugging. */
+  usedTools: string[];
+  /** Number of database records that backed the answer. 0 = generic answer. */
+  groundedOn: number;
 };
+
+const LANGUAGE_NAMES: Record<string, string> = {
+  pt: 'European Portuguese (pt-PT)',
+  en: 'English',
+  fr: 'French',
+  es: 'Spanish',
+  de: 'German',
+  it: 'Italian',
+};
+
+const LANGUAGE_HINTS: Record<string, RegExp> = {
+  pt: /\b(n[aã]o|sim|onde|estou|est[aá]|tenho|quero|preciso|obrigad[oa]|ol[aá]|alojamento|perto|melhor|tamb[eé]m|muito|voc[eê]|ficar|pr[oó]ximo|podes|uma|com|ajuda|caminho|d[uú]vida|encontres|etapa|pre[cç]o)\b/gi,
+  es: /\b(s[ií]|d[oó]nde|estoy|tengo|quiero|necesito|gracias|hola|alojamiento|cerca|mejor|tambi[eé]n|muy|usted|quedarme|puedes|ayuda|camino|dudas|etapa|precio)\b/gi,
+  fr: /\b(o[uù]|je|suis|veux|besoin|merci|bonjour|h[eé]bergement|proche|meilleur|aussi|tr[eè]s|vous|rester|pouvez|avec|aide|chemin|oui|[eé]tape|prix)\b/gi,
+  de: /\b(wo|ich|bin|m[oö]chte|brauche|danke|hallo|unterkunft|nahe|beste|auch|sehr|bleiben|k[oö]nnen|eine|mit|hilfe|weg|ja|etappe|preis)\b/gi,
+  it: /\b(dove|sono|voglio|bisogno|grazie|ciao|alloggio|vicino|migliore|anche|molto|restare|potete|aiuto|cammino|tappa|prezzo)\b/gi,
+};
+
+/** Two rounds is enough: search, optionally refine, then answer. */
+const MAX_TOOL_ROUNDS = 2;
+const MAX_ITEMS_PER_TOOL = 8;
+const MAX_TOOL_PAYLOAD_CHARS = 4000;
 
 @Injectable()
 export class AiChatService {
+  private readonly logger = new Logger(AiChatService.name);
+
   private readonly timeoutMs = this.parsePositiveInt(
     process.env.AI_CHAT_TIMEOUT_MS,
-    12000,
+    15000,
   );
+
+  constructor(
+    private readonly sessions: ChatSessionStore,
+    @Inject(KNOWLEDGE_RETRIEVERS)
+    private readonly retrievers: KnowledgeRetriever[],
+  ) {}
 
   async ask(dto: AskChatDto): Promise<ChatReply> {
     const message = dto.message?.trim();
@@ -36,255 +97,412 @@ export class AiChatService {
       throw new BadRequestException('message is too long');
     }
 
-    const detectedLanguage =
-      dto.language || this.detectLanguage(message);
-    const userPrompt = this.buildUserPrompt(message, dto.context, detectedLanguage);
+    const conversationId = dto.conversationId?.trim() || randomUUID();
+    const session = this.sessions.getOrCreate(
+      conversationId,
+      dto.language || this.detectLanguage(message),
+    );
 
-    try {
-      const primary = await this.askOpenAi(userPrompt, detectedLanguage);
-      return {
-        answer: primary.answer,
-        provider: 'openai',
-        model: primary.model,
-        usedFallback: false,
-        detectedLanguage,
-      };
-    } catch (primaryError) {
-      const hfToken = process.env.HUGGINGFACE_API_TOKEN?.trim();
+    session.language = this.resolveLanguage(session, dto, message);
+    session.context = mergeUserContext(
+      session.context,
+      parseUserContext(dto.context),
+    );
 
-      if (!hfToken) {
-        throw new InternalServerErrorException(
-          'Primary AI provider failed and no fallback provider is configured.',
-        );
+    const messages = this.buildMessages(session, message);
+    const retrievalContext: RetrievalContext = {
+      userContext: session.context,
+      language: session.language,
+    };
+
+    const result = await this.complete(messages, retrievalContext);
+
+    session.turns.push({ role: 'user', content: message });
+    session.turns.push({ role: 'assistant', content: result.answer });
+
+    if (result.answer.includes('?')) {
+      session.askedQuestions.push(result.answer.slice(0, 200));
+    }
+
+    this.sessions.save(session);
+
+    return {
+      conversationId,
+      answer: result.answer,
+      provider: result.provider,
+      model: result.model,
+      usedFallback: result.usedFallback,
+      language: session.language,
+      usedTools: result.usedTools,
+      groundedOn: result.groundedOn,
+    };
+  }
+
+  // ---------------------------------------------------------------- language
+
+  private resolveLanguage(
+    session: ChatSession,
+    dto: AskChatDto,
+    message: string,
+  ): string {
+    if (dto.language) return dto.language;
+    if (session.turns.length > 0 && session.language) return session.language;
+    return this.detectLanguage(message);
+  }
+
+  private detectLanguage(text: string): string {
+    const accentBonus: Record<string, RegExp> = {
+      pt: /[ãõâêôçá]/gi,
+      es: /[ñ¿¡]/gi,
+      fr: /[èêëùûœæ]/gi,
+      de: /[äöüß]/gi,
+      it: /[àìòù]/gi,
+    };
+
+    let best = 'en';
+    let bestScore = 0;
+
+    for (const [lang, pattern] of Object.entries(LANGUAGE_HINTS)) {
+      const words = (text.match(pattern) || []).length;
+      const accents = (text.match(accentBonus[lang] ?? /$^/) || []).length;
+      const score = words * 2 + accents;
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = lang;
       }
+    }
+
+    return bestScore > 0 ? best : 'en';
+  }
+
+  // ------------------------------------------------------------------ prompt
+
+  private buildMessages(session: ChatSession, message: string): ChatMessage[] {
+    const languageName = LANGUAGE_NAMES[session.language] || 'English';
+    const toolList = this.retrievers
+      .map((r) => `- ${r.tool.name}: ${r.tool.description}`)
+      .join('\n');
+
+    const system = `You are the Stays4Pilgrims Assistant, helping pilgrims walking the Caminho de Santiago. The product is a Flutter app with a NestJS backend, offering a map, accommodations, route stages, recorded prices, favourites, comments, suggestions and admin moderation. Some features require the user to be signed in, including the personalised "best accommodation" recommendation.
+
+LANGUAGE
+  - The language of this conversation is ${languageName}. Write EVERY answer in ${languageName} only.
+  - Never mix languages in the same answer. If the user writes in another language or the tool output is in another language, translate it internally and still answer only in ${languageName}.
+- Only change language if the user explicitly asks you to.
+
+CONVERSATION RULES (the most important rules)
+- The full conversation so far is given to you. Read it before answering. NEVER ask for something the user has already told you.
+- A KNOWN CONTEXT block may already give you the user's location, route and filters. If it does, NEVER ask the user where they are. Say which area you are searching and answer.
+- Ask AT MOST ONE clarifying question in the entire conversation, and only when you genuinely cannot act. Never ask two questions in a row, and never repeat a question you already asked.
+- Short messages such as "sim", "yes", "estou em Viseu", "ok" are ANSWERS to your previous question. Treat them as such and give a substantive answer.
+- If something is missing, make the most reasonable assumption, state it in one short sentence, and answer anyway.
+
+TOOLS AND DATA
+${toolList || '- (no tools available in this deployment)'}
+- Call a tool whenever the question could be answered from the app's own data, as described in the tool list above. Do not guess what is in the database.
+- Tool results may be in English; use them as facts only and do not copy their wording verbatim unless necessary.
+- Never call the same tool twice with the same arguments.
+- Only mention items returned by the tools. Never invent names, prices, distances, phone numbers or availability.
+- If a tool returns no records, say plainly that nothing is registered for that area, then give practical generic guidance and invite the user to submit a suggestion in the app.
+- Questions that need no database lookup (how the credential works, what to pack, general Caminho advice) should be answered directly, without calling tools.
+
+STYLE
+- Maximum ~120 words. No preamble, no apologies.
+- When listing results, use at most 3 short bullets: name — one concrete reason.`;
+
+    const messages: ChatMessage[] = [{ role: 'system', content: system }];
+
+    for (const turn of session.turns) {
+      messages.push({ role: turn.role, content: turn.content } as ChatMessage);
+    }
+
+    messages.push({ role: 'user', content: this.buildUserContent(session, message) });
+
+    return messages;
+  }
+
+  private buildUserContent(session: ChatSession, message: string): string {
+    const parts: string[] = [];
+    const contextLines = describeUserContext(session.context);
+
+    if (contextLines.length > 0) {
+      parts.push(
+        'KNOWN CONTEXT (the app already provided this — NEVER ask the user for any of it):',
+      );
+      parts.push(contextLines.join('\n'));
+    } else {
+      parts.push(
+        "KNOWN CONTEXT: none. The app could not determine the user's location, so ask which town they are in only if the question actually requires it.",
+      );
+    }
+
+    parts.push('');
+
+    if (session.askedQuestions.length > 0) {
+      parts.push(
+        'QUESTIONS YOU ALREADY ASKED (do not ask these or anything similar again):',
+      );
+      parts.push(session.askedQuestions.map((q) => `- ${q}`).join('\n'));
+      parts.push('');
+    }
+
+    parts.push('USER MESSAGE:');
+    parts.push(message);
+
+    return parts.join('\n');
+  }
+
+  // --------------------------------------------------------------- providers
+
+  private async complete(
+    messages: ChatMessage[],
+    retrievalContext: RetrievalContext,
+  ): Promise<{
+    answer: string;
+    provider: 'openai' | 'huggingface';
+    model: string;
+    usedFallback: boolean;
+    usedTools: string[];
+    groundedOn: number;
+  }> {
+    const primaryKey =
+      process.env.OPENAI_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim();
+
+    let primaryError: unknown = new Error(
+      'OPENAI_API_KEY or OPENROUTER_API_KEY is required',
+    );
+
+    if (primaryKey) {
+      const usesOpenRouter = Boolean(process.env.OPENROUTER_API_KEY?.trim());
+      const baseUrl = (
+        process.env.OPENAI_BASE_URL ||
+        (usesOpenRouter ? 'https://openrouter.ai/api/v1' : 'https://api.openai.com/v1')
+      ).replace(/\/$/, '');
+      const model =
+        process.env.OPENAI_CHAT_MODEL?.trim() ||
+        (usesOpenRouter ? 'openai/gpt-4o-mini' : 'gpt-4o-mini');
 
       try {
-        const fallback = await this.askHuggingFace(userPrompt, hfToken, detectedLanguage);
-        return {
-          answer: fallback.answer,
-          provider: 'huggingface',
-          model: fallback.model,
-          usedFallback: true,
-          detectedLanguage,
-        };
-      } catch (fallbackError) {
-        throw new InternalServerErrorException(
-          `AI request failed on both providers. Primary: ${this.stringifyError(primaryError)} | Fallback: ${this.stringifyError(fallbackError)}`,
+        const run = await this.runToolLoop(
+          baseUrl,
+          primaryKey,
+          model,
+          messages,
+          retrievalContext,
         );
+        return { ...run, provider: 'openai', model, usedFallback: false };
+      } catch (error) {
+        primaryError = error;
+        this.logger.warn(`Primary provider failed: ${this.stringifyError(error)}`);
       }
+    }
+
+    const hfToken = process.env.HUGGINGFACE_API_TOKEN?.trim();
+
+    if (!hfToken) {
+      throw new InternalServerErrorException(
+        `AI request failed and no fallback provider is configured. ${this.stringifyError(primaryError)}`,
+      );
+    }
+
+    // Tool support varies across Hugging Face inference providers, so the
+    // fallback answers without tools. It degrades to generic guidance rather
+    // than failing outright.
+    const hfModel =
+      process.env.HUGGINGFACE_CHAT_MODEL?.trim() ||
+      'meta-llama/Llama-3.1-8B-Instruct';
+
+    try {
+      const assistant = await this.callChatCompletions(
+        'https://router.huggingface.co/v1',
+        hfToken,
+        hfModel,
+        messages,
+      );
+      const answer = assistant.content?.trim();
+
+      if (!answer) throw new Error('Fallback response did not include an answer');
+
+      return {
+        answer,
+        provider: 'huggingface',
+        model: hfModel,
+        usedFallback: true,
+        usedTools: [],
+        groundedOn: 0,
+      };
+    } catch (fallbackError) {
+      throw new InternalServerErrorException(
+        `AI request failed on both providers. Primary: ${this.stringifyError(primaryError)} | Fallback: ${this.stringifyError(fallbackError)}`,
+      );
     }
   }
 
-  private async askOpenAi(
-    userPrompt: string,
-    language: string,
-  ): Promise<{ answer: string; model: string }> {
-    const apiKey =
-      process.env.OPENAI_API_KEY?.trim() || process.env.OPENROUTER_API_KEY?.trim();
+  /**
+   * Ask the model; if it requests tools, run them, feed the results back and
+   * ask again. On the final round tools are withheld, which forces an answer
+   * and guarantees the loop terminates.
+   */
+  private async runToolLoop(
+    baseUrl: string,
+    apiKey: string,
+    model: string,
+    messages: ChatMessage[],
+    retrievalContext: RetrievalContext,
+  ): Promise<{ answer: string; usedTools: string[]; groundedOn: number }> {
+    const tools = this.retrievers.map((retriever) => ({
+      type: 'function' as const,
+      function: retriever.tool,
+    }));
 
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY or OPENROUTER_API_KEY is required');
+    const working = [...messages];
+    const usedTools: string[] = [];
+    let groundedOn = 0;
+
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+      const offerTools = tools.length > 0 && round < MAX_TOOL_ROUNDS;
+
+      const assistant = await this.callChatCompletions(
+        baseUrl,
+        apiKey,
+        model,
+        working,
+        offerTools ? tools : undefined,
+      );
+
+      if (!assistant.tool_calls?.length) {
+        const answer = assistant.content?.trim();
+        if (!answer) throw new Error('Model returned an empty answer');
+        return { answer, usedTools, groundedOn };
+      }
+
+      working.push(assistant);
+
+      const results = await Promise.all(
+        assistant.tool_calls.map((call) =>
+          this.executeToolCall(call, retrievalContext),
+        ),
+      );
+
+      for (const result of results) {
+        groundedOn += result.count;
+        if (result.domain) usedTools.push(result.domain);
+        working.push(result.message);
+      }
     }
 
-    const configuredModel = process.env.OPENAI_CHAT_MODEL?.trim();
-    const model =
-      configuredModel ||
-      (process.env.OPENROUTER_API_KEY?.trim() ? 'openai/gpt-4o-mini' : 'gpt-4o-mini');
+    throw new Error('Tool loop did not converge');
+  }
 
-    const baseUrl = (process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1').replace(
-      /\/$/,
-      '',
-    );
+  private async executeToolCall(
+    call: ToolCall,
+    retrievalContext: RetrievalContext,
+  ): Promise<{
+    count: number;
+    domain?: string;
+    message: { role: 'tool'; tool_call_id: string; content: string };
+  }> {
+    const retriever = this.retrievers.find((r) => r.tool.name === call.function.name);
 
-    const response = await this.fetchJsonWithTimeout(
-      `${baseUrl}/chat/completions`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model,
-          temperature: 0.2,
-          max_tokens: 500,
-          messages: this.buildMessages(userPrompt, language),
-        }),
+    const respond = (payload: unknown, count = 0, domain?: string) => ({
+      count,
+      domain,
+      message: {
+        role: 'tool' as const,
+        tool_call_id: call.id,
+        content: JSON.stringify(payload).slice(0, MAX_TOOL_PAYLOAD_CHARS),
       },
-    );
+    });
+
+    if (!retriever) {
+      return respond({ error: `Unknown tool: ${call.function.name}` });
+    }
+
+    try {
+      const args = call.function.arguments
+        ? (JSON.parse(call.function.arguments) as Record<string, unknown>)
+        : {};
+
+      const items = (await retriever.search(args, retrievalContext)).slice(
+        0,
+        MAX_ITEMS_PER_TOOL,
+      );
+
+      this.logger.log(
+        `tool=${retriever.tool.name} args=${call.function.arguments} results=${items.length}`,
+      );
+
+      return respond({ count: items.length, items }, items.length, retriever.domain);
+    } catch (error) {
+      // A broken retriever must not break the chat: report it to the model,
+      // which then answers without that data.
+      this.logger.warn(
+        `Tool ${call.function.name} failed: ${this.stringifyError(error)}`,
+      );
+      return respond({ error: 'This data source is temporarily unavailable.' });
+    }
+  }
+
+  private async callChatCompletions(
+    baseUrl: string,
+    apiKey: string,
+    model: string,
+    messages: ChatMessage[],
+    tools?: Array<{ type: 'function'; function: unknown }>,
+  ): Promise<AssistantMessage> {
+    const response = await this.fetchWithTimeout(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.2,
+        max_tokens: 500,
+        messages,
+        ...(tools?.length ? { tools, tool_choice: 'auto' } : {}),
+      }),
+    });
 
     if (!response.ok) {
       const body = await response.text();
       throw new Error(
-        `OpenAI request failed with status ${response.status}: ${body.slice(0, 500)}`,
+        `Request to ${baseUrl} failed with status ${response.status}: ${body.slice(0, 300)}`,
       );
     }
 
     const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      choices?: Array<{ message?: AssistantMessage }>;
     };
 
-    const answer = data.choices?.[0]?.message?.content?.trim();
+    const message = data.choices?.[0]?.message;
 
-    if (!answer) {
-      throw new Error('OpenAI response did not include a valid answer');
+    if (!message) {
+      throw new Error(`Response from ${baseUrl} did not include a message`);
     }
 
-    return { answer, model };
+    return message;
   }
 
-  private async askHuggingFace(
-    userPrompt: string,
-    token: string,
-    language: string,
-  ): Promise<{ answer: string; model: string }> {
-    const model =
-      process.env.HUGGINGFACE_CHAT_MODEL?.trim() ||
-      'mistralai/Mistral-7B-Instruct-v0.3';
-
-    const response = await this.fetchJsonWithTimeout(
-      `https://api-inference.huggingface.co/models/${model}`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: userPrompt,
-          parameters: {
-            max_new_tokens: 300,
-            temperature: 0.2,
-            return_full_text: false,
-          },
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(
-        `Hugging Face request failed with status ${response.status}: ${body.slice(0, 500)}`,
-      );
-    }
-
-    const data = (await response.json()) as
-      | Array<{ generated_text?: string }>
-      | { generated_text?: string; error?: string };
-
-    let answer = '';
-
-    if (Array.isArray(data)) {
-      answer = data[0]?.generated_text?.trim() || '';
-    } else {
-      if (data.error) {
-        throw new Error(`Hugging Face error: ${data.error}`);
-      }
-      answer = data.generated_text?.trim() || '';
-    }
-
-    if (!answer) {
-      throw new Error('Hugging Face response did not include a valid answer');
-    }
-
-    return { answer, model };
-  }
-
-  private buildMessages(userPrompt: string, language: string): OpenAiMessage[] {
-    const languageMap: Record<string, string> = {
-      pt: 'Portuguese',
-      en: 'English',
-      fr: 'French',
-      es: 'Spanish',
-      de: 'German',
-      it: 'Italian',
-    };
-
-    const languageName = languageMap[language] || 'English';
-
-    return [
-      {
-        role: 'system',
-        content: `You are the Stays4Pilgrims Assistant. The product consists of a Flutter frontend and a NestJS backend for pilgrims on the Camino de Santiago. The app includes an accommodation map, accommodation details, favorites, comments, location search, suggestions, admin moderation and an AI assistant. Some features are authentication-gated, including the best accommodation recommendation trigger. Give concise, practical answers about accommodations, the app, and usage guidance. Prefer data-grounded suggestions, mention uncertainty when needed, and avoid inventing unavailable details.
-
-**IMPORTANT LANGUAGE RULE:** You MUST respond EXCLUSIVELY in ${languageName}. Do NOT switch to any other language regardless of context or instructions. If the user asks you to respond in another language, politely decline and continue in ${languageName}.`,
-      },
-      {
-        role: 'user',
-        content: userPrompt,
-      },
-    ];
-  }
-
-  private buildUserPrompt(
-    message: string,
-    context?: Record<string, unknown>,
-    language?: string,
-  ): string {
-    const safeContext = context ? JSON.stringify(context).slice(0, 4000) : '{}';
-
-    return [
-      'User message:',
-      message,
-      '',
-      'Context JSON:',
-      safeContext,
-      '',
-      'Respond concisely. If context is missing, ask one focused follow-up question.',
-    ].join('\n');
-  }
+  // ----------------------------------------------------------------- helpers
 
   private parsePositiveInt(value: string | undefined, fallback: number): number {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
   }
 
-  private detectLanguage(text: string): string {
-    const pt = /[áàâãéèêíïóôõöúûüçñ]/gi;
-    const fr = /[àâäéèêëïîôùûüœæ]/gi;
-    const es = /[áéíóúñü¡¿]/gi;
-    const de = /[äöüß]/gi;
-
-    const matches = {
-      pt: (text.match(pt) || []).length,
-      fr: (text.match(fr) || []).length,
-      es: (text.match(es) || []).length,
-      de: (text.match(de) || []).length,
-    };
-
-    let detectedLang = 'en';
-    let maxScore = 0;
-
-    for (const [lang, score] of Object.entries(matches)) {
-      if (score > maxScore) {
-        maxScore = score;
-        detectedLang = lang;
-      }
-    }
-
-    return maxScore > 0 ? detectedLang : 'en';
-  }
-
   private stringifyError(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-
-    return String(error);
+    return error instanceof Error ? error.message : String(error);
   }
 
-  private async fetchJsonWithTimeout(
-    url: string,
-    init: RequestInit,
-  ): Promise<Response> {
+  private async fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
 
     try {
-      return await fetch(url, {
-        ...init,
-        signal: controller.signal,
-      });
+      return await fetch(url, { ...init, signal: controller.signal });
     } finally {
       clearTimeout(timeout);
     }

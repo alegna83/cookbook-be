@@ -914,6 +914,186 @@ export class AccommodationsService {
     });
   }
 
+  async findForChat(params: {
+    locality?: string;
+    lat?: number;
+    lng?: number;
+    radiusKm?: number;
+    maxPriceEur?: number;
+    type?: string;
+    service?: string;
+    limit: number;
+  }): Promise<
+    Array<{
+      id: number;
+      name: string;
+      type?: string | null;
+      locality?: string | null;
+      priceFrom?: number | null;
+      rating?: number | null;
+      reviewsCount?: number | null;
+      distanceKm?: number | null;
+      services?: string[] | null;
+      nearbyActivities?: string[] | null;
+      pilgrimExclusive?: boolean | null;
+      allowsReservations?: boolean | null;
+      datesOpen?: string | null;
+    }>
+  > {
+    const limit = Math.min(Math.max(Math.floor(params.limit || 8), 1), 20);
+    const radiusKm = Math.min(Math.max(Number(params.radiusKm ?? 15), 1), 50);
+
+    const asBoolean = (value: unknown): boolean | null => {
+      if (value === true || value === 'true' || value === 1 || value === '1') {
+        return true;
+      }
+      if (value === false || value === 'false' || value === 0 || value === '0') {
+        return false;
+      }
+      return null;
+    };
+
+    const asStringList = (value: unknown): string[] | null => {
+      if (Array.isArray(value)) {
+        return value.map((item) => String(item).trim()).filter(Boolean);
+      }
+
+      if (typeof value === 'string' && value.trim()) {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            return parsed.map((item) => String(item).trim()).filter(Boolean);
+          }
+        } catch {
+          return value
+            .split(',')
+            .map((item) => item.trim())
+            .filter(Boolean);
+        }
+      }
+
+      return null;
+    };
+
+    let query = this.placeRepository
+      .createQueryBuilder('place')
+      .leftJoin('place.place_category', 'place_category')
+      .leftJoin('place.prices', 'prices')
+      .leftJoin('place.camino', 'camino')
+      .leftJoin('place.stage', 'stage')
+      .leftJoin('comments', 'comment', 'comment.place_id = place.id AND comment.status = :approvedCommentStatus', {
+        approvedCommentStatus: 'approved',
+      })
+      .select([
+        'place.id AS id',
+        'place.place_name AS name',
+        'place.region AS locality',
+        'place_category.name AS type',
+        'place.services AS services',
+        'place.nearbyActivities AS nearbyActivities',
+        'place.pilgrim_exclusive AS pilgrimExclusiveRaw',
+        'place.allow_reservation AS allowsReservationsRaw',
+        'place.dates_open AS datesOpen',
+        'place.latitude AS latitude',
+        'place.longitude AS longitude',
+        'MIN(prices.price) AS priceFrom',
+        'AVG(comment.rating) AS rating',
+        'COUNT(comment.id) AS reviewsCount',
+      ])
+      .where('place.status = :status', { status: 'approved' })
+      .groupBy('place.id')
+      .addGroupBy('place.place_name')
+      .addGroupBy('place.region')
+      .addGroupBy('place.place_category_id')
+      .addGroupBy('place.services')
+      .addGroupBy('place.nearbyActivities')
+      .addGroupBy('place.pilgrim_exclusive')
+      .addGroupBy('place.allow_reservation')
+      .addGroupBy('place.dates_open')
+      .addGroupBy('place.latitude')
+      .addGroupBy('place.longitude')
+      .orderBy('reviewsCount', 'DESC')
+      .addOrderBy('rating', 'DESC')
+      .take(limit);
+
+    if (params.locality) {
+      query = query.andWhere('LOWER(BTRIM(place.region)) = LOWER(BTRIM(:locality))', {
+        locality: params.locality,
+      });
+    }
+
+    if (params.type) {
+      query = query.andWhere('LOWER(BTRIM(place_category.name)) = LOWER(BTRIM(:type))', {
+        type: params.type,
+      });
+    }
+
+    if (params.service) {
+      query = query.andWhere(
+        `EXISTS (
+          SELECT 1
+          FROM json_array_elements_text(COALESCE(place.services::json, '[]'::json)) AS service_item
+          WHERE LOWER(service_item) LIKE LOWER(:service)
+        )`,
+        { service: `%${params.service}%` },
+      );
+    }
+
+    if (params.maxPriceEur != null) {
+      query = query.andWhere('COALESCE((SELECT MIN(pp.price) FROM place_prices pp WHERE pp.placeId = place.id), 999999) <= :maxPriceEur', {
+        maxPriceEur: params.maxPriceEur,
+      });
+    }
+
+    if (params.lat != null && params.lng != null) {
+      query = query.andWhere(
+        `(
+          111.32 * SQRT(
+            POWER(COALESCE(place.latitude::float, 0) - :lat, 2) +
+            POWER((COALESCE(place.longitude::float, 0) - :lng) * COS(RADIANS(:lat)), 2)
+          )
+        ) <= :radiusKm`,
+        { lat: params.lat, lng: params.lng, radiusKm },
+      );
+    }
+
+    const rows = await query.getRawMany();
+
+    return rows.map((row: Record<string, unknown>) => ({
+      id: Number(row.id),
+      name: String(row.name ?? ''),
+      type: row.type != null ? String(row.type) : null,
+      locality: row.locality != null ? String(row.locality) : null,
+      priceFrom:
+        row.pricefrom != null
+          ? Number(row.pricefrom)
+          : row.priceFrom != null
+            ? Number(row.priceFrom)
+            : null,
+      rating: row.rating != null ? Number(row.rating) : null,
+      reviewsCount:
+        row.reviewscount != null
+          ? Number(row.reviewscount)
+          : row.reviewsCount != null
+            ? Number(row.reviewsCount)
+            : null,
+      distanceKm:
+        row.latitude != null && row.longitude != null && params.lat != null && params.lng != null
+          ? Number(row.distancekm ?? row.distanceKm ?? null)
+          : null,
+      services: asStringList(row.services),
+      nearbyActivities: asStringList(row.nearbyactivities ?? row.nearbyActivities),
+      pilgrimExclusive: asBoolean(row.pilgrimExclusiveraw ?? row.pilgrimExclusiveRaw),
+      allowsReservations: asBoolean(row.allowsReservationsraw ?? row.allowsReservationsRaw),
+      datesOpen:
+        row.datesopen != null
+          ? String(row.datesopen)
+          : row.datesOpen != null
+            ? String(row.datesOpen)
+            : null,
+    }));
+  }
+
   async findAccommodationByPlaceId(placeId: number): Promise<any> {
     const cacheKey = `findAccommodationByPlaceId:${placeId}`;
     const cached = this.getCachedValue<Accommodation>(cacheKey);
@@ -1327,7 +1507,8 @@ export class AccommodationsService {
 
       return dtos;
     } catch (e) {
-      throw new BadRequestException(`Error fetching pending photos: ${e.message}`);
+      const message = e instanceof Error ? e.message : String(e);
+      throw new BadRequestException(`Error fetching pending photos: ${message}`);
     }
   }
 
