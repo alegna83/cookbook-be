@@ -211,7 +211,7 @@ CONVERSATION RULES (the most important rules)
 TOOLS AND DATA
 ${toolList || '- (no tools available in this deployment)'}
 - Call a tool whenever the question could be answered from the app's own data, as described in the tool list above.
-- If the app database does not have enough information, use the web search tool before giving up.
+- Prefer the web search tool first for current, factual, location-based, route, accommodation, or service questions. Use app database tools only if the web search does not answer or if the user explicitly asks for app-listed options.
 - Prefer official pages, direct provider pages, accommodation listings and recent pages when using web search.
 - Never tell the user to search, google, browse, or look it up themselves. You must do the search with tools if any tool can help.
 - Never tell the user to go to tourism sites, tourism pages, or comparison portals to do the search themselves.
@@ -806,11 +806,30 @@ STYLE
     }
   }
 
+  private noResultsAccommodationFallback(language: string): string {
+    switch (language) {
+      case 'pt':
+        return 'Ainda não consegui confirmar alojamentos concretos para essa zona.';
+      case 'es':
+        return 'Aún no he podido confirmar alojamientos concretos para esa zona.';
+      case 'fr':
+        return 'Je n\'ai pas encore pu confirmer d\'hébergements concrets pour cette zone.';
+      case 'de':
+        return 'Ich konnte für diese Zone noch keine konkreten Unterkünfte bestätigen.';
+      case 'it':
+        return 'Non sono ancora riuscito a confermare alloggi concreti per questa zona.';
+      default:
+        return 'I could not confirm concrete accommodations for that area yet.';
+    }
+  }
+
   private buildConcreteToolAnswer(
     items: RetrievedItem[],
     language: string,
   ): string | null {
-    const selected = this.uniqueConcreteItems(items).slice(0, MAX_CONCRETE_RESULTS);
+    const selected = this.uniqueConcreteItems(items)
+      .filter((item) => item.kind === 'web')
+      .slice(0, MAX_CONCRETE_RESULTS);
 
     if (selected.length === 0) {
       return null;
@@ -875,36 +894,19 @@ STYLE
       return parts[0];
     }
 
-    if (item.kind === 'web') {
-      switch (language) {
-        case 'pt':
-          return 'fonte recente encontrada';
-        case 'es':
-          return 'fuente reciente encontrada';
-        case 'fr':
-          return 'source récente trouvée';
-        case 'de':
-          return 'aktuelle Quelle gefunden';
-        case 'it':
-          return 'fonte recente trovata';
-        default:
-          return 'recent source found';
-      }
-    }
-
     switch (language) {
       case 'pt':
-        return 'resultado disponível na base de dados';
+        return 'fonte recente encontrada';
       case 'es':
-        return 'resultado disponible en la base de datos';
+        return 'fuente reciente encontrada';
       case 'fr':
-        return 'résultat disponible dans la base de données';
+        return 'source récente trouvée';
       case 'de':
-        return 'Ergebnis in der Datenbank verfügbar';
+        return 'aktuelle Quelle gefunden';
       case 'it':
-        return 'risultato disponibile nel database';
+        return 'fonte recente trovata';
       default:
-        return 'result available in the app database';
+        return 'recent source found';
     }
   }
 
