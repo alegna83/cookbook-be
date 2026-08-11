@@ -71,6 +71,7 @@ const LANGUAGE_HINTS: Record<string, RegExp> = {
 const MAX_TOOL_ROUNDS = 2;
 const MAX_ITEMS_PER_TOOL = 8;
 const MAX_TOOL_PAYLOAD_CHARS = 4000;
+const MAX_CONCRETE_RESULTS = 3;
 
 @Injectable()
 export class AiChatService {
@@ -388,6 +389,7 @@ STYLE
     const working = [...messages];
     const usedTools: string[] = [];
     let groundedOn = 0;
+    const itemsByDomain = new Map<string, RetrievedItem[]>();
 
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
       const offerTools = tools.length > 0 && round < MAX_TOOL_ROUNDS;
@@ -417,7 +419,29 @@ STYLE
       for (const result of results) {
         groundedOn += result.count;
         if (result.domain) usedTools.push(result.domain);
+        if (result.domain && result.items.length > 0) {
+          const existing = itemsByDomain.get(result.domain) ?? [];
+          itemsByDomain.set(result.domain, [...existing, ...result.items]);
+        }
         working.push(result.message);
+      }
+
+      const aggregatedItems: RetrievedItem[] = [];
+      for (const domainItems of itemsByDomain.values()) {
+        aggregatedItems.push(...domainItems);
+      }
+
+      const concreteAnswer = this.buildConcreteToolAnswer(
+        aggregatedItems,
+        retrievalContext.language,
+      );
+
+      if (concreteAnswer) {
+        return {
+          answer: concreteAnswer,
+          usedTools,
+          groundedOn,
+        };
       }
 
       if (groundedOn === 0) {
@@ -488,6 +512,19 @@ STYLE
 
     if (items.length === 0) {
       return null;
+    }
+
+    const concreteWebAnswer = this.buildConcreteToolAnswer(
+      items,
+      retrievalContext.language,
+    );
+
+    if (concreteWebAnswer) {
+      return {
+        answer: concreteWebAnswer,
+        usedTools: [...usedTools, 'web'],
+        groundedOn: items.length,
+      };
     }
 
     const webContext = [
@@ -597,13 +634,20 @@ STYLE
   ): Promise<{
     count: number;
     domain?: string;
+    items: RetrievedItem[];
     message: { role: 'tool'; tool_call_id: string; content: string };
   }> {
     const retriever = this.retrievers.find((r) => r.tool.name === call.function.name);
 
-    const respond = (payload: unknown, count = 0, domain?: string) => ({
+    const respond = (
+      payload: unknown,
+      count = 0,
+      domain?: string,
+      items: RetrievedItem[] = [],
+    ) => ({
       count,
       domain,
+      items,
       message: {
         role: 'tool' as const,
         tool_call_id: call.id,
@@ -629,7 +673,12 @@ STYLE
         `tool=${retriever.tool.name} args=${call.function.arguments} results=${items.length}`,
       );
 
-      return respond({ count: items.length, items }, items.length, retriever.domain);
+      return respond(
+        { count: items.length, items },
+        items.length,
+        retriever.domain,
+        items,
+      );
     } catch (error) {
       // A broken retriever must not break the chat: report it to the model,
       // which then answers without that data.
@@ -701,12 +750,15 @@ STYLE
       return trimmed;
     }
 
-    const sentences = trimmed.match(/[^.!?\n]+[.!?]?/g) ?? [trimmed];
-    const filtered = sentences.filter(
-      (sentence) => !this.containsUserSearchDirective(sentence),
-    );
+    // Keep line structure intact so URLs are never split (e.g. "https://www...").
+    const lines = trimmed.split('\n');
+    const filtered = lines.filter((line) => !this.containsUserSearchDirective(line));
 
-    const cleaned = filtered.join(' ').replace(/\s+/g, ' ').trim();
+    const cleaned = filtered
+      .join('\n')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
 
     if (cleaned) {
       return cleaned;
@@ -739,6 +791,142 @@ STYLE
         return 'Non sono riuscito a confermare opzioni migliori con questi criteri.';
       default:
         return 'I could not confirm better options with these criteria.';
+    }
+  }
+
+  private buildConcreteToolAnswer(
+    items: RetrievedItem[],
+    language: string,
+  ): string | null {
+    const selected = this.uniqueConcreteItems(items).slice(0, MAX_CONCRETE_RESULTS);
+
+    if (selected.length === 0) {
+      return null;
+    }
+
+    const intro = this.concreteIntro(language);
+    const lines = [intro];
+
+    for (const item of selected) {
+      const reason = this.buildConcreteReason(item, language);
+      lines.push(`- ${item.title}${reason ? ` - ${reason}` : ''}`);
+
+      const bestUrl = this.bestItemUrl(item);
+
+      if (bestUrl) {
+        lines.push(`  ${this.linkLabel(language)}: ${bestUrl}`);
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  private uniqueConcreteItems(items: RetrievedItem[]): RetrievedItem[] {
+    const seen = new Set<string>();
+    const unique: RetrievedItem[] = [];
+
+    for (const item of items) {
+      const key = `${item.kind}:${String(item.id)}:${item.title}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      unique.push(item);
+    }
+
+    return unique;
+  }
+
+  private bestItemUrl(item: RetrievedItem): string | undefined {
+    const reservationUrl =
+      typeof item.extra?.reservationUrl === 'string'
+        ? item.extra.reservationUrl
+        : undefined;
+
+    return reservationUrl || item.url || undefined;
+  }
+
+  private buildConcreteReason(item: RetrievedItem, language: string): string {
+    const parts = item.summary
+      .split('·')
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    const preferred = parts.find((part) =>
+      /from\s+\d+|rated|km|services|open:|days|difficulty|distance|price|etapa|stage|camino/i.test(part),
+    );
+    if (preferred) {
+      return preferred;
+    }
+
+    if (parts.length > 0) {
+      return parts[0];
+    }
+
+    if (item.kind === 'web') {
+      switch (language) {
+        case 'pt':
+          return 'fonte recente encontrada';
+        case 'es':
+          return 'fuente reciente encontrada';
+        case 'fr':
+          return 'source récente trouvée';
+        case 'de':
+          return 'aktuelle Quelle gefunden';
+        case 'it':
+          return 'fonte recente trovata';
+        default:
+          return 'recent source found';
+      }
+    }
+
+    switch (language) {
+      case 'pt':
+        return 'resultado disponível na base de dados';
+      case 'es':
+        return 'resultado disponible en la base de datos';
+      case 'fr':
+        return 'résultat disponible dans la base de données';
+      case 'de':
+        return 'Ergebnis in der Datenbank verfügbar';
+      case 'it':
+        return 'risultato disponibile nel database';
+      default:
+        return 'result available in the app database';
+    }
+  }
+
+  private concreteIntro(language: string): string {
+    switch (language) {
+      case 'pt':
+        return 'Encontrei estes resultados concretos:';
+      case 'es':
+        return 'Encontré estos resultados concretos:';
+      case 'fr':
+        return 'J\'ai trouvé ces résultats concrets :';
+      case 'de':
+        return 'Ich habe diese konkreten Ergebnisse gefunden:';
+      case 'it':
+        return 'Ho trovato questi risultati concreti:';
+      default:
+        return 'I found these concrete results:';
+    }
+  }
+
+  private linkLabel(language: string): string {
+    switch (language) {
+      case 'pt':
+        return 'Link direto';
+      case 'es':
+        return 'Enlace directo';
+      case 'fr':
+        return 'Lien direct';
+      case 'de':
+        return 'Direktlink';
+      case 'it':
+        return 'Link diretto';
+      default:
+        return 'Direct link';
     }
   }
 
