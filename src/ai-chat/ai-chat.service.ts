@@ -212,8 +212,9 @@ TOOLS AND DATA
 ${toolList || '- (no tools available in this deployment)'}
 - Call a tool whenever the question could be answered from the app's own data, as described in the tool list above.
 - If the app database does not have enough information, use the web search tool before giving up.
-- Prefer official websites, tourism pages, accommodation listings and recent pages when using web search.
+- Prefer official pages, direct provider pages, accommodation listings and recent pages when using web search.
 - Never tell the user to search, google, browse, or look it up themselves. You must do the search with tools if any tool can help.
+- Never tell the user to go to tourism sites, tourism pages, or comparison portals to do the search themselves.
 - If the first search is too narrow, automatically broaden it and try again before answering.
 - Tool results may be in English; use them as facts only and do not copy their wording verbatim unless necessary.
 - Never call the same tool twice with the same arguments.
@@ -527,32 +528,8 @@ STYLE
       };
     }
 
-    const webContext = [
-      'WEB SEARCH RESULTS (use these as facts and keep the answer concise):',
-      ...items.map(
-        (item, index) =>
-          `${index + 1}. ${item.title} — ${item.summary}${item.url ? `\n   ${item.url}` : ''}`,
-      ),
-      '',
-      'Use the web results if they answer the user. If they only partially answer, say what was confirmed and give one practical next step. Do not describe the search process.',
-    ].join('\n');
-
-    const assistant = await this.callChatCompletions(
-      baseUrl,
-      apiKey,
-      model,
-      [...working, { role: 'user', content: webContext }],
-      undefined,
-      700,
-    );
-
-    const answer = assistant.content?.trim();
-    if (!answer) {
-      return null;
-    }
-
     return {
-      answer,
+      answer: this.noResultsWebFallback(retrievalContext.language),
       usedTools: [...usedTools, 'web'],
       groundedOn: items.length,
     };
@@ -772,6 +749,8 @@ STYLE
       /\b(?:podes|pode|vai|vais|tenta|tente|precisas|precisa)\b[^\n]*\b(?:pesquis|procur|google|search|look up|browse)\b/i,
       /\b(?:pesquis|procur|google|search|look up|browse)\b[^\n]*\b(?:tu|você|you)\b/i,
       /\b(?:search the web|look it up|browse the web)\b/i,
+      /\b(?:tourism|turismo)\b[^\n]*(?:site|sites|page|pages|portal|portals|website|websites)/i,
+      /\b(?:visit|visita|consulte|consulta|check|see)\b[^\n]*(?:tourism|turismo)\b/i,
     ];
 
     return patterns.some((pattern) => pattern.test(text));
@@ -791,6 +770,23 @@ STYLE
         return 'Non sono riuscito a confermare opzioni migliori con questi criteri.';
       default:
         return 'I could not confirm better options with these criteria.';
+    }
+  }
+
+  private noResultsWebFallback(language: string): string {
+    switch (language) {
+      case 'pt':
+        return 'Ainda não consegui confirmar dados concretos para isso agora. Posso afinar por vila, etapa ou serviço.';
+      case 'es':
+        return 'Aún no pude confirmar datos concretos para eso ahora. Puedo afinar por villa, etapa o servicio.';
+      case 'fr':
+        return 'Je n\'ai pas encore pu confirmer de données concrètes pour cela. Je peux affiner par ville, étape ou service.';
+      case 'de':
+        return 'Ich konnte dazu noch keine konkreten Daten bestätigen. Ich kann nach Ort, Etappe oder Service präzisieren.';
+      case 'it':
+        return 'Non sono ancora riuscito a confermare dati concreti per questo. Posso affinare per paese, tappa o servizio.';
+      default:
+        return 'I could not confirm concrete data for that right now. I can narrow it by town, stage, or service.';
     }
   }
 

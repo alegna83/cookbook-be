@@ -44,7 +44,7 @@ export class WebSearchRetriever implements KnowledgeRetriever {
   readonly tool: ToolSpec = {
     name: 'search_web',
     description:
-      'Search the public web for current travel information, recent pages, official accommodation sites, tourism pages and other information not guaranteed to exist in the app database. Use this when the user asks for up-to-date information, alternatives that may not be registered in the database, or a broader internet search.',
+      'Search the public web for current travel information, recent pages, official accommodation sites and other information not guaranteed to exist in the app database. Use this when the user asks for up-to-date information, alternatives that may not be registered in the database, or a broader internet search.',
     parameters: {
       type: 'object',
       properties: {
