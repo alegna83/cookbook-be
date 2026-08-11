@@ -927,6 +927,8 @@ export class AccommodationsService {
     Array<{
       id: number;
       name: string;
+      url?: string | null;
+      reservationUrl?: string | null;
       type?: string | null;
       locality?: string | null;
       priceFrom?: number | null;
@@ -987,6 +989,8 @@ export class AccommodationsService {
       .select([
         'place.id AS id',
         'place.place_name AS name',
+        'place.link AS url',
+        'place.reservation_link AS reservationUrl',
         'place.region AS locality',
         'place_category.name AS type',
         'place.services AS services',
@@ -1003,6 +1007,8 @@ export class AccommodationsService {
       .where('place.status = :status', { status: 'approved' })
       .groupBy('place.id')
       .addGroupBy('place.place_name')
+      .addGroupBy('place.link')
+      .addGroupBy('place.reservation_link')
       .addGroupBy('place.region')
       .addGroupBy('place.place_category_id')
       .addGroupBy('place.services')
@@ -1075,6 +1081,18 @@ export class AccommodationsService {
     return rows.map((row: Record<string, unknown>) => ({
       id: Number(row.id),
       name: String(row.name ?? ''),
+      url:
+        row.url != null
+          ? String(row.url)
+          : row.link != null
+            ? String(row.link)
+            : null,
+      reservationUrl:
+        row.reservationurl != null
+          ? String(row.reservationurl)
+          : row.reservationUrl != null
+            ? String(row.reservationUrl)
+            : null,
       type: row.type != null ? String(row.type) : null,
       locality: row.locality != null ? String(row.locality) : null,
       priceFrom:
