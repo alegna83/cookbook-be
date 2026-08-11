@@ -12,6 +12,7 @@ import {
   KNOWLEDGE_RETRIEVERS,
   KnowledgeRetriever,
   RetrievalContext,
+  RetrievedItem,
 } from './knowledge-retriever';
 import {
   describeUserContext,
@@ -145,9 +146,15 @@ export class AiChatService {
     dto: AskChatDto,
     message: string,
   ): string {
+    const detected = this.detectLanguage(message);
+
+    if (detected !== 'en') {
+      return detected;
+    }
+
     if (dto.language) return dto.language;
-    if (session.turns.length > 0 && session.language) return session.language;
-    return this.detectLanguage(message);
+    if (session.language) return session.language;
+    return 'en';
   }
 
   private detectLanguage(text: string): string {
@@ -193,6 +200,7 @@ LANGUAGE
 
 CONVERSATION RULES (the most important rules)
 - The full conversation so far is given to you. Read it before answering. NEVER ask for something the user has already told you.
+- Write the answer in the same language as the latest user message. If the latest message is Portuguese, answer in Portuguese. If it is English, answer in English. Switch language whenever the user switches language.
 - A KNOWN CONTEXT block may already give you the user's location, route and filters. If it does, NEVER ask the user where they are. Say which area you are searching and answer.
 - Ask AT MOST ONE clarifying question in the entire conversation, and only when you genuinely cannot act. Never ask two questions in a row, and never repeat a question you already asked.
 - Short messages such as "sim", "yes", "estou em Viseu", "ok" are ANSWERS to your previous question. Treat them as such and give a substantive answer.
@@ -203,15 +211,21 @@ ${toolList || '- (no tools available in this deployment)'}
 - Call a tool whenever the question could be answered from the app's own data, as described in the tool list above.
 - If the app database does not have enough information, use the web search tool before giving up.
 - Prefer official websites, tourism pages, accommodation listings and recent pages when using web search.
+- Never tell the user to search, google, browse, or look it up themselves. You must do the search with tools if any tool can help.
+- If the first search is too narrow, automatically broaden it and try again before answering.
 - Tool results may be in English; use them as facts only and do not copy their wording verbatim unless necessary.
 - Never call the same tool twice with the same arguments.
 - Only mention items returned by the tools. Never invent names, prices, distances, phone numbers or availability.
 - If a tool returns no records, first try a broader search or the web search tool. If there is still nothing useful, say: "I couldn't confirm an exact match for that filter." Then give one short practical next step.
+- For accommodation, route, and service searches, lead with the answer first. If results exist, start with one short sentence like "Encontrei estas opções:" and then show at most 3 bullets.
+- Never explain your search process unless the user asks how you found the answer.
 - Questions that need no database lookup (how the credential works, what to pack, general Caminho advice) should be answered directly, without calling tools.
 
 STYLE
-- Maximum ~120 words. No preamble, no apologies.
-- When listing results, use at most 3 short bullets: name — one concrete reason.`;
+- Maximum ~100 words for normal answers, ~140 words when listing search results.
+- No preamble, no apologies, no meta talk about limitations unless no result was found.
+- When listing results, use at most 3 short bullets: name — one concrete reason.
+- Prefer short, direct sentences. If you found useful matches, do not end with "search the web" or "check online".`;
 
     const messages: ChatMessage[] = [{ role: 'system', content: system }];
 
@@ -454,7 +468,21 @@ STYLE
       return null;
     }
 
-    const items = await webRetriever.search({ query, limit: 5 }, retrievalContext);
+    const queryVariants = [
+      query,
+      this.buildBroaderWebQuery(query),
+      this.buildBroaderWebQuery(userMessage),
+    ].filter((value, index, all) => value && all.indexOf(value) === index) as string[];
+
+    let items: RetrievedItem[] = [];
+
+    for (const variant of queryVariants) {
+      items = await webRetriever.search({ query: variant, limit: 5 }, retrievalContext);
+      if (items.length > 0) {
+        break;
+      }
+    }
+
     if (items.length === 0) {
       return null;
     }
@@ -466,7 +494,7 @@ STYLE
           `${index + 1}. ${item.title} — ${item.summary}${item.url ? `\n   ${item.url}` : ''}`,
       ),
       '',
-      'Use the web results if they answer the user. If they only partially answer, say what was confirmed and give one practical next step.',
+      'Use the web results if they answer the user. If they only partially answer, say what was confirmed and give one practical next step. Do not describe the search process.',
     ].join('\n');
 
     const assistant = await this.callChatCompletions(
@@ -547,6 +575,17 @@ STYLE
       .trim();
 
     return parts ? parts.slice(0, 200) : null;
+  }
+
+  private buildBroaderWebQuery(query: string): string {
+    return query
+      .replace(/\b(zona histórica|centro histórico|old town|historic area)\b/gi, 'center')
+      .replace(/\b(alojamentos?|accommodations?|hostels?|hoteis?|hotéis?)\b/gi, 'accommodation')
+      .replace(/\b(cozinha|kitchen|cuisine)\b/gi, 'kitchen')
+      .replace(/\b(perto de|near|nearby)\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 200);
   }
 
   private async executeToolCall(
