@@ -1,4 +1,3 @@
-import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import compression = require('compression');
@@ -19,13 +18,6 @@ async function bootstrap() {
 
   // Compress JSON payloads to reduce transfer time in production networks.
   app.use(compression());
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: true,
-    }),
-  );
 
   if (shouldLogRequests) {
     app.use((req, res, next) => {
