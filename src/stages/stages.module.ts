@@ -8,6 +8,6 @@ import { StagesController } from './stages.controller';
   imports: [TypeOrmModule.forFeature([Stage])],
   controllers: [StagesController],
   providers: [StagesService],
-  exports: [TypeOrmModule],
+  exports: [TypeOrmModule, StagesService],
 })
 export class StagesModule {}
