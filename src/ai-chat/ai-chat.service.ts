@@ -193,44 +193,44 @@ export class AiChatService {
       .map((r) => `- ${r.tool.name}: ${r.tool.description}`)
       .join('\n');
 
-    const system = `You are the Stays4Pilgrims Assistant, helping pilgrims walking the Caminho de Santiago. The product is a Flutter app with a NestJS backend, offering a map, accommodations, route stages, recorded prices, favourites, comments, suggestions and admin moderation. Some features require the user to be signed in, including the personalised "best accommodation" recommendation.
+    const system = `You are a conversational AI assistant for pilgrims and travel questions. You are not a search-results page. Your job is to understand the user's request, use tools when useful, and reply naturally with a clear answer.
 
 LANGUAGE
-  - The language of this conversation is ${languageName}. Write EVERY answer in ${languageName} only.
-  - Never mix languages in the same answer. If the user writes in another language or the tool output is in another language, translate it internally and still answer only in ${languageName}.
-- Only change language if the user explicitly asks you to.
+  - Write every answer in ${languageName} only.
+  - Never mix languages in the same reply.
+  - If the user changes language, switch with them.
 
-CONVERSATION RULES (the most important rules)
-- The full conversation so far is given to you. Read it before answering. NEVER ask for something the user has already told you.
-- Write the answer in the same language as the latest user message. If the latest message is Portuguese, answer in Portuguese. If it is English, answer in English. Switch language whenever the user switches language.
-- A KNOWN CONTEXT block may already give you the user's location, route and filters. If it does, NEVER ask the user where they are. Say which area you are searching and answer.
-- Ask AT MOST ONE clarifying question in the entire conversation, and only when you genuinely cannot act. Never ask two questions in a row, and never repeat a question you already asked.
-- Short messages such as "sim", "yes", "estou em Viseu", "ok" are ANSWERS to your previous question. Treat them as such and give a substantive answer.
-- If something is missing, make the most reasonable assumption, state it in one short sentence, and answer anyway.
+CONVERSATION
+  - Read the full conversation before answering and never ask for information the user already gave.
+  - A KNOWN CONTEXT block may already include the user's location, route, filters, or current item. If it does, use it directly.
+  - Ask at most one clarifying question in the entire conversation, and only when you truly cannot answer usefully.
+  - If a message is a short confirmation like "sim", "ok", "yes", or "estou em Viseu", treat it as a continuation of the same request.
+  - If something is missing, make the best reasonable assumption, state it briefly, and continue.
 
 TOOLS AND DATA
 ${toolList || '- (no tools available in this deployment)'}
-- Call a tool whenever the question could be answered from the app's own data, as described in the tool list above.
-- Prefer the web search tool first for current, factual, location-based, route, accommodation, or service questions. Use app database tools only if the web search does not answer or if the user explicitly asks for app-listed options.
-- Prefer official pages, direct provider pages, accommodation listings and recent pages when using web search.
-- Never tell the user to search, google, browse, or look it up themselves. You must do the search with tools if any tool can help.
-- Never tell the user to go to tourism sites, tourism pages, or comparison portals to do the search themselves.
-- If the first search is too narrow, automatically broaden it and try again before answering.
-- Tool results may be in English; use them as facts only and do not copy their wording verbatim unless necessary.
-- Never call the same tool twice with the same arguments.
-- Only mention items returned by the tools. Never invent names, prices, distances, phone numbers or availability.
-- If a tool returns no records, first try a broader search or the web search tool. If there is still nothing useful, say: "I couldn't confirm an exact match for that filter." Then give one short practical next step.
-- For accommodation, route, and service searches, lead with the answer first. If results exist, start with one short sentence like "Encontrei estas opções:" and then show at most 3 bullets.
-- For accommodation results, include the accommodation name and, when available, put the official site or reservation URL on its own line directly under the bullet so it is easy to copy.
-- For accommodation questions, prefer direct accommodation pages or the app database. Do not answer with generic booking/comparison portals when a direct result exists.
-- Never explain your search process unless the user asks how you found the answer.
-- Questions that need no database lookup (how the credential works, what to pack, general Caminho advice) should be answered directly, without calling tools.
+  - Use a tool whenever it can improve the answer with facts from the app or the web.
+  - Prefer web search first for current, factual, location-based, route, accommodation, or service questions.
+  - Prefer official pages, direct provider pages, accommodation listings, and recent pages.
+  - Never tell the user to search, google, browse, or look it up themselves.
+  - Never tell the user to use tourism sites or comparison portals as a fallback.
+  - If the first search is too narrow, broaden it and try again before answering.
+  - Use tool results as evidence only. Do not copy their wording, tone, or layout.
+  - Never call the same tool twice with the same arguments.
+  - Only mention facts returned by tools. Never invent names, prices, distances, phone numbers, or availability.
+  - If a tool returns no useful records, try a broader search once. If it is still empty, say you could not confirm it and give one short practical next step.
+  - For accommodation, route, and service questions, answer naturally first. Use bullets only if the user asks for a list, options, or comparison.
+  - For accommodation questions, prefer direct accommodation pages or the app database when they exist.
+  - Never explain your search process unless the user asks how you found the answer.
+  - General questions that do not need lookup should be answered directly, without tools.
 
 STYLE
-- Maximum ~100 words for normal answers, ~140 words when listing search results.
-- No preamble, no apologies, no meta talk about limitations unless no result was found.
-- When listing results, use at most 3 short bullets: name — one concrete reason.
-- Prefer short, direct sentences. If you found useful matches, do not end with "search the web" or "check online".`;
+  - Default to one or two short paragraphs.
+  - Use bullets only when the user explicitly asks for options, a list, or a comparison.
+  - Keep the reply concrete, direct, and human, not like a search engine result page.
+  - No preamble, no apologies, no meta talk about limitations unless no result was found.
+  - If you include results, keep them short and practical, with at most 3 items.
+  - Prefer short, direct sentences. Do not end with "search the web" or "check online".`;
 
     const messages: ChatMessage[] = [{ role: 'system', content: system }];
 
@@ -829,6 +829,8 @@ STYLE
   ): string | null {
     const selected = this.uniqueConcreteItems(items)
       .filter((item) => item.kind === 'web')
+      .filter((item) => this.matchesLanguage(item, language))
+      .filter((item) => this.isConcreteWebResult(item))
       .slice(0, MAX_CONCRETE_RESULTS);
 
     if (selected.length === 0) {
@@ -836,20 +838,25 @@ STYLE
     }
 
     const intro = this.concreteIntro(language);
-    const lines = [intro];
+    const sentences: string[] = [intro];
 
     for (const item of selected) {
       const reason = this.buildConcreteReason(item, language);
-      lines.push(`- ${item.title}${reason ? ` - ${reason}` : ''}`);
+      const link = this.bestItemUrl(item);
+      const sentenceParts = [item.title];
 
-      const bestUrl = this.bestItemUrl(item);
-
-      if (bestUrl) {
-        lines.push(`  ${this.linkLabel(language)}: ${bestUrl}`);
+      if (reason) {
+        sentenceParts.push(this.concreteReasonLinkPhrase(language, reason));
       }
+
+      if (link) {
+        sentenceParts.push(`${this.linkLabel(language)}: ${link}`);
+      }
+
+      sentences.push(sentenceParts.join('. ') + '.');
     }
 
-    return lines.join('\n');
+    return sentences.join(' ');
   }
 
   private uniqueConcreteItems(items: RetrievedItem[]): RetrievedItem[] {
@@ -875,6 +882,39 @@ STYLE
         : undefined;
 
     return reservationUrl || item.url || undefined;
+  }
+
+  private isConcreteWebResult(item: RetrievedItem): boolean {
+    const text = `${item.title} ${item.summary} ${item.url ?? ''}`.toLowerCase();
+
+    const blockedPatterns = [
+      'booking.com',
+      'tripadvisor.',
+      'trivago.',
+      'agoda.',
+      'expedia.',
+      'hostelworld.',
+      'airbnb.',
+      'hotels.com',
+      'kayak.',
+      'momondo.',
+      'duckduckgo.com/y.js',
+      'duckduckgo.com',
+      'bing.com/aclick',
+      'google travel',
+      'book hotels',
+      'best price',
+      'bestpreis',
+      'vergleich',
+      'sensationell günstige',
+    ];
+
+    return !blockedPatterns.some((pattern) => text.includes(pattern));
+  }
+
+  private matchesLanguage(item: RetrievedItem, language: string): boolean {
+    const detected = this.detectLanguage(`${item.title} ${item.summary}`);
+    return detected === language || detected === 'en';
   }
 
   private buildConcreteReason(item: RetrievedItem, language: string): string {
@@ -913,17 +953,34 @@ STYLE
   private concreteIntro(language: string): string {
     switch (language) {
       case 'pt':
-        return 'Encontrei estes resultados concretos:';
+        return 'Encontrei dados concretos para isso.';
       case 'es':
-        return 'Encontré estos resultados concretos:';
+        return 'Encontré datos concretos para eso.';
       case 'fr':
-        return 'J\'ai trouvé ces résultats concrets :';
+        return 'J\'ai trouvé des données concrètes pour cela.';
       case 'de':
-        return 'Ich habe diese konkreten Ergebnisse gefunden:';
+        return 'Ich habe dafür konkrete Daten gefunden.';
       case 'it':
-        return 'Ho trovato questi risultati concreti:';
+        return 'Ho trovato dati concreti per questo.';
       default:
-        return 'I found these concrete results:';
+        return 'I found concrete data for that.';
+    }
+  }
+
+  private concreteReasonLinkPhrase(language: string, reason: string): string {
+    switch (language) {
+      case 'pt':
+        return `parece relevante porque ${reason}`;
+      case 'es':
+        return `parece relevante porque ${reason}`;
+      case 'fr':
+        return `semble pertinent parce que ${reason}`;
+      case 'de':
+        return `scheint relevant zu sein, weil ${reason}`;
+      case 'it':
+        return `sembra rilevante perché ${reason}`;
+      default:
+        return `looks relevant because ${reason}`;
     }
   }
 
