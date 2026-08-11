@@ -4,7 +4,7 @@ export const KNOWLEDGE_RETRIEVERS = 'KNOWLEDGE_RETRIEVERS';
 
 /** A single result, whatever the domain it came from. */
 export type RetrievedItem = {
-  kind: 'accommodation' | 'stage' | 'place-price' | 'camino';
+  kind: 'accommodation' | 'stage' | 'place-price' | 'camino' | 'web';
   id: string | number;
   /** Short label the assistant can show to the user. */
   title: string;

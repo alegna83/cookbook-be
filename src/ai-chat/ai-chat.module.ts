@@ -9,6 +9,7 @@ import {
   AccommodationsRetriever,
 } from './retrievers/accomodations.retriever';
 import { STAGES_PORT, StagesRetriever } from './retrievers/stages.retriever';
+import { WebSearchRetriever } from './retrievers/web-search.retriever';
 import { AccommodationsModule } from '../accommodations/accommodations.module';
 import { AccommodationsService } from '../accommodations/accommodations.service';
 import { StagesModule } from '../stages/stages.module';
@@ -33,6 +34,7 @@ import { CAMINOS_PORT, CaminosRetriever } from './retrievers/caminos.retriever';
     AccommodationsRetriever,
     StagesRetriever,
     CaminosRetriever,
+    WebSearchRetriever,
 
     // Add a domain: write the retriever, register it here, add it to `inject`.
     // Nothing in AiChatService changes; the tool list in the prompt is built
@@ -40,7 +42,12 @@ import { CAMINOS_PORT, CaminosRetriever } from './retrievers/caminos.retriever';
     {
       provide: KNOWLEDGE_RETRIEVERS,
       useFactory: (...retrievers: KnowledgeRetriever[]) => retrievers,
-      inject: [AccommodationsRetriever, StagesRetriever, CaminosRetriever],
+      inject: [
+        AccommodationsRetriever,
+        StagesRetriever,
+        CaminosRetriever,
+        WebSearchRetriever,
+      ],
     },
   ],
   exports: [AiChatService],

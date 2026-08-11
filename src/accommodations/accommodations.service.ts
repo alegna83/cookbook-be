@@ -1017,9 +1017,14 @@ export class AccommodationsService {
       .take(limit);
 
     if (params.locality) {
-      query = query.andWhere('LOWER(BTRIM(place.region)) = LOWER(BTRIM(:locality))', {
-        locality: params.locality,
-      });
+      query = query.andWhere(
+        `(
+          LOWER(COALESCE(BTRIM(place.region), '')) LIKE LOWER(:localityLike)
+          OR LOWER(COALESCE(BTRIM(place.place_name), '')) LIKE LOWER(:localityLike)
+          OR LOWER(COALESCE(BTRIM(place.location_help), '')) LIKE LOWER(:localityLike)
+        )`,
+        { localityLike: `%${params.locality}%` },
+      );
     }
 
     if (params.type) {
@@ -1030,12 +1035,20 @@ export class AccommodationsService {
 
     if (params.service) {
       query = query.andWhere(
-        `EXISTS (
-          SELECT 1
-          FROM json_array_elements_text(COALESCE(place.services::json, '[]'::json)) AS service_item
-          WHERE LOWER(service_item) LIKE LOWER(:service)
+        `(
+          EXISTS (
+            SELECT 1
+            FROM json_array_elements_text(COALESCE(place.services::json, '[]'::json)) AS service_item
+            WHERE LOWER(service_item) LIKE LOWER(:serviceLike)
+          )
+          OR EXISTS (
+            SELECT 1
+            FROM json_array_elements_text(COALESCE(place.nearbyActivities::json, '[]'::json)) AS activity_item
+            WHERE LOWER(activity_item) LIKE LOWER(:serviceLike)
+          )
+          OR LOWER(COALESCE(BTRIM(place.location_help), '')) LIKE LOWER(:serviceLike)
         )`,
-        { service: `%${params.service}%` },
+        { serviceLike: `%${params.service}%` },
       );
     }
 
