@@ -445,6 +445,14 @@ STYLE
         };
       }
 
+      if (this.isAccommodationRequest(userMessage) && round === MAX_TOOL_ROUNDS) {
+        return {
+          answer: this.noResultsWebFallback(retrievalContext.language),
+          usedTools,
+          groundedOn,
+        };
+      }
+
       if (groundedOn === 0) {
         const webFallback = await this.tryWebFallback(
           baseUrl,
@@ -751,9 +759,17 @@ STYLE
       /\b(?:search the web|look it up|browse the web)\b/i,
       /\b(?:tourism|turismo)\b[^\n]*(?:site|sites|page|pages|portal|portals|website|websites)/i,
       /\b(?:visit|visita|consulte|consulta|check|see)\b[^\n]*(?:tourism|turismo)\b/i,
+      /\b(?:plataformas?|platforms?)\s+(?:de\s+)?reservas?\b/i,
+      /\b(?:pergunte|ask)\b[^\n]*(?:a\s+)?(?:locais|locals|people|pessoas|other pilgrims|outros peregrinos)\b/i,
     ];
 
     return patterns.some((pattern) => pattern.test(text));
+  }
+
+  private isAccommodationRequest(text: string): boolean {
+    return /\b(alojamento|alojamentos|acomodacao|acomodações|accommodations?|hotel|hostel|guesthouse|pensão|pensao)\b/i.test(
+      text,
+    );
   }
 
   private noSearchFallback(language: string): string {

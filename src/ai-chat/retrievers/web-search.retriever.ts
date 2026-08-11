@@ -106,6 +106,11 @@ export class WebSearchRetriever implements KnowledgeRetriever {
       const rawUrl = match[1];
       const titleHtml = match[2];
       const snippetHtml = match[3];
+
+      if (this.isDuckDuckGoAd(rawUrl)) {
+        continue;
+      }
+
       const url = this.cleanDuckDuckGoUrl(rawUrl);
       const title = this.stripHtml(titleHtml);
       const snippet = this.stripHtml(snippetHtml);
@@ -157,13 +162,34 @@ export class WebSearchRetriever implements KnowledgeRetriever {
     }
   }
 
+  private isDuckDuckGoAd(rawUrl: string): boolean {
+    try {
+      const parsed = new URL(rawUrl, 'https://duckduckgo.com');
+      return parsed.searchParams.has('ad_domain') || parsed.searchParams.has('ad_provider');
+    } catch {
+      return false;
+    }
+  }
+
   private cleanDuckDuckGoUrl(rawUrl: string): string {
     try {
       const parsed = new URL(rawUrl, 'https://duckduckgo.com');
-      const target = parsed.searchParams.get('uddg');
+      const target =
+        parsed.searchParams.get('uddg') ||
+        parsed.searchParams.get('u') ||
+        parsed.searchParams.get('u3');
+
       if (target) {
-        return decodeURIComponent(target);
+        const decoded = decodeURIComponent(target);
+        if (/^https?:\/\//i.test(decoded)) {
+          return decoded;
+        }
       }
+
+      if (/^https?:\/\//i.test(rawUrl)) {
+        return rawUrl;
+      }
+
       return rawUrl;
     } catch {
       return rawUrl;
