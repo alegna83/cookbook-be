@@ -1,5 +1,5 @@
 ﻿@startuml
-title Stays4Pilgrims - Accomodation browsing and comments communication
+title Stays4Pilgrims - Accommodation browsing and comments communication
 hide footbox
 skinparam defaultFontName Arial
 skinparam defaultFontSize 12
@@ -14,8 +14,8 @@ skinparam sequence {
 
 actor User
 participant "Frontend" as FE
-participant "Accomm Ctrl" as AccomodationsController
-participant "Accomm Svc" as AccomodationsService
+participant "Accommodation Ctrl" as AccommodationController
+participant "Accommodation Svc" as AccommodationService
 participant "Comments Ctrl" as CommentsController
 participant "Comments Svc" as CommentsService
 database "PostgreSQL" as DB
@@ -23,22 +23,22 @@ database "PostgreSQL" as DB
 == Accommodation discovery ==
 
 User -> FE : open home / Camino / detail
-FE -> AccomodationsController : handle(getall)
-AccomodationsController -> AccomodationsService : findAll(page, limit)
-AccomodationsService -> DB : fetch accommodations
-AccomodationsController --> FE : accommodation list
+FE -> AccommodationController : handle(getall)
+AccommodationController -> AccommodationService : findAll(page, limit)
+AccommodationService -> DB : fetch accommodations
+AccommodationController --> FE : accommodation list
 
 User -> FE : filter by Camino
-FE -> AccomodationsController : handle(getbycamino)
-AccomodationsController -> AccomodationsService : findByCamino(name)
-AccomodationsService -> DB : fetch filtered list
-AccomodationsController --> FE : filtered list
+FE -> AccommodationController : handle(getbycamino)
+AccommodationController -> AccommodationService : findByCamino(name)
+AccommodationService -> DB : fetch filtered list
+AccommodationController --> FE : filtered list
 
-User -> FE : open Accomodation detail
-FE -> AccomodationsController : handle(getone)
-AccomodationsController -> AccomodationsService : findOne(id, accountId)
-AccomodationsService -> DB : fetch detail + relations
-AccomodationsController --> FE : detail + gallery + services
+User -> FE : open Accommodation detail
+FE -> AccommodationController : handle(getone)
+AccommodationController -> AccommodationService : findOne(id, accountId)
+AccommodationService -> DB : fetch detail + relations
+AccommodationController --> FE : detail + gallery + services
 
 == Comments and ratings ==
 

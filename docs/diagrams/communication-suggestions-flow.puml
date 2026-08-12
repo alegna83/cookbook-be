@@ -16,7 +16,7 @@ actor User
 participant "Frontend" as FE
 participant "Sug Ctrl" as SuggestionController
 participant "Sug Svc" as SuggestionService
-participant "Accomm Svc" as AccomodationsService
+participant "Accommodation Svc" as AccommodationService
 participant "Com Svc" as CommentsService
 database "PostgreSQL" as DB
 participant "OpenRouter / OpenAI" as AI
@@ -36,15 +36,15 @@ FE --> User : show suggestions notification and dialog
 
 == Best accommodation recommendation ==
 
-User -> FE : request best Accomodation recommendation
+User -> FE : request best Accommodation recommendation
 note over FE
 Best accommodation trigger
 is shown only for authenticated users.
 end note
-FE -> SuggestionController : bestAccomodation(lat, lon, radius, category)
-SuggestionController -> SuggestionService : suggestBestAccomodation(...)
-SuggestionService -> AccomodationsService : getByBounds(bounds)
-AccomodationsService -> DB : fetch approved in area
+FE -> SuggestionController : bestAccommodation(lat, lon, radius, category)
+SuggestionController -> SuggestionService : suggestBestAccommodation(...)
+SuggestionService -> AccommodationService : getByBounds(bounds)
+AccommodationService -> DB : fetch approved in area
 SuggestionService -> CommentsService : use ratings + counts
 CommentsService -> DB : aggregate comment statistics
 alt enough local rating data
@@ -54,6 +54,6 @@ else fallback to best local option
   SuggestionService -> SuggestionService : rank by reviews + ratings
 end
 SuggestionController --> FE : JSON recommendation payload
-FE --> User : show best Accomodation popup
+FE --> User : show best Accommodation popup
 
 @enduml

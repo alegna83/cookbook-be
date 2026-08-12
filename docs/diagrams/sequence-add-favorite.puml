@@ -17,16 +17,16 @@ participant "Stays4Pilgrims Backend - FavoritesController" as API
 participant "FavoritesService" as SVC
 database "FavoritesRepo / DB" as DB
 
-User -> FE: Click heart icon on Accomodation
+User -> FE: Click heart icon on Accommodation
 alt already favorited
-  FE -> API: POST /favorites/handle\n{action:'toggle', payload:{AccomodationId, accountId}}
+  FE -> API: POST /favorites/handle\n{action:'toggle', payload:{AccommodationId, accountId}}
 else not favorited
-  FE -> API: POST /favorites/handle\n{action:'toggle', payload:{AccomodationId, accountId}}
+  FE -> API: POST /favorites/handle\n{action:'toggle', payload:{AccommodationId, accountId}}
 end
 activate API
-API -> SVC: toggle(accountId, AccomodationId)
+API -> SVC: toggle(accountId, AccommodationId)
 activate SVC
-SVC -> DB: find Favorite {account, Accomodation}
+SVC -> DB: find Favorite {account, Accommodation}
 activate DB
 DB --> SVC: existing or null
 deactivate DB
@@ -37,7 +37,7 @@ alt exists
   deactivate DB
   SVC --> API: {action: 'removed', ok: true}
 else not exists
-  SVC -> DB: create new Favorite {accountId, AccomodationId}
+  SVC -> DB: create new Favorite {accountId, AccommodationId}
   activate DB
   DB --> SVC: saved favorite entity
   deactivate DB
@@ -48,7 +48,7 @@ API --> FE: 200 OK {action, favoriteId?}
 deactivate API
 FE --> User: Update heart icon UI (filled/empty)
 
-note over SVC,DB: Favorite is an M:N relation\nbetween Account and Accomodation
+note over SVC,DB: Favorite is an M:N relation\nbetween Account and Accommodation
 
 @enduml
 

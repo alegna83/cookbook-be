@@ -1,5 +1,5 @@
 ﻿@startuml
-title Add Accomodation (create) sequence
+title Add Accommodation (create) sequence
 scale 0.85
 hide footbox
 skinparam defaultFontName Arial
@@ -13,17 +13,17 @@ skinparam sequence {
 }
 actor User
 participant "Stays4Pilgrims Frontend" as FE
-participant "Stays4Pilgrims Backend - AccomodationsController" as API
-participant "AccomodationsService" as SVC
+participant "Stays4Pilgrims Backend - AccommodationController" as API
+participant "AccommodationService" as SVC
 participant "ContentModerationService" as MOD
 participant "CategoryRepo / DB" as CATDB
-participant "AccomodationRepo / DB" as ADB
+participant "AccommodationRepo / DB" as ADB
 participant "GalleryPhotoRepo / DB" as GDB
 
-User -> FE: Fill "Add Accomodation" form\n(data + main_photo + gallery_photos)
-FE -> API: POST /Accomodations/handle\n{action:'create', payload:CreateAccomodationDto}
+User -> FE: Fill "Add Accommodation" form\n(data + main_photo + gallery_photos)
+FE -> API: POST /Accommodations/handle\n{action:'create', payload:CreateAccommodationDto}
 activate API
-API -> SVC: create(CreateAccomodationDto)
+API -> SVC: create(CreateAccommodationDto)
 activate SVC
 alt gallery_photos present
   SVC -> MOD: moderateImageUrls(galleryPhotoUrls)
@@ -39,16 +39,16 @@ alt gallery_photos present
   end
 end
 
-alt Accomodation_category provided
+alt Accommodation_category provided
   SVC -> CATDB: find category by id or name
   activate CATDB
   CATDB --> SVC: category or not found
   deactivate CATDB
 end
 
-SVC -> ADB: save new Accomodation\n(main_photo normalized)
+SVC -> ADB: save new Accommodation\n(main_photo normalized)
 activate ADB
-ADB --> SVC: saved Accomodation id
+ADB --> SVC: saved Accommodation id
 deactivate ADB
 
 alt gallery_photos present
@@ -63,9 +63,9 @@ activate ADB
 ADB --> SVC: full saved entity
 deactivate ADB
 
-SVC --> API: return created AccomodationDto
+SVC --> API: return created AccommodationDto
 deactivate SVC
-API --> FE: 200 OK {AccomodationDto}
+API --> FE: 200 OK {AccommodationDto}
 deactivate API
 
 note over FE,GDB: Gallery photos start as pending\nand are approved/rejected later

@@ -31,9 +31,10 @@ Backend --> DB : SQL queries\n(transactions)
 note right of Backend
 Core domains:
 - Auth and Accounts
-- Accommodations and Comments
+- Accommodation and Comments
 - Upload and Moderation
 - Suggestions and Contact
+- AI Chat
 end note
 
 @enduml

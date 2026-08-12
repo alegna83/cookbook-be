@@ -30,7 +30,7 @@ package "Stays4Pilgrims System" {
   package "Stays4Pilgrims Backend (NestJS)" as Backend {
     component "Auth Service\n[Hash passwords - bcrypt]" as AUTH
     component "Accounts Service\n[Email, Name, Password]" as ACC
-    component "Accomodations Service\n[Address, Contact Info]" as AccomodationS
+    component "Accommodations Service\n[Address, Contact Info]" as AccommodationService
     component "Comments Service\n[Rating, Text]" as COMMENTS
     component "Gallery Service\n[Image URLs, metadata]" as GALLERY
     component "Contact Service\n[Name, Email, Phone, Message]" as CONTACT
@@ -38,9 +38,9 @@ package "Stays4Pilgrims System" {
 
   database "PostgreSQL" as DB {
     entity "accounts\n(id, email, password_hash,\nname, phone, isEmailVerified,\ncreatedAt)" as TBL_ACC
-    entity "Accomodations\n(id, Accomodation_name, address,\nphone, email, website,\naccount_id)" as TBL_AccomodationS
-    entity "comments\n(id, text, rating,\naccountId, AccomodationId,\nstatus, createdAt)" as TBL_COMMENTS
-    entity "gallery_photos\n(id, url, accountId,\nAccomodationId, status)" as TBL_GALLERY
+    entity "Accommodations\n(id, Accommodation_name, address,\nphone, email, website,\naccount_id)" as TBL_Accommodations
+    entity "comments\n(id, text, rating,\naccountId, AccommodationId,\nstatus, createdAt)" as TBL_COMMENTS
+    entity "gallery_photos\n(id, url, accountId,\nAccommodationId, status)" as TBL_GALLERY
   }
 
   package "External Services" {
@@ -58,13 +58,13 @@ FE_INPUT --> AUTH: credentials
 FE_INPUT --> CONTACT: contact form payload
 AUTH --> TBL_ACC: hash + store
 ACC --> TBL_ACC: name, email, phone
-AccomodationS --> TBL_AccomodationS: address, contact
+AccommodationService --> TBL_Accommodations: address, contact
 COMMENTS --> TBL_COMMENTS: text, rating
 GALLERY --> TBL_GALLERY: URLs
 CONTACT --> EMAIL_SVC: forward contact request
 EMAIL_SVC <--> ACC: verification flows
 EMAIL_SVC <--> COMMENTS: moderation decision emails
-EMAIL_SVC <--> AccomodationS: moderation decision emails
+EMAIL_SVC <--> AccommodationService: moderation decision emails
 STORAGE <-- GALLERY: image uploads
 DB --> BACKUP: nightly snapshot
 DB --> AUDIT: all queries logged
@@ -75,16 +75,16 @@ note right of TBL_ACC
   Deleted accounts - anonymized after 30 days
 end note
 
-note right of TBL_AccomodationS
+note right of TBL_Accommodations
   PII: phone, email, address
-  Retention: While Accomodation is active
-  Archived Accomodations - retained 12 months
+  Retention: While Accommodation is active
+  Archived Accommodations - retained 12 months
 end note
 
 note right of EMAIL_SVC
   Verification: 24h transient tokens
   Contact and moderation emails include
-  user identity, Accomodation name and optional reason
+  user identity, Accommodation name and optional reason
   Logs: Deleted after completion
 end note
 

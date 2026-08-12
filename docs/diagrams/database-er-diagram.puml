@@ -9,19 +9,19 @@ entity "Account (accounts)" as account {
   * is_email_verified : BOOLEAN
 }
 
-entity "Accomodation" as Accomodation {
+entity "Accommodation" as Accommodation {
   * id : INT <<PK>>
-  * Accomodation_name : VARCHAR(255)
+  * Accommodation_name : VARCHAR(255)
   * status : ENUM (pending, approved, rejected)
   * approved_at : TIMESTAMP
   * rejection_reason : VARCHAR(500)
   account_id : INT <<FK>>
-  Accomodation_category_id : INT <<FK>>
+  Accommodation_category_id : INT <<FK>>
   camino_id : INT <<FK>>
   stage_id : INT <<FK>>
 }
 
-entity "AccomodationCategory (Accomodation_categories)" as Accomodation_category {
+entity "AccommodationCategory (Accommodation_categories)" as AccommodationCategory {
   * id : INT <<PK>>
   * name : VARCHAR(100) <<UQ>>
 }
@@ -36,7 +36,7 @@ entity "Comment (comments)" as comment {
   * created_at : TIMESTAMP
   * updated_at : TIMESTAMP
   account_id : INT <<FK>>
-  Accomodation_id : INT <<FK>>
+  Accommodation_id : INT <<FK>>
 }
 
 entity "GalleryPhoto (gallery_photos)" as gallery_photo {
@@ -47,26 +47,26 @@ entity "GalleryPhoto (gallery_photos)" as gallery_photo {
   * rejection_reason : VARCHAR(500)
   * created_at : TIMESTAMP
   account_id : INT <<FK>>
-  Accomodation_id : INT <<FK>>
+  Accommodation_id : INT <<FK>>
 }
 
 entity "Favorite (favorites)" as favorite {
   * id : INT <<PK>>
   * created_at : TIMESTAMP
   account_id : INT <<FK>>
-  Accomodation_id : INT <<FK>>
+  Accommodation_id : INT <<FK>>
 }
 
-entity "AccomodationPrice" as Accomodation_price {
+entity "AccommodationPrice" as AccommodationPrice {
   * id : INT <<PK>>
   * description : VARCHAR
   * price : DECIMAL(10,2)
-  Accomodation_id : INT <<FK>>
+  Accommodation_id : INT <<FK>>
 }
 
-entity "AccomodationRemovalRequest" as Accomodation_removal_request {
+entity "AccommodationRemovalRequest" as AccommodationRemovalRequest {
   * id : INT <<PK>>
-  * Accomodation_name : VARCHAR(255)
+  * Accommodation_name : VARCHAR(255)
   * requester_name : VARCHAR(255)
   * requester_email : VARCHAR(255)
   * reason : TEXT
@@ -75,10 +75,10 @@ entity "AccomodationRemovalRequest" as Accomodation_removal_request {
   * reviewed_at : TIMESTAMP
   * rejection_reason : VARCHAR(500)
   account_id : INT <<FK>>
-  Accomodation_id : INT <<FK>>
+  Accommodation_id : INT <<FK>>
 }
 
-entity "AccomodationEditRequest" as Accomodation_edit_request {
+entity "AccommodationEditRequest" as AccommodationEditRequest {
   * id : INT <<PK>>
   * requester_name : VARCHAR(255)
   * requester_email : VARCHAR(255)
@@ -89,7 +89,7 @@ entity "AccomodationEditRequest" as Accomodation_edit_request {
   * reviewed_at : TIMESTAMP
   * rejection_reason : VARCHAR(500)
   account_id : INT <<FK>>
-  Accomodation_id : INT <<FK>>
+  Accommodation_id : INT <<FK>>
 }
 
 entity "Camino (caminos)" as camino {
@@ -104,22 +104,22 @@ entity "Stage (stages)" as stage {
 }
 
 ' Relationships
-account ||--o{ Accomodation : "owns"
+account ||--o{ Accommodation : "owns"
 account ||--o{ comment : "writes"
 account ||--o{ gallery_photo : "uploads"
 account ||--o{ favorite : "marks"
-account ||--o{ Accomodation_removal_request : "requests"
-account ||--o{ Accomodation_edit_request : "requests"
+account ||--o{ AccommodationRemovalRequest : "requests"
+account ||--o{ AccommodationEditRequest : "requests"
 
-Accomodation_category ||--o{ Accomodation : "categorizes"
-Accomodation ||--o{ comment : "receives"
-Accomodation ||--o{ gallery_photo : "contains"
-Accomodation ||--o{ favorite : "marked_in"
-Accomodation ||--o{ Accomodation_price : "has_prices"
-Accomodation ||--o{ Accomodation_removal_request : "subject_of"
-Accomodation ||--o{ Accomodation_edit_request : "subject_of"
-Accomodation }o--|| camino : "located_in"
-Accomodation }o--|| stage : "mapped_to"
+AccommodationCategory ||--o{ Accommodation : "categorizes"
+Accommodation ||--o{ comment : "receives"
+Accommodation ||--o{ gallery_photo : "contains"
+Accommodation ||--o{ favorite : "marked_in"
+Accommodation ||--o{ AccommodationPrice : "has_prices"
+Accommodation ||--o{ AccommodationRemovalRequest : "subject_of"
+Accommodation ||--o{ AccommodationEditRequest : "subject_of"
+Accommodation }o--|| camino : "located_in"
+Accommodation }o--|| stage : "mapped_to"
 
 camino ||--o{ stage : "contains"
 

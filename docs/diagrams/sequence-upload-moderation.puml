@@ -19,10 +19,10 @@ participant "Storage (S3/local)" as STORAGE
 participant "ContentModerationService" as MOD
 participant "GalleryPhotoRepo / DB" as GDB
 
-User -> FE: Select image and submit\n(AccomodationId, accountId)
-FE -> API: POST /upload (multipart)\n{file, AccomodationId, accountId}
+User -> FE: Select image and submit\n(AccommodationId, accountId)
+FE -> API: POST /upload (multipart)\n{file, AccommodationId, accountId}
 activate API
-API -> UP: handleUpload(file, folder='Accomodations/gallery')
+API -> UP: handleUpload(file, folder='Accommodations/gallery')
 activate UP
 UP -> STORAGE: store file -> returns public URL/path
 activate STORAGE
@@ -33,7 +33,7 @@ activate MOD
 MOD --> UP: decision {allow | reject}
 deactivate MOD
 alt allow
-  UP -> GDB: create GalleryPhoto {url, Accomodation, account, status: 'pending'}
+  UP -> GDB: create GalleryPhoto {url, Accommodation, account, status: 'pending'}
   activate GDB
   GDB --> UP: saved photo entity
   deactivate GDB
@@ -45,7 +45,7 @@ deactivate UP
 API --> FE: 200 OK {url, status} or 400 Bad Request
 deactivate API
 
-note over GDB,MOD: Admin can later approve/reject\nvia Accomodations/handle actions
+note over GDB,MOD: Admin can later approve/reject\nvia Accommodations/handle actions
 
 @enduml
 

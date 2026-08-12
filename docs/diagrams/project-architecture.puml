@@ -21,9 +21,10 @@ component "Stays4Pilgrims Frontend\n(Web / Mobile)" as FE
 
 package "Stays4Pilgrims Backend (NestJS)" as BE {
   component "Auth\nAccounts" as AUTH
-  component "Accomodations" as ACC
+  component "Accommodation\nmodule" as ACC
   component "Caminos\nStages\nStatistics" as ROUTES
   component "Comments\nFavorites\nSuggestions" as SOCIAL
+  component "AI Chat" as AI_CHAT
   component "Upload" as UPLOAD
   component "Content\nModeration" as MOD
   component "Contact" as CONTACT
@@ -41,19 +42,22 @@ AUTH -[hidden]down-> ACC
 ACC -[hidden]down-> ROUTES
 ROUTES -[hidden]down-> SOCIAL
 SOCIAL -[hidden]down-> UPLOAD
-UPLOAD -[hidden]down-> MOD
+UPLOAD -[hidden]down-> AI_CHAT
+AI_CHAT -[hidden]down-> MOD
 MOD -[hidden]down-> CONTACT
 
 AUTH --> DB : accounts, sessions
 ACC --> DB : places, categories, requests
 ROUTES --> DB : caminos, stages, stats
 SOCIAL --> DB : comments, favorites
+AI_CHAT --> DB : read-only domain lookups
 UPLOAD --> CLOUDINARY : media upload/delete
 MOD --> OPENAI : moderation checks
 AUTH --> EMAIL : auth emails
 ACC --> EMAIL : moderation emails
 SOCIAL --> EMAIL : review notifications
 CONTACT --> EMAIL : contact delivery
+AI_CHAT --> OPENAI : chat completions / fallback
 
 note right of BE
   Core backend domains in AppModule.

@@ -37,7 +37,7 @@ group 2) Content contribution
     API -> DB : update user avatar
     API --> FE : account updated
   else Accommodation photo
-    FE -> API : POST /Accomodations/handle {action:addphotos}
+    FE -> API : POST /Accommodations/handle {action:addphotos}
     API -> ModSvc : create moderation item
     ModSvc -> DB : state = pending
     ModSvc -> Email : notify admins
