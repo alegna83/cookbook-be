@@ -15,9 +15,13 @@ import { PlaceEditRequest } from './entities/place-edit-request.entity';
 import { CreateEditRequestDto } from './dto/create-edit-request.dto';
 import { ContentModerationService } from 'src/moderation/content-moderation.service';
 import { EmailService } from 'src/auth/email.service';
+import type {
+  AccommodationChatRow,
+  AccommodationsPort,
+} from 'src/ai-chat/retrievers/accomodations.retriever';
 
 @Injectable()
-export class AccommodationsService {
+export class AccommodationsService implements AccommodationsPort {
   private readonly readCache = new Map<
     string,
     { expiresAt: number; value: unknown }
@@ -127,7 +131,6 @@ export class AccommodationsService {
   private normalizeBoundsValue(value: number): number {
     // 3 decimals (~110m) improves cache hit rate for map pan/zoom requests.
     return Number(value.toFixed(3));
-
   }
 
   private buildBoundsCacheKey(bounds: {
@@ -171,6 +174,7 @@ export class AccommodationsService {
 
     return undefined;
   }
+
   private async getAdminEmails(): Promise<string[]> {
     const admins = await this.accountRepo.find({ where: { userType: 'admin' } });
 
@@ -914,217 +918,6 @@ export class AccommodationsService {
     });
   }
 
-  async findForChat(params: {
-    locality?: string;
-    lat?: number;
-    lng?: number;
-    radiusKm?: number;
-    maxPriceEur?: number;
-    type?: string;
-    service?: string;
-    limit: number;
-  }): Promise<
-    Array<{
-      id: number;
-      name: string;
-      url?: string | null;
-      reservationUrl?: string | null;
-      type?: string | null;
-      locality?: string | null;
-      priceFrom?: number | null;
-      rating?: number | null;
-      reviewsCount?: number | null;
-      distanceKm?: number | null;
-      services?: string[] | null;
-      nearbyActivities?: string[] | null;
-      pilgrimExclusive?: boolean | null;
-      allowsReservations?: boolean | null;
-      datesOpen?: string | null;
-    }>
-  > {
-    const limit = Math.min(Math.max(Math.floor(params.limit || 8), 1), 20);
-    const radiusKm = Math.min(Math.max(Number(params.radiusKm ?? 15), 1), 50);
-
-    const asBoolean = (value: unknown): boolean | null => {
-      if (value === true || value === 'true' || value === 1 || value === '1') {
-        return true;
-      }
-      if (value === false || value === 'false' || value === 0 || value === '0') {
-        return false;
-      }
-      return null;
-    };
-
-    const asStringList = (value: unknown): string[] | null => {
-      if (Array.isArray(value)) {
-        return value.map((item) => String(item).trim()).filter(Boolean);
-      }
-
-      if (typeof value === 'string' && value.trim()) {
-        try {
-          const parsed = JSON.parse(value);
-          if (Array.isArray(parsed)) {
-            return parsed.map((item) => String(item).trim()).filter(Boolean);
-          }
-        } catch {
-          return value
-            .split(',')
-            .map((item) => item.trim())
-            .filter(Boolean);
-        }
-      }
-
-      return null;
-    };
-
-    let query = this.placeRepository
-      .createQueryBuilder('place')
-      .leftJoin('place.place_category', 'place_category')
-      .leftJoin('place.prices', 'prices')
-      .leftJoin('place.camino', 'camino')
-      .leftJoin('place.stage', 'stage')
-      .leftJoin('comments', 'comment', 'comment.place_id = place.id AND comment.status = :approvedCommentStatus', {
-        approvedCommentStatus: 'approved',
-      })
-      .select([
-        'place.id AS id',
-        'place.place_name AS name',
-        'place.link AS url',
-        'place.reservation_link AS reservationUrl',
-        'place.region AS locality',
-        'place_category.name AS type',
-        'place.services AS services',
-        'place.nearbyActivities AS nearbyActivities',
-        'place.pilgrim_exclusive AS pilgrimExclusiveRaw',
-        'place.allow_reservation AS allowsReservationsRaw',
-        'place.dates_open AS datesOpen',
-        'place.latitude AS latitude',
-        'place.longitude AS longitude',
-        'MIN(prices.price) AS priceFrom',
-        'AVG(comment.rating) AS rating',
-        'COUNT(comment.id) AS reviewsCount',
-      ])
-      .where('place.status = :status', { status: 'approved' })
-      .groupBy('place.id')
-      .addGroupBy('place.place_name')
-      .addGroupBy('place.link')
-      .addGroupBy('place.reservation_link')
-      .addGroupBy('place.region')
-      .addGroupBy('place.place_category_id')
-      .addGroupBy('place.services')
-      .addGroupBy('place.nearbyActivities')
-      .addGroupBy('place.pilgrim_exclusive')
-      .addGroupBy('place.allow_reservation')
-      .addGroupBy('place.dates_open')
-      .addGroupBy('place.latitude')
-      .addGroupBy('place.longitude')
-      .orderBy('reviewsCount', 'DESC')
-      .addOrderBy('rating', 'DESC')
-      .take(limit);
-
-    if (params.locality) {
-      query = query.andWhere(
-        `(
-          LOWER(COALESCE(BTRIM(place.region), '')) LIKE LOWER(:localityLike)
-          OR LOWER(COALESCE(BTRIM(place.place_name), '')) LIKE LOWER(:localityLike)
-          OR LOWER(COALESCE(BTRIM(place.location_help), '')) LIKE LOWER(:localityLike)
-        )`,
-        { localityLike: `%${params.locality}%` },
-      );
-    }
-
-    if (params.type) {
-      query = query.andWhere('LOWER(BTRIM(place_category.name)) = LOWER(BTRIM(:type))', {
-        type: params.type,
-      });
-    }
-
-    if (params.service) {
-      query = query.andWhere(
-        `(
-          EXISTS (
-            SELECT 1
-            FROM json_array_elements_text(COALESCE(place.services::json, '[]'::json)) AS service_item
-            WHERE LOWER(service_item) LIKE LOWER(:serviceLike)
-          )
-          OR EXISTS (
-            SELECT 1
-            FROM json_array_elements_text(COALESCE(place.nearbyActivities::json, '[]'::json)) AS activity_item
-            WHERE LOWER(activity_item) LIKE LOWER(:serviceLike)
-          )
-          OR LOWER(COALESCE(BTRIM(place.location_help), '')) LIKE LOWER(:serviceLike)
-        )`,
-        { serviceLike: `%${params.service}%` },
-      );
-    }
-
-    if (params.maxPriceEur != null) {
-      query = query.andWhere('COALESCE((SELECT MIN(pp.price) FROM place_prices pp WHERE pp.placeId = place.id), 999999) <= :maxPriceEur', {
-        maxPriceEur: params.maxPriceEur,
-      });
-    }
-
-    if (params.lat != null && params.lng != null) {
-      query = query.andWhere(
-        `(
-          111.32 * SQRT(
-            POWER(COALESCE(place.latitude::float, 0) - :lat, 2) +
-            POWER((COALESCE(place.longitude::float, 0) - :lng) * COS(RADIANS(:lat)), 2)
-          )
-        ) <= :radiusKm`,
-        { lat: params.lat, lng: params.lng, radiusKm },
-      );
-    }
-
-    const rows = await query.getRawMany();
-
-    return rows.map((row: Record<string, unknown>) => ({
-      id: Number(row.id),
-      name: String(row.name ?? ''),
-      url:
-        row.url != null
-          ? String(row.url)
-          : row.link != null
-            ? String(row.link)
-            : null,
-      reservationUrl:
-        row.reservationurl != null
-          ? String(row.reservationurl)
-          : row.reservationUrl != null
-            ? String(row.reservationUrl)
-            : null,
-      type: row.type != null ? String(row.type) : null,
-      locality: row.locality != null ? String(row.locality) : null,
-      priceFrom:
-        row.pricefrom != null
-          ? Number(row.pricefrom)
-          : row.priceFrom != null
-            ? Number(row.priceFrom)
-            : null,
-      rating: row.rating != null ? Number(row.rating) : null,
-      reviewsCount:
-        row.reviewscount != null
-          ? Number(row.reviewscount)
-          : row.reviewsCount != null
-            ? Number(row.reviewsCount)
-            : null,
-      distanceKm:
-        row.latitude != null && row.longitude != null && params.lat != null && params.lng != null
-          ? Number(row.distancekm ?? row.distanceKm ?? null)
-          : null,
-      services: asStringList(row.services),
-      nearbyActivities: asStringList(row.nearbyactivities ?? row.nearbyActivities),
-      pilgrimExclusive: asBoolean(row.pilgrimExclusiveraw ?? row.pilgrimExclusiveRaw),
-      allowsReservations: asBoolean(row.allowsReservationsraw ?? row.allowsReservationsRaw),
-      datesOpen:
-        row.datesopen != null
-          ? String(row.datesopen)
-          : row.datesOpen != null
-            ? String(row.datesOpen)
-            : null,
-    }));
-  }
-
   async findAccommodationByPlaceId(placeId: number): Promise<any> {
     const cacheKey = `findAccommodationByPlaceId:${placeId}`;
     const cached = this.getCachedValue<Accommodation>(cacheKey);
@@ -1538,8 +1331,7 @@ export class AccommodationsService {
 
       return dtos;
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      throw new BadRequestException(`Error fetching pending photos: ${message}`);
+      throw new BadRequestException(`Error fetching pending photos: ${e.message}`);
     }
   }
 
@@ -2014,5 +1806,242 @@ export class AccommodationsService {
       reason: request.rejectionReason,
     });
     return this.formatRemovalRequest(saved);
+  }
+
+  // ---------------------------------------------------------------------------
+  // AI chat integration (AccommodationsPort)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Feeds the AI assistant's `search_accommodations` tool.
+   *
+   * Differs from getByBounds on purpose: the assistant searches around a point
+   * with a radius, or by town name, and it needs prices and services to answer
+   * "where can I sleep for under 15 EUR with laundry?".
+   */
+  async findForChat(params: {
+    locality?: string;
+    lat?: number;
+    lng?: number;
+    radiusKm?: number;
+    maxPriceEur?: number;
+    type?: string;
+    service?: string;
+    limit: number;
+  }): Promise<AccommodationChatRow[]> {
+    const limit = Math.min(Math.max(params.limit ?? 8, 1), 20);
+    const radiusKm = Math.min(Math.max(params.radiusKm ?? 15, 1), 50);
+    const hasPoint =
+      Number.isFinite(params.lat) && Number.isFinite(params.lng);
+
+    const cacheKey = [
+      'findForChat',
+      params.locality?.trim().toLowerCase() ?? '',
+      hasPoint ? this.normalizeBoundsValue(params.lat!) : '',
+      hasPoint ? this.normalizeBoundsValue(params.lng!) : '',
+      radiusKm,
+      params.maxPriceEur ?? '',
+      params.type?.trim().toLowerCase() ?? '',
+      params.service?.trim().toLowerCase() ?? '',
+      limit,
+    ].join(':');
+
+    return this.getOrLoad(cacheKey, async () => {
+      const totalStartNs = process.hrtime.bigint();
+
+      const query = this.placeRepository
+        .createQueryBuilder('place')
+        .leftJoin('place.place_category', 'place_category')
+        .leftJoinAndSelect('place.prices', 'prices')
+        .select([
+          'place.id',
+          'place.place_name',
+          'place.region',
+          'place.address',
+          'place.phone',
+          'place.website',
+          'place.latitude',
+          'place.longitude',
+          'place.nearbyActivities',
+          'place.pilgrim_exclusive',
+          'place.allow_reservation',
+          'place.dates_open',
+          'place.status',
+        ])
+        .addSelect(['place_category.id', 'place_category.name'])
+        .where('place.status = :status', { status: 'approved' });
+
+      if (hasPoint) {
+        // Cheap bounding box first; the exact circle is applied in memory
+        // below. 111 km per degree of latitude is accurate enough here.
+        const latDelta = radiusKm / 111;
+        const cosLat = Math.cos((params.lat! * Math.PI) / 180);
+        const lngDelta = radiusKm / (111 * (Math.abs(cosLat) < 0.01 ? 0.01 : cosLat));
+
+        query
+          .andWhere('place.latitude BETWEEN :south AND :north', {
+            south: params.lat! - latDelta,
+            north: params.lat! + latDelta,
+          })
+          .andWhere('place.longitude BETWEEN :west AND :east', {
+            west: params.lng! - Math.abs(lngDelta),
+            east: params.lng! + Math.abs(lngDelta),
+          });
+      } else if (params.locality?.trim()) {
+        query.andWhere('LOWER(BTRIM(place.region)) LIKE LOWER(:locality)', {
+          locality: `%${params.locality.trim()}%`,
+        });
+      }
+
+      if (params.type?.trim()) {
+        query.andWhere('LOWER(place_category.name) LIKE LOWER(:type)', {
+          type: `%${params.type.trim()}%`,
+        });
+      }
+
+      // Over-fetch: service and price are filtered in memory afterwards.
+      const places = await query.take(limit * 5).getMany();
+      this.logTiming('findForChat.db', totalStartNs);
+
+      if (!places.length) {
+        return [];
+      }
+
+      // Services live in the place_services join table, not in the entity
+      // column, so they must be attached exactly like the map does.
+      await this.attachServices(places);
+
+      const wantedService = params.service?.trim().toLowerCase();
+
+      const rows = places
+        .map((place) => this.toChatRow(place, params.lat, params.lng))
+        .filter((row) => {
+          if (row.distanceKm != null && row.distanceKm > radiusKm) return false;
+
+          if (
+            params.maxPriceEur != null &&
+            (row.priceFrom == null || row.priceFrom > params.maxPriceEur)
+          ) {
+            return false;
+          }
+
+          if (wantedService) {
+            const haystack = [
+              ...(row.services ?? []),
+              ...(row.nearbyActivities ?? []),
+            ]
+              .join(' ')
+              .toLowerCase();
+
+            if (!haystack.includes(wantedService)) return false;
+          }
+
+          return true;
+        })
+        .sort((a, b) => {
+          if (a.distanceKm != null && b.distanceKm != null) {
+            return a.distanceKm - b.distanceKm;
+          }
+          if (a.priceFrom != null && b.priceFrom != null) {
+            return a.priceFrom - b.priceFrom;
+          }
+          return a.name.localeCompare(b.name);
+        })
+        .slice(0, limit);
+
+      this.logTiming('findForChat.total', totalStartNs);
+
+      return rows;
+    });
+  }
+
+  private toChatRow(
+    place: Accommodation,
+    lat?: number,
+    lng?: number,
+  ): AccommodationChatRow {
+    const placeLat = this.toNumberOrNull(place.latitude);
+    const placeLng = this.toNumberOrNull(place.longitude);
+
+    const distanceKm =
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      placeLat != null &&
+      placeLng != null
+        ? this.haversineKm(lat!, lng!, placeLat, placeLng)
+        : null;
+
+    return {
+      id: place.id,
+      name: place.place_name ?? 'Unnamed place',
+      type: place.place_category?.name ?? null,
+      locality: place.region ?? null,
+      priceFrom: this.lowestPrice(place),
+      distanceKm,
+      services: place.services ?? null,
+      nearbyActivities: place.nearbyActivities ?? null,
+      pilgrimExclusive: this.toBooleanOrNull(place.pilgrim_exclusive),
+      allowsReservations: this.toBooleanOrNull(place.allow_reservation),
+      datesOpen: place.dates_open ?? null,
+    };
+  }
+
+  /**
+   * Reads the price defensively. The price entity has changed column names
+   * before, and the Flutter model already tolerates several spellings, so the
+   * chat should not be the one place that breaks when it changes again.
+   */
+  private lowestPrice(place: Accommodation): number | null {
+    const rows = (place.prices ?? []) as Array<Record<string, unknown>>;
+
+    const amounts = rows
+      .map((row) =>
+        Number(row?.amount ?? row?.price ?? row?.value ?? row?.cost),
+      )
+      .filter((value) => Number.isFinite(value) && value > 0);
+
+    return amounts.length ? Math.min(...amounts) : null;
+  }
+
+  /** Postgres `decimal` comes back as a string through TypeORM. */
+  private toNumberOrNull(value: unknown): number | null {
+    if (value == null) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  /** `pilgrim_exclusive` and `allow_reservation` are varchar, not boolean. */
+  private toBooleanOrNull(value: unknown): boolean | null {
+    if (value == null) return null;
+    if (typeof value === 'boolean') return value;
+
+    const normalized = String(value).trim().toLowerCase();
+    if (!normalized) return null;
+
+    if (['true', '1', 'yes', 'y', 'sim', 's'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'n', 'nao', 'não'].includes(normalized)) return false;
+
+    return null;
+  }
+
+  private haversineKm(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number,
+  ): number {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+
+    return (
+      Math.round(earthRadiusKm * 2 * Math.asin(Math.sqrt(a)) * 10) / 10
+    );
   }
 }
