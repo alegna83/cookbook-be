@@ -1992,12 +1992,8 @@ export class AccommodationsService implements AccommodationsPort {
    * chat should not be the one place that breaks when it changes again.
    */
   private lowestPrice(place: Accommodation): number | null {
-    const rows = (place.prices ?? []) as Array<Record<string, unknown>>;
-
-    const amounts = rows
-      .map((row) =>
-        Number(row?.amount ?? row?.price ?? row?.value ?? row?.cost),
-      )
+    const amounts = (place.prices ?? [])
+      .map((row) => Number(row?.price))
       .filter((value) => Number.isFinite(value) && value > 0);
 
     return amounts.length ? Math.min(...amounts) : null;
