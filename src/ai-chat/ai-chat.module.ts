@@ -10,6 +10,7 @@ import {
 } from './retrievers/accomodations.retriever';
 import { STAGES_PORT, StagesRetriever } from './retrievers/stages.retriever';
 import { WebSearchRetriever } from './retrievers/web-search.retriever';
+import { NearbyPlacesRetriever } from './retrievers/nearby-places.retriever';
 import { AccommodationsModule } from '../accommodations/accommodations.module';
 import { AccommodationsService } from '../accommodations/accommodations.service';
 import { StagesModule } from '../stages/stages.module';
@@ -34,6 +35,7 @@ import { CAMINOS_PORT, CaminosRetriever } from './retrievers/caminos.retriever';
     AccommodationsRetriever,
     StagesRetriever,
     CaminosRetriever,
+    NearbyPlacesRetriever,
     WebSearchRetriever,
 
     // Add a domain: write the retriever, register it here, add it to `inject`.
@@ -46,6 +48,9 @@ import { CAMINOS_PORT, CaminosRetriever } from './retrievers/caminos.retriever';
         AccommodationsRetriever,
         StagesRetriever,
         CaminosRetriever,
+        // Order matters a little: it is the order the tool list appears in the
+        // system prompt, and web search stays last so it reads as a fallback.
+        NearbyPlacesRetriever,
         WebSearchRetriever,
       ],
     },

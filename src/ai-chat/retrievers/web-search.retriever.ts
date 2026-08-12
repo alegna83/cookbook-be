@@ -39,6 +39,14 @@ export class WebSearchRetriever implements KnowledgeRetriever {
     'www.kayak.com',
     'momondo.com',
     'www.momondo.com',
+    'check-rates.com',
+    'm.check-rates.com',
+    'cheaphotels.com',
+    'www.cheaphotels.com',
+    'hotelscombined.com',
+    'www.hotelscombined.com',
+    'destinia.com',
+    'www.destinia.com',
   ];
 
   readonly tool: ToolSpec = {
@@ -70,7 +78,9 @@ export class WebSearchRetriever implements KnowledgeRetriever {
 
     const limit = Math.min(Math.max(Number(args.limit ?? 5) || 5, 1), 8);
     const results = await this.searchDuckDuckGo(query, limit);
-    const directResults = this.prioritizeDirectAccommodationResults(query, results);
+    const directResults = this.prioritizeDirectAccommodationResults(query, results).filter(
+      (result) => !this.isGenericAccommodationComparisonPage(result),
+    );
 
     return directResults.map((result, index) => ({
       kind: 'web',
@@ -85,6 +95,9 @@ export class WebSearchRetriever implements KnowledgeRetriever {
   private async searchDuckDuckGo(query: string, limit: number): Promise<WebSearchResult[]> {
     const endpoint = new URL('https://html.duckduckgo.com/html/');
     endpoint.searchParams.set('q', query);
+    // Without a region the engine answers from a global index, which is how a
+    // search for Portuguese accommodation came back with Mimizan, France.
+    endpoint.searchParams.set('kl', process.env.WEB_SEARCH_REGION?.trim() || 'pt-pt');
 
     const response = await fetch(endpoint, {
       headers: {
@@ -138,11 +151,12 @@ export class WebSearchRetriever implements KnowledgeRetriever {
 
     const direct = results.filter((result) => !this.isGenericAccommodationHost(result.url));
 
-    if (direct.length > 0) {
-      return direct;
-    }
+    // Previously this returned [] when every hit was a booking portal, which
+    // is the normal case for accommodation queries — the assistant then had
+    // nothing at all to work with. Demote them instead of discarding them.
+    const generic = results.filter((result) => this.isGenericAccommodationHost(result.url));
 
-    return [];
+    return [...direct, ...generic];
   }
 
   private looksLikeAccommodationQuery(query: string): boolean {
@@ -160,6 +174,26 @@ export class WebSearchRetriever implements KnowledgeRetriever {
     } catch {
       return false;
     }
+  }
+
+  private isGenericAccommodationComparisonPage(result: WebSearchResult): boolean {
+    const text = `${result.title} ${result.snippet ?? ''} ${result.url}`.toLowerCase();
+
+    const blockedPatterns = [
+      'compare hotel websites',
+      'cheap accommodation',
+      'accommodation deals in',
+      'hundreds of',
+      'resorts, motels',
+      'b&bs, apartments',
+      'destination-',
+      '/destination-',
+      'compare prices',
+      'best price guarantee',
+      'book the perfect',
+    ];
+
+    return blockedPatterns.some((pattern) => text.includes(pattern));
   }
 
   private isDuckDuckGoAd(rawUrl: string): boolean {

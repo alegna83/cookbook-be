@@ -148,15 +148,38 @@ export class AiChatService {
     dto: AskChatDto,
     message: string,
   ): string {
+    // The conversation language is decided ONCE and then locked. Re-detecting
+    // per message is what makes the assistant flip between PT and EN on short
+    // turns like "sim" or "quantos kms faltam?", which carry no detectable
+    // markers in any language.
+    if (session.turns.length > 0 && session.language) {
+      return session.language;
+    }
+
+    // First turn only. A client locale of 'en' is not trusted on its own,
+    // because Flutter reports 'en' whenever supportedLocales is not
+    // configured — see the note in ChatAssistantPanel.
     const detected = this.detectLanguage(message);
+
+    if (dto.language && dto.language !== 'en') {
+      return dto.language;
+    }
 
     if (detected !== 'en') {
       return detected;
     }
 
-    if (dto.language) return dto.language;
-    if (session.language) return session.language;
-    return 'en';
+    if (this.isLikelyEnglish(message)) {
+      return 'en';
+    }
+
+    return dto.language === 'en' ? 'en' : 'pt';
+  }
+
+  private isLikelyEnglish(text: string): boolean {
+    return /\b(the|and|you|your|please|what|where|when|how|need|want|would|could|should|help|hotel|accommodation|near me|find|tell me)\b/i.test(
+      text,
+    );
   }
 
   private detectLanguage(text: string): string {
@@ -196,24 +219,33 @@ export class AiChatService {
     const system = `You are a conversational AI assistant. You are not a search-results page and not a report generator. Your job is to understand the user's latest message in the context of the full conversation, use tools when useful, and answer naturally, concretely, and briefly.
 
 LANGUAGE
-  - Write every answer in ${languageName} only.
-  - Never mix languages in the same reply.
-  - If the user changes language, switch with them.
+  - This conversation is in ${languageName}. Write EVERY reply entirely in ${languageName}.
+  - This applies no matter what language the latest user message appears to be in, and no matter what language the tool results are in. Tool results are usually in English: translate the facts into ${languageName} instead of copying them.
+  - Never mix two languages in one reply, not even for a place name, a service name or a quoted snippet.
+  - Only switch language if the user explicitly asks you to (for example "responde em ingles").
 
 CONVERSATION
   - Read the full conversation before answering and focus on the latest user turn as the immediate thing to answer.
   - If the user is replying to you, answer that reply directly instead of restarting the topic.
+  - Treat short follow-ups, pronouns, and fragments like "isso", "isto", "aqui", "lá", "perto de mim", "e nesse caso?", or "e esse?" as references to the previous turn unless the user clearly starts a new topic.
+  - Keep track of the conversation goal across turns. Do not forget the place, item, route, stage, service, or preference that is already being discussed.
   - Never ask for information the user already gave.
   - A KNOWN CONTEXT block may already include the user's location, route, filters, or current item. If it does, use it directly.
   - Ask at most one clarifying question in the entire conversation, and only when you truly cannot answer usefully.
+  - If the user asks for something "perto de mim" and no location is known, ask exactly one short location question and stop.
   - If a message is a short confirmation like "sim", "ok", "yes", or "estou em Viseu", treat it as a continuation of the same request.
   - If something is missing, make the best reasonable assumption, state it briefly, and continue.
   - Keep the dialogue flowing: when the user follows up, refine the previous answer rather than switching to generic advice.
+  - If the user asks a follow-up question, answer the follow-up itself first, then only add one short supporting detail if it helps.
 
 TOOLS AND DATA
 ${toolList || '- (no tools available in this deployment)'}
   - Use a tool whenever it can improve the answer with facts from the app or the web.
-  - Prefer web search first for current, factual, location-based, route, accommodation, or service questions.
+  - The app database comes FIRST. For accommodations, stages, routes and services, call the matching app tool before anything else: those records are curated for pilgrims and are the reason this app exists.
+  - For places that are NOT accommodations — restaurants, cafés, supermarkets, pharmacies, ATMs, laundries, drinking water, things to visit — use search_nearby_places. That is the tool for "where can I have dinner", "what is worth seeing here", "where do I buy food".
+  - search_nearby_places has no price information. If the user asks for the cheapest option, say plainly that you cannot rank by price, then give the nearby options and any useful signal you do have (fast food versus restaurant, cafés for a lighter meal). NEVER invent euro amounts, price levels or rankings.
+  - search_web is a FALLBACK, not a starting point. Only use it when the app tools returned nothing useful, or when the question is clearly outside the app's data (weather, opening times of a third party, current news).
+  - Never answer an accommodation question with a generic booking or comparison site when the app database has records for that area.
   - Prefer official pages, direct provider pages, accommodation listings, and recent pages.
   - Never tell the user to search, google, browse, or look it up themselves.
   - Never tell the user to use tourism sites or comparison portals as a fallback.
@@ -232,6 +264,10 @@ STYLE
   - Default to one or two short paragraphs.
   - Write like a person in a live conversation, not like a support ticket or search result.
   - Be concrete: name the thing, the reason, the action, or the answer instead of speaking vaguely.
+  - The first sentence must contain the actual answer or the exact question needed to continue. Do not start with filler like "I can help" or "let me check".
+  - If the answer exists, give it directly before any explanation.
+  - If the answer does not exist, say so in one short sentence and ask the one precise question needed to proceed.
+  - Keep the reply tied to the current thread: do not re-explain already established context unless the user asks for a recap.
   - Use bullets only when the user explicitly asks for options, a list, or a comparison.
   - Keep the reply concrete, direct, and human, not like a search engine result page.
   - No preamble, no apologies, no meta talk about limitations unless no result was found.
@@ -266,7 +302,7 @@ STYLE
 
     parts.push('');
 
-    parts.push('INSTRUCTION: Answer the latest user message directly, as part of a free conversation. Do not turn the reply into a report.');
+    parts.push('INSTRUCTION: Answer the latest user message directly, as part of a free conversation. Start with the concrete answer or the single exact question needed to continue. Keep the reply coherent with the previous turns: resolve references, continue the same topic, and do not restart from zero. Do not turn the reply into a report or open with filler.');
     parts.push('');
 
     if (session.askedQuestions.length > 0) {
@@ -436,31 +472,11 @@ STYLE
         working.push(result.message);
       }
 
-      const aggregatedItems: RetrievedItem[] = [];
-      for (const domainItems of itemsByDomain.values()) {
-        aggregatedItems.push(...domainItems);
-      }
-
-      const concreteAnswer = this.buildConcreteToolAnswer(
-        aggregatedItems,
-        retrievalContext.language,
-      );
-
-      if (concreteAnswer) {
-        return {
-          answer: concreteAnswer,
-          usedTools,
-          groundedOn,
-        };
-      }
-
-      if (this.isAccommodationRequest(userMessage) && round === MAX_TOOL_ROUNDS) {
-        return {
-          answer: this.noResultsWebFallback(retrievalContext.language),
-          usedTools,
-          groundedOn,
-        };
-      }
+      // Tool results go back to the model as tool messages and the MODEL
+      // writes the reply. Short-circuiting here with a hand-assembled string
+      // was what produced answers like "Google Maps. parece relevante porque
+      // Find local businesses..." — a Portuguese template wrapped around raw
+      // English snippets, with the model's actual answer thrown away.
 
       if (groundedOn === 0) {
         const webFallback = await this.tryWebFallback(
@@ -532,21 +548,28 @@ STYLE
       return null;
     }
 
-    const concreteWebAnswer = this.buildConcreteToolAnswer(
-      items,
-      retrievalContext.language,
-    );
+    // Hand the results to the model as a tool message and let it write the
+    // reply in the conversation language, instead of emitting a template.
+    working.push({
+      role: 'user',
+      content: [
+        'WEB SEARCH RESULTS (fallback, the app database had nothing):',
+        JSON.stringify({ count: items.length, items }).slice(0, 4000),
+        '',
+        'Answer the user from these results. Translate them into the conversation',
+        'language. Name the specific places. Never tell the user to search themselves.',
+      ].join('\n'),
+    });
 
-    if (concreteWebAnswer) {
-      return {
-        answer: concreteWebAnswer,
-        usedTools: [...usedTools, 'web'],
-        groundedOn: items.length,
-      };
+    const assistant = await this.callChatCompletions(baseUrl, apiKey, model, working);
+    const answer = assistant.content?.trim();
+
+    if (!answer) {
+      return null;
     }
 
     return {
-      answer: this.noResultsWebFallback(retrievalContext.language),
+      answer,
       usedTools: [...usedTools, 'web'],
       groundedOn: items.length,
     };
@@ -912,6 +935,17 @@ STYLE
       'bing.com/aclick',
       'google travel',
       'book hotels',
+      'compare hotel websites',
+      'cheap accommodation',
+      'accommodation deals in',
+      'hundreds of',
+      'resorts, motels',
+      'b&bs, apartments',
+      'destination-',
+      '/destination-',
+      'compare prices',
+      'best price guarantee',
+      'book the perfect',
       'best price',
       'bestpreis',
       'vergleich',
