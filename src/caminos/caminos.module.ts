@@ -8,6 +8,6 @@ import { CaminosController } from './caminos.controller';
   imports: [TypeOrmModule.forFeature([Camino])],
   controllers: [CaminosController],
   providers: [CaminosService],
-  exports: [TypeOrmModule],
+  exports: [TypeOrmModule, CaminosService],
 })
 export class CaminosModule {}

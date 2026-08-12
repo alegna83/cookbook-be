@@ -15,9 +15,13 @@ import { PlaceEditRequest } from './entities/place-edit-request.entity';
 import { CreateEditRequestDto } from './dto/create-edit-request.dto';
 import { ContentModerationService } from 'src/moderation/content-moderation.service';
 import { EmailService } from 'src/auth/email.service';
+import type {
+  AccommodationChatRow,
+  AccommodationsPort,
+} from 'src/ai-chat/retrievers/accomodations.retriever';
 
 @Injectable()
-export class AccommodationsService {
+export class AccommodationsService implements AccommodationsPort {
   private readonly readCache = new Map<
     string,
     { expiresAt: number; value: unknown }
@@ -1802,5 +1806,238 @@ export class AccommodationsService {
       reason: request.rejectionReason,
     });
     return this.formatRemovalRequest(saved);
+  }
+
+  // ---------------------------------------------------------------------------
+  // AI chat integration (AccommodationsPort)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Feeds the AI assistant's `search_accommodations` tool.
+   *
+   * Differs from getByBounds on purpose: the assistant searches around a point
+   * with a radius, or by town name, and it needs prices and services to answer
+   * "where can I sleep for under 15 EUR with laundry?".
+   */
+  async findForChat(params: {
+    locality?: string;
+    lat?: number;
+    lng?: number;
+    radiusKm?: number;
+    maxPriceEur?: number;
+    type?: string;
+    service?: string;
+    limit: number;
+  }): Promise<AccommodationChatRow[]> {
+    const limit = Math.min(Math.max(params.limit ?? 8, 1), 20);
+    const radiusKm = Math.min(Math.max(params.radiusKm ?? 15, 1), 50);
+    const hasPoint =
+      Number.isFinite(params.lat) && Number.isFinite(params.lng);
+
+    const cacheKey = [
+      'findForChat',
+      params.locality?.trim().toLowerCase() ?? '',
+      hasPoint ? this.normalizeBoundsValue(params.lat!) : '',
+      hasPoint ? this.normalizeBoundsValue(params.lng!) : '',
+      radiusKm,
+      params.maxPriceEur ?? '',
+      params.type?.trim().toLowerCase() ?? '',
+      params.service?.trim().toLowerCase() ?? '',
+      limit,
+    ].join(':');
+
+    return this.getOrLoad(cacheKey, async () => {
+      const totalStartNs = process.hrtime.bigint();
+
+      const query = this.placeRepository
+        .createQueryBuilder('place')
+        .leftJoin('place.place_category', 'place_category')
+        .leftJoinAndSelect('place.prices', 'prices')
+        .select([
+          'place.id',
+          'place.place_name',
+          'place.region',
+          'place.address',
+          'place.phone',
+          'place.website',
+          'place.latitude',
+          'place.longitude',
+          'place.nearbyActivities',
+          'place.pilgrim_exclusive',
+          'place.allow_reservation',
+          'place.dates_open',
+          'place.status',
+        ])
+        .addSelect(['place_category.id', 'place_category.name'])
+        .where('place.status = :status', { status: 'approved' });
+
+      if (hasPoint) {
+        // Cheap bounding box first; the exact circle is applied in memory
+        // below. 111 km per degree of latitude is accurate enough here.
+        const latDelta = radiusKm / 111;
+        const cosLat = Math.cos((params.lat! * Math.PI) / 180);
+        const lngDelta = radiusKm / (111 * (Math.abs(cosLat) < 0.01 ? 0.01 : cosLat));
+
+        query
+          .andWhere('place.latitude BETWEEN :south AND :north', {
+            south: params.lat! - latDelta,
+            north: params.lat! + latDelta,
+          })
+          .andWhere('place.longitude BETWEEN :west AND :east', {
+            west: params.lng! - Math.abs(lngDelta),
+            east: params.lng! + Math.abs(lngDelta),
+          });
+      } else if (params.locality?.trim()) {
+        query.andWhere('LOWER(BTRIM(place.region)) LIKE LOWER(:locality)', {
+          locality: `%${params.locality.trim()}%`,
+        });
+      }
+
+      if (params.type?.trim()) {
+        query.andWhere('LOWER(place_category.name) LIKE LOWER(:type)', {
+          type: `%${params.type.trim()}%`,
+        });
+      }
+
+      // Over-fetch: service and price are filtered in memory afterwards.
+      const places = await query.take(limit * 5).getMany();
+      this.logTiming('findForChat.db', totalStartNs);
+
+      if (!places.length) {
+        return [];
+      }
+
+      // Services live in the place_services join table, not in the entity
+      // column, so they must be attached exactly like the map does.
+      await this.attachServices(places);
+
+      const wantedService = params.service?.trim().toLowerCase();
+
+      const rows = places
+        .map((place) => this.toChatRow(place, params.lat, params.lng))
+        .filter((row) => {
+          if (row.distanceKm != null && row.distanceKm > radiusKm) return false;
+
+          if (
+            params.maxPriceEur != null &&
+            (row.priceFrom == null || row.priceFrom > params.maxPriceEur)
+          ) {
+            return false;
+          }
+
+          if (wantedService) {
+            const haystack = [
+              ...(row.services ?? []),
+              ...(row.nearbyActivities ?? []),
+            ]
+              .join(' ')
+              .toLowerCase();
+
+            if (!haystack.includes(wantedService)) return false;
+          }
+
+          return true;
+        })
+        .sort((a, b) => {
+          if (a.distanceKm != null && b.distanceKm != null) {
+            return a.distanceKm - b.distanceKm;
+          }
+          if (a.priceFrom != null && b.priceFrom != null) {
+            return a.priceFrom - b.priceFrom;
+          }
+          return a.name.localeCompare(b.name);
+        })
+        .slice(0, limit);
+
+      this.logTiming('findForChat.total', totalStartNs);
+
+      return rows;
+    });
+  }
+
+  private toChatRow(
+    place: Accommodation,
+    lat?: number,
+    lng?: number,
+  ): AccommodationChatRow {
+    const placeLat = this.toNumberOrNull(place.latitude);
+    const placeLng = this.toNumberOrNull(place.longitude);
+
+    const distanceKm =
+      Number.isFinite(lat) &&
+      Number.isFinite(lng) &&
+      placeLat != null &&
+      placeLng != null
+        ? this.haversineKm(lat!, lng!, placeLat, placeLng)
+        : null;
+
+    return {
+      id: place.id,
+      name: place.place_name ?? 'Unnamed place',
+      type: place.place_category?.name ?? null,
+      locality: place.region ?? null,
+      priceFrom: this.lowestPrice(place),
+      distanceKm,
+      services: place.services ?? null,
+      nearbyActivities: place.nearbyActivities ?? null,
+      pilgrimExclusive: this.toBooleanOrNull(place.pilgrim_exclusive),
+      allowsReservations: this.toBooleanOrNull(place.allow_reservation),
+      datesOpen: place.dates_open ?? null,
+    };
+  }
+
+  /**
+   * Reads the price defensively. The price entity has changed column names
+   * before, and the Flutter model already tolerates several spellings, so the
+   * chat should not be the one place that breaks when it changes again.
+   */
+  private lowestPrice(place: Accommodation): number | null {
+    const amounts = (place.prices ?? [])
+      .map((row) => Number(row?.price))
+      .filter((value) => Number.isFinite(value) && value > 0);
+
+    return amounts.length ? Math.min(...amounts) : null;
+  }
+
+  /** Postgres `decimal` comes back as a string through TypeORM. */
+  private toNumberOrNull(value: unknown): number | null {
+    if (value == null) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  /** `pilgrim_exclusive` and `allow_reservation` are varchar, not boolean. */
+  private toBooleanOrNull(value: unknown): boolean | null {
+    if (value == null) return null;
+    if (typeof value === 'boolean') return value;
+
+    const normalized = String(value).trim().toLowerCase();
+    if (!normalized) return null;
+
+    if (['true', '1', 'yes', 'y', 'sim', 's'].includes(normalized)) return true;
+    if (['false', '0', 'no', 'n', 'nao', 'não'].includes(normalized)) return false;
+
+    return null;
+  }
+
+  private haversineKm(
+    lat1: number,
+    lng1: number,
+    lat2: number,
+    lng2: number,
+  ): number {
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const earthRadiusKm = 6371;
+
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+
+    return (
+      Math.round(earthRadiusKm * 2 * Math.asin(Math.sqrt(a)) * 10) / 10
+    );
   }
 }

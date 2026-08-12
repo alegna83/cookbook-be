@@ -17,6 +17,8 @@ import { UploadModule } from './upload/upload.module';
 import { ContentModerationModule } from './moderation/content-moderation.module';
 import { ContactModule } from './contact/contact.module';
 import { AiChatModule } from './ai-chat/ai-chat.module';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { join } from 'path';
 @Module({
   imports: [
@@ -96,8 +98,26 @@ import { join } from 'path';
     ContentModerationModule,
     ContactModule,
     AiChatModule,
+    ThrottlerModule.forRoot([
+      {
+        name: 'burst',
+        ttl: 10_000,
+        limit: 5,
+      },
+      {
+        name: 'sustained',
+        ttl: 3_600_000,
+        limit: 60,
+      },
+    ]),
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
