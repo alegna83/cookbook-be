@@ -18,7 +18,6 @@ import { ContentModerationModule } from './moderation/content-moderation.module'
 import { ContactModule } from './contact/contact.module';
 import { AiChatModule } from './ai-chat/ai-chat.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
 import { join } from 'path';
 @Module({
   imports: [
@@ -114,10 +113,6 @@ import { join } from 'path';
   controllers: [AppController],
   providers: [
     AppService,
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
   ],
 })
 export class AppModule {}

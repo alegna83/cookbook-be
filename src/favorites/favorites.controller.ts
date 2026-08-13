@@ -5,10 +5,12 @@ import {
   HttpCode,
   BadRequestException,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { FavoritesService } from './favorites.service';
 import { HandleFavoriteDto } from './dto/handle-favorite.dto';
 
 @Controller('favorites')
+@SkipThrottle()
 export class FavoritesController {
   constructor(private readonly svc: FavoritesService) {}
 

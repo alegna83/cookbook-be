@@ -7,6 +7,7 @@ import {
   HttpCode,
   Body,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { UploadService } from './upload.service';
 import { UploadResponseDto, UploadMultipleResponseDto } from './dto/upload-response.dto';
@@ -19,6 +20,7 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   @Post()
+  @Throttle({ burst: { limit: 10, ttl: 10_000 }, sustained: { limit: 120, ttl: 3_600_000 } })
   @HttpCode(200)
   @UseInterceptors(
     AnyFilesInterceptor({

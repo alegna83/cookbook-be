@@ -8,6 +8,7 @@ import {
   Res,
   BadRequestException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { HandleAdminDto } from './dto/handle-admin.dto';
@@ -27,6 +28,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @Throttle({ burst: { limit: 5, ttl: 10_000 }, sustained: { limit: 60, ttl: 3_600_000 } })
   @HttpCode(200)
   async login(@Body() loginDto: LoginDto) {
     const result = await this.authService.login(
@@ -37,6 +39,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @Throttle({ burst: { limit: 5, ttl: 10_000 }, sustained: { limit: 60, ttl: 3_600_000 } })
   @UseGuards(JwtAuthGuard)
   @HttpCode(204) // Protege o logout, só faz se estiver autenticado
   async logout(@Req() req: Request, @Res() res: Response) {
@@ -55,6 +58,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @Throttle({ burst: { limit: 5, ttl: 10_000 }, sustained: { limit: 60, ttl: 3_600_000 } })
   @HttpCode(201)
   async register(@Body() registerDto: RegisterDto) {
     return this.accountsService.register(
@@ -67,24 +71,28 @@ export class AuthController {
   }
 
   @Post('verify-email')
+  @Throttle({ burst: { limit: 5, ttl: 10_000 }, sustained: { limit: 60, ttl: 3_600_000 } })
   @HttpCode(200)
   async verifyEmail(@Body() verifyDto: VerifyEmailDto) {
     return this.accountsService.verifyEmail(verifyDto.token);
   }
 
   @Post('request-password-reset')
+  @Throttle({ burst: { limit: 5, ttl: 10_000 }, sustained: { limit: 60, ttl: 3_600_000 } })
   @HttpCode(200)
   async requestPasswordReset(@Body() body: any) {
     return this.accountsService.requestPasswordReset(body.email);
   }
 
   @Post('reset-password')
+  @Throttle({ burst: { limit: 5, ttl: 10_000 }, sustained: { limit: 60, ttl: 3_600_000 } })
   @HttpCode(200)
   async resetPassword(@Body() body: any) {
     return this.accountsService.resetPassword(body.token, body.newPassword);
   }
 
   @Post('resend-verification')
+  @Throttle({ burst: { limit: 5, ttl: 10_000 }, sustained: { limit: 60, ttl: 3_600_000 } })
   @HttpCode(200)
   async resendVerification(@Body() resendDto: ResendVerificationDto) {
     console.log('[AuthController] resendVerification called for', resendDto?.email);
@@ -92,6 +100,7 @@ export class AuthController {
   }
 
   @Post('change-password')
+  @Throttle({ burst: { limit: 5, ttl: 10_000 }, sustained: { limit: 60, ttl: 3_600_000 } })
   @UseGuards(JwtAuthGuard)
   @HttpCode(200)
   async changePassword(@Req() req: Request, @Body() dto: ChangePasswordDto) {
@@ -106,6 +115,7 @@ export class AuthController {
 
   // 🔐 Admin endpoint encapsulado
   @Post('admin/handle')
+  @Throttle({ burst: { limit: 5, ttl: 10_000 }, sustained: { limit: 60, ttl: 3_600_000 } })
   @HttpCode(200)
   async handleAdmin(@Body() data: HandleAdminDto): Promise<any> {
     return this.authService.handleAdminAction(data);
