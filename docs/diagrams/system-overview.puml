@@ -1,5 +1,4 @@
 @startuml
-title Stays4Pilgrims - System Overview
 
 top to bottom direction
 skinparam shadowing false
@@ -9,6 +8,9 @@ skinparam componentStyle rectangle
 skinparam packageStyle rectangle
 skinparam wrapWidth 180
 skinparam dpi 180
+skinparam nodesep 55
+skinparam ranksep 120
+skinparam ArrowFontOffset 30
 
 actor "Pilgrim / Host / Admin" as User
 
@@ -24,12 +26,13 @@ rectangle "Data Layer" as DATA {
 	database "PostgreSQL" as DB
 }
 
-User --> Frontend : Browse, authenticate\ncontribute content
+User --> Frontend : Browse\nauthenticate\ncontribute content
 Frontend --> Backend : HTTPS requests\n(JSON REST)
 Backend --> DB : SQL queries\n(transactions)
 
 note right of Backend
 Core domains:
+
 - Auth and Accounts
 - Accommodation and Comments
 - Upload and Moderation
