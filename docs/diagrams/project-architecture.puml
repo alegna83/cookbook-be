@@ -1,73 +1,67 @@
-﻿@startuml
-title Stays4Pilgrims - Project Architecture Overview
-
+@startuml
 top to bottom direction
+scale 1300 width
 skinparam defaultFontName Arial
-skinparam defaultFontSize 12
+skinparam defaultFontSize 10
 skinparam linetype ortho
-skinparam componentStyle rectangle
 skinparam shadowing false
+skinparam dpi 220
 skinparam packageStyle rectangle
-skinparam dpi 180
+skinparam packageBorderStyle dashed
+skinparam packageBorderColor #444444
+skinparam packageBackgroundColor transparent
+skinparam componentStyle rectangle
+skinparam legendFontSize 8
+skinparam nodesep 24
+skinparam ranksep 48
+skinparam ArrowFontOffset 90
 skinparam package {
-  Padding 20
-}
-skinparam nodesep 55
-skinparam ranksep 70
-
-actor User
-
-component "Stays4Pilgrims Frontend\n(Web / Mobile)" as FE
-
-package "Stays4Pilgrims Backend (NestJS)" as BE {
-  component "Auth\nAccounts" as AUTH
-  component "Accommodation\nmodule" as ACC
-  component "Caminos\nStages\nStatistics" as ROUTES
-  component "Comments\nFavorites\nSuggestions" as SOCIAL
-  component "AI Chat" as AI_CHAT
-  component "Upload" as UPLOAD
-  component "Content\nModeration" as MOD
-  component "Contact" as CONTACT
+	Padding 15
 }
 
-database "PostgreSQL\n(managed / Supabase)" as DB
-cloud "Media Storage\n(Cloudinary)" as CLOUDINARY
-cloud "Email Provider\n(Resend/SMTP)" as EMAIL
-cloud "AI Moderation\n(optional)" as OPENAI
+component "App (Flutter)" as APP #E5E5E5
+component "REST API (NestJS)" as API #E5E5E5
 
-User --> FE : browse / submit content
-FE --> BE : HTTPS REST API
+package "Backend (NestJS)" as BACKEND {
+	component "CommentsModule\nFavoritesModule\nUploadModule" as MODULE_A #E5E5E5
+	component "AccommodationsModule\nAccommodationCategoriesModule" as MODULE_B #E5E5E5
+	component "CaminosModule\nStagesModule\nStatisticsCaminosModule" as MODULE_C #E5E5E5
+	component "AuthModule\nAccountsModule" as MODULE_D #E5E5E5
 
-AUTH -[hidden]down-> ACC
-ACC -[hidden]down-> ROUTES
-ROUTES -[hidden]down-> SOCIAL
-SOCIAL -[hidden]down-> UPLOAD
-UPLOAD -[hidden]down-> AI_CHAT
-AI_CHAT -[hidden]down-> MOD
-MOD -[hidden]down-> CONTACT
+	component "SuggestionModule" as MODULE_E #E5E5E5
+	component "ContentModerationModule" as MODULE_F #E5E5E5
+	component "ContactModule" as MODULE_G #E5E5E5
 
-AUTH --> DB : accounts, sessions
-ACC --> DB : places, categories, requests
-ROUTES --> DB : caminos, stages, stats
-SOCIAL --> DB : comments, favorites
-AI_CHAT --> DB : read-only domain lookups
-UPLOAD --> CLOUDINARY : media upload/delete
-MOD --> OPENAI : moderation checks
-AUTH --> EMAIL : auth emails
-ACC --> EMAIL : moderation emails
-SOCIAL --> EMAIL : review notifications
-CONTACT --> EMAIL : contact delivery
-AI_CHAT --> OPENAI : chat completions / fallback
+	MODULE_A -[hidden]right-> MODULE_B
+	MODULE_B -[hidden]right-> MODULE_C
+	MODULE_C -[hidden]right-> MODULE_D
 
-note right of BE
-  Core backend domains in AppModule.
-  Each module encapsulates controllers,
-  services and data access.
-end note
+	MODULE_C -[hidden]down-> MODULE_E
+	MODULE_D -[hidden]down-> MODULE_F
+	MODULE_F -[hidden]down-> MODULE_G
+}
 
-note bottom of FE
-  Single client for all user interactions.
-  Consumes API and renders map-driven UI.
-end note
+cloud "Cloudinary" as CLOUDINARY #E5E5E5
+database "PostgreSQL" as DB #E5E5E5
+cloud "AI Service" as AI #E5E5E5
+cloud "Email Service" as EMAIL #E5E5E5
+
+APP -[hidden]down-> API
+API -[hidden]down-> BACKEND
+
+CLOUDINARY -[hidden]right-> DB
+DB -[hidden]down-> AI
+AI -[hidden]down-> EMAIL
+
+APP --> API : \nHTTP/JSON requests
+API --> BACKEND : \nmodule routing
+
+BACKEND <--> DB : \nread/write via\nTypeORM
+MODULE_A --> CLOUDINARY : \nimage upload
+MODULE_E --> AI : \nsuggestions and\nrecommendations
+MODULE_F --> AI : \nautomated content checks\n(comments/photos only)
+MODULE_D --> EMAIL : \nregistration confirmation
+MODULE_F --> EMAIL : \nmoderation result\nnotification
+MODULE_G --> EMAIL : \ncontact\nmessages
 
 @enduml
