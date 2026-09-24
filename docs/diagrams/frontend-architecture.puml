@@ -1,13 +1,15 @@
 @startuml
-title Stays4Pilgrims Frontend Architecture
 top to bottom direction
-scale 0.92
+scale 1.0
 
 skinparam defaultFontName Arial
 skinparam defaultFontSize 11
 skinparam linetype ortho
 skinparam shadowing false
 skinparam packageStyle rectangle
+skinparam packageBorderStyle dashed
+skinparam packageBorderColor #444444
+skinparam packageBackgroundColor transparent
 skinparam package {
 	Padding 10
 }
@@ -15,30 +17,30 @@ skinparam componentStyle rectangle
 
 actor User
 
-package "Presentation Layer" as L1 {
+package "Interface Layer" as L1 {
 	component "UI Screens\nMap, Detail, Account, Auth" as UI
 }
 
-package "State Layer" as L2 {
+package "State Management Layer" as L2 {
 	component "State Management\nflutter_bloc / Cubit" as State
 }
 
-package "Data Layer" as L3 {
+package "Client Layer" as L3 {
 	component "Services and API Client" as Client
+}
+
+package "Local Persistence Layer" as L4 {
 	component "Local Storage\nAuth + Consent" as Storage
 }
 
-component "Stays4Pilgrims Backend API" as API
+package "Stays4Pilgrims Backend API" as BACKEND {
+	component "Backend API" as API
+}
 
-User --> UI : interacts
-UI --> State : user actions
-State --> UI : state updates
-State --> Client : load / submit data
-State --> Storage : persist session
+User --> UI : interage
+UI --> State : ações do utilizador
+State --> UI : atualizações de estado
+State --> Client : carregar / submeter dados
+State <--> Storage : persistir / restaurar sessão
 Client --> API : HTTP/REST
-
-note right of L3
-Storage keeps session and consent locally.
-Network communication is centralized in Client.
-end note
 @enduml
