@@ -1,6 +1,6 @@
 @startuml
 top to bottom direction
-scale 1.0
+scale 1.25
 
 skinparam defaultFontName Arial
 skinparam defaultFontSize 11
@@ -15,32 +15,34 @@ skinparam package {
 }
 skinparam componentStyle rectangle
 
-actor User
+skinparam ranksep 130
+skinparam ArrowFontOffset 50
 
-package "Interface Layer" as L1 {
-	component "UI Screens\nMap, Detail, Account, Auth" as UI
+actor Utilizador
+
+package "Camada de Interface" as L1 {
+	component "Ecrãs de interface\nMapa, detalhe, conta, autenticação" as UI
 }
 
-package "State Management Layer" as L2 {
-	component "State Management\nflutter_bloc / Cubit" as State
+package "Camada de Gestão de Estado" as L2 {
+	component "Gestão de estado\nflutter_bloc / Cubit" as State
 }
 
-package "Client Layer" as L3 {
-	component "Services and API Client" as Client
+package "Camada de Cliente" as L3 {
+	component "Serviços e cliente de API" as Client
 }
 
-package "Local Persistence Layer" as L4 {
-	component "Local Storage\nAuth + Consent" as Storage
+package "Camada de Persistência Local" as L4 {
+	component "Armazenamento local\nSessão e consentimento" as Storage
 }
 
-package "Stays4Pilgrims Backend API" as BACKEND {
-	component "Backend API" as API
+package "Backend (NestJS)" as BACKEND {
+	component "REST API" as API
 }
 
-User --> UI : interage
-UI --> State : ações do utilizador
-State --> UI : atualizações de estado
-State --> Client : carregar / submeter dados
-State <--> Storage : persistir / restaurar sessão
-Client --> API : HTTP/REST
+Utilizador --> UI
+UI <--> State : ações / estado
+State --> Client : dados
+State <--> Storage : sessão
+Client --> API : HTTPS (REST)
 @enduml
