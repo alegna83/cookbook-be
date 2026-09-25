@@ -10,34 +10,34 @@ skinparam wrapWidth 180
 skinparam dpi 180
 skinparam nodesep 55
 skinparam ranksep 120
-skinparam ArrowFontOffset 30
+skinparam ArrowFontOffset 42
 
-actor "Pilgrim / Host / Admin" as User
+actor "Utilizador" as User
 
-rectangle "Client Layer" as CLIENT {
+rectangle "Camada de Cliente" as CLIENT {
 	component "Stays4Pilgrims Frontend\n(Flutter Web / Mobile)" as Frontend
 }
 
-rectangle "Application Layer" as APP {
+rectangle "Camada de Aplicação" as APP {
 	component "Stays4Pilgrims Backend\n(NestJS REST API)" as Backend
 }
 
-rectangle "Data Layer" as DATA {
+rectangle "Camada de Dados" as DATA {
 	database "PostgreSQL" as DB
 }
 
-User --> Frontend : Browse\nauthenticate\ncontribute content
-Frontend --> Backend : HTTPS requests\n(JSON REST)
-Backend --> DB : SQL queries\n(transactions)
+User --> Frontend : Explorar, autenticar-se\ne submeter conteúdo
+Frontend --> Backend : pedidos HTTPS\n(JSON REST)
+Backend --> DB : consultas SQL\n(transações)
 
 note right of Backend
-Core domains:
+Domínios centrais:
 
-- Auth and Accounts
-- Accommodation and Comments
-- Upload and Moderation
-- Suggestions and Contact
-- AI Chat
+- Autenticação e contas
+- Alojamentos e comentários
+- Carregamento e moderação
+- Sugestões e contacto
+- Assistente de IA
 end note
 
 @enduml
