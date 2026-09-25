@@ -1,6 +1,6 @@
 @startuml
 top to bottom direction
-scale 1300 width
+scale 1500 width
 skinparam defaultFontName Arial
 skinparam defaultFontSize 10
 skinparam linetype ortho
@@ -13,8 +13,8 @@ skinparam packageBackgroundColor transparent
 skinparam componentStyle rectangle
 skinparam legendFontSize 8
 skinparam nodesep 24
-skinparam ranksep 48
-skinparam ArrowFontOffset 90
+skinparam ranksep 62
+skinparam ArrowFontOffset 38
 skinparam package {
 	Padding 15
 }
@@ -38,30 +38,32 @@ package "Backend (NestJS)" as BACKEND {
 
 	MODULE_C -[hidden]down-> MODULE_E
 	MODULE_D -[hidden]down-> MODULE_F
-	MODULE_F -[hidden]down-> MODULE_G
+	MODULE_E -[hidden]right-> MODULE_F
+	MODULE_F -[hidden]right-> MODULE_G
 }
 
 cloud "Cloudinary" as CLOUDINARY #E5E5E5
 database "PostgreSQL" as DB #E5E5E5
-cloud "AI Service" as AI #E5E5E5
-cloud "Email Service" as EMAIL #E5E5E5
+cloud "Serviço de IA" as AI #E5E5E5
+cloud "Serviço de e-mail" as EMAIL #E5E5E5
 
 APP -[hidden]down-> API
 API -[hidden]down-> BACKEND
 
-CLOUDINARY -[hidden]right-> DB
-DB -[hidden]down-> AI
+BACKEND -[hidden]left-> DB
+DB -[hidden]left-> CLOUDINARY
+BACKEND -[hidden]right-> AI
 AI -[hidden]down-> EMAIL
 
-APP --> API : \npedidos HTTP/JSON
-API --> BACKEND : \nencaminhamento por módulo
+APP --> API : HTTPS/JSON
+API --> BACKEND
 
-BACKEND <--> DB : \nleitura/escrita via\nTypeORM
-MODULE_A --> CLOUDINARY : \nupload de imagem
-MODULE_E --> AI : \nsugestões e\nrecomendações
-MODULE_F --> AI : \nverificação automática de conteúdo\n(apenas comentários/fotos)
-MODULE_D --> EMAIL : \nconfirmação de registo
-MODULE_F --> EMAIL : \nnotificação do resultado\nda moderação
-MODULE_G --> EMAIL : \nmensagens de\ncontacto
+BACKEND <--> DB : leitura/escrita via\nTypeORM
+MODULE_A --> CLOUDINARY : carregamento\nde imagens
+MODULE_E --> AI : sugestões
+MODULE_F --> AI : moderação automática\n(comentários/fotos)
+MODULE_D --> EMAIL : confirmação de\nregisto
+MODULE_F --> EMAIL : notificação de\nmoderação
+MODULE_G --> EMAIL : mensagens de\ncontacto
 
 @enduml
