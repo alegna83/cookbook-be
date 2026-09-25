@@ -1,8 +1,7 @@
 ﻿@startuml
-title Dataflow - PII and Data Retention
 
 left to right direction
-scale 0.82
+scale 0.9
 skinparam defaultFontName Arial
 skinparam defaultFontSize 11
 skinparam linetype ortho
@@ -22,76 +21,38 @@ skinparam note {
   Padding 6
 }
 
-package "Stays4Pilgrims System" {
-  package "Stays4Pilgrims Frontend (Flutter/Web)" as Frontend {
-    queue "User Input\nCredentials, Profile, Reviews" as FE_INPUT
+package "Sistema Stays4Pilgrims" {
+  package "Aplicação Flutter/Web" as Frontend {
+    queue "Entrada do utilizador" as FE_INPUT
   }
 
-  package "Stays4Pilgrims Backend (NestJS)" as Backend {
-    component "Auth Service\n[Hash passwords - bcrypt]" as AUTH
-    component "Accounts Service\n[Email, Name, Password]" as ACC
-    component "Accommodations Service\n[Address, Contact Info]" as AccommodationService
-    component "Comments Service\n[Rating, Text]" as COMMENTS
-    component "Gallery Service\n[Image URLs, metadata]" as GALLERY
-    component "Contact Service\n[Name, Email, Phone, Message]" as CONTACT
+  package "Backend NestJS" as Backend {
+    component "Módulos do backend\nAuthModule, AccountsModule,\nAccommodationsModule, CommentsModule,\nUploadModule, ContactModule" as BACKEND_MODULES
+  }
+
+  package "Serviços externos" {
+    queue "Serviço de e-mail" as EMAIL_SVC
+    queue "Serviço de moderação de conteúdo\n(IA)" as MODERATION
+    queue "Cloudinary" as CLOUDINARY
   }
 
   database "PostgreSQL" as DB {
-    entity "accounts\n(id, email, password_hash,\nname, phone, isEmailVerified,\ncreatedAt)" as TBL_ACC
-    entity "Accommodations\n(id, Accommodation_name, address,\nphone, email, website,\naccount_id)" as TBL_Accommodations
-    entity "comments\n(id, text, rating,\naccountId, AccommodationId,\nstatus, createdAt)" as TBL_COMMENTS
-    entity "gallery_photos\n(id, url, accountId,\nAccommodationId, status)" as TBL_GALLERY
-  }
-
-  package "External Services" {
-    queue "Email Service\n[Verification, Contact, Moderation Emails]" as EMAIL_SVC
-    queue "Storage (S3/Local)\n[Image Binary Data]" as STORAGE
-  }
-
-  package "Backups & Archive" {
-    database "Daily Backup (encrypted)\n24-month retention" as BACKUP
-    queue "Audit Logs\n(indefinite retention)" as AUDIT
+    entity "Account\n(id, email, password,\nname, isEmailVerified,\nemailVerificationToken,\nemailVerificationTokenExpiry)" as TBL_ACC
+    entity "Accommodation\n(id, accommodation_name, address,\nphone, email, website,\naccount_id, status)" as TBL_PLACES
+    entity "Comment\n(id, text, rating,\naccount_id, accommodation_id,\nstatus, created_at)" as TBL_COMMENTS
+    entity "GalleryPhoto\n(id, photo_url, account_id,\naccommodation_id, status, created_at)" as TBL_GALLERY
   }
 }
 
-FE_INPUT --> AUTH: credentials
-FE_INPUT --> CONTACT: contact form payload
-AUTH --> TBL_ACC: hash + store
-ACC --> TBL_ACC: name, email, phone
-AccommodationService --> TBL_Accommodations: address, contact
-COMMENTS --> TBL_COMMENTS: text, rating
-GALLERY --> TBL_GALLERY: URLs
-CONTACT --> EMAIL_SVC: forward contact request
-EMAIL_SVC <--> ACC: verification flows
-EMAIL_SVC <--> COMMENTS: moderation decision emails
-EMAIL_SVC <--> AccommodationService: moderation decision emails
-STORAGE <-- GALLERY: image uploads
-DB --> BACKUP: nightly snapshot
-DB --> AUDIT: all queries logged
+FE_INPUT --> BACKEND_MODULES
 
-note right of TBL_ACC
-  PII: email, phone, password_hash
-  Retention: Active accounts - lifetime
-  Deleted accounts - anonymized after 30 days
-end note
-
-note right of TBL_Accommodations
-  PII: phone, email, address
-  Retention: While Accommodation is active
-  Archived Accommodations - retained 12 months
-end note
-
-note right of EMAIL_SVC
-  Verification: 24h transient tokens
-  Contact and moderation emails include
-  user identity, Accommodation name and optional reason
-  Logs: Deleted after completion
-end note
-
-note right of STORAGE
-  Images: CDN cache 7 days,
-  Archive: indefinite
-end note
+BACKEND_MODULES --> TBL_ACC
+BACKEND_MODULES --> TBL_PLACES
+BACKEND_MODULES --> TBL_COMMENTS
+BACKEND_MODULES --> TBL_GALLERY
+BACKEND_MODULES --> EMAIL_SVC
+BACKEND_MODULES --> MODERATION
+BACKEND_MODULES --> CLOUDINARY
 
 @enduml
 
