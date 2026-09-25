@@ -1,61 +1,47 @@
-﻿@startuml Accommodation Lifecycle State Machine
-title Accommodation Lifecycle
+@startuml
 
-[*] --> Draft
+left to right direction
 
-Draft --> PendingModeration: User submits for review
-Draft --> Draft: Edit (allowed during draft)
+hide methods
+hide stereotypes
+skinparam shadowing false
+skinparam linetype ortho
+skinparam roundcorner 12
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam ranksep 25
+skinparam nodesep 20
+skinparam state {
+  BackgroundColor #FCFCFC
+  BorderColor #4B5563
+}
 
-PendingModeration --> Approved: Admin/moderator approves
-PendingModeration --> Rejected: Admin/moderator rejects
-PendingModeration --> Draft: Rejected -> user can re-edit
+state "Pendente de moderação" as PendenteDeModeracao
+state "Aprovado / Publicado" as AprovadoPublicado
+state "Rejeitado" as Rejeitado
 
-Approved --> Published: Admin publishes or auto-publish
-Published --> Archived: Admin archives or user requests removal (approved)
-Published --> Flagged: User reports abuse / content violation detected
+[*] --> PendenteDeModeracao
 
-Flagged --> Archived: Admin removes after review
-Flagged --> Published: Admin reviews & clears flag
+PendenteDeModeracao -down-> AprovadoPublicado : Administrador aprova
+PendenteDeModeracao -right-> Rejeitado : Administrador rejeita
 
-Rejected --> Draft: User receives rejection reason, edits and resubmits
+Rejeitado --> [*]
 
-Archived --> [*]
-
-note right of Draft
-  Initial state after creation
-  User can edit all fields
-  Gallery photos are pending
+note right of PendenteDeModeracao
+  Submissão inicial após criação.
+  Aguarda aprovação do administrador.
+  Sem validação automática por IA.
 end note
 
-note right of PendingModeration
-  Awaiting admin approval
-  Cannot edit (except owner)
-  Gallery photos are pending
+note right of AprovadoPublicado
+  Alojamento visível ao público.
+  Aparece em pesquisa e no mapa.
+  Qualquer alteração segue um pedido de edição ou de remoção.
 end note
 
-note right of Approved
-  Admin has approved content
-  Ready to be published
-  Can still be edited or removed
-end note
-
-note right of Published
-  Visible to all users
-  Listed in search/map
-  Cannot edit (removal request required)
-end note
-
-note right of Archived
-  Out of public view
-  Preserved in DB for audit
-  Cannot be reverted
-end note
-
-note right of Flagged
-  Marked for review
-  Still visible during review (admin only)
-  Can be reactivated if cleared
+note right of Rejeitado
+  Submissão rejeitada.
+  O utilizador tem de criar uma nova submissão se quiser voltar a propor o alojamento.
 end note
 
 @enduml
-
