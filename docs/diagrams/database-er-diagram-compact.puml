@@ -1,5 +1,4 @@
 ﻿@startuml
-title Stays4Pilgrims - Compact Database ER Diagram
 
 left to right direction
 
@@ -18,12 +17,12 @@ skinparam entity {
 }
 
 legend right
-  == Legend ==
-  [PK] Primary key
-  [FK] Foreign key
+  == Legenda ==
+  [PK] Chave primária
+  [FK] Chave estrangeira
 endlegend
 
-entity "Account (accounts)" as account {
+entity "Account" as account {
   [PK] id
   email
   password
@@ -79,7 +78,7 @@ entity "Accommodation" as Accommodation {
   [FK] stage_id
 }
 
-entity "AccommodationCategory (accommodation_categories)" as AccommodationCategory {
+entity "AccommodationCategory" as AccommodationCategory {
   [PK] id
   name
 }
@@ -158,7 +157,7 @@ entity "AccommodationEditRequest" as AccommodationEditRequest {
   rejection_reason
 }
 
-entity "Camino (caminos)" as camino {
+entity "Camino" as camino {
   [PK] id
   name
   ranking
@@ -167,7 +166,7 @@ entity "Camino (caminos)" as camino {
   [FK] parent_camino_id
 }
 
-entity "Stage (stages)" as stage {
+entity "Stage" as stage {
   [PK] id
   name
   [FK] camino_id
