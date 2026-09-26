@@ -1,6 +1,5 @@
 ﻿@startuml
-title Stays4Pilgrims - Frontend and backend communication overview
-scale 0.85
+scale 0.88
 left to right direction
 skinparam defaultFontName Arial
 skinparam defaultFontSize 11
@@ -9,32 +8,23 @@ skinparam component {
   Padding 8
 }
 skinparam ArrowThickness 1
+skinparam nodesep 18
+skinparam ranksep 18
 
-component "Stays4Pilgrims Frontend" as FE
-component "Stays4Pilgrims Backend" as BE
+component "Frontend (Flutter)" as FE
+component "Backend (NestJS)" as BE
 
-FE --> BE : Auth
-FE --> BE : Accommodation browsing
-FE --> BE : Comments
-FE --> BE : Favorites / Suggestions
-FE --> BE : Uploads
-FE --> BE : Account updates
-FE --> BE : Contact form
-FE --> BE : Moderation actions
-FE --> BE : AI chat
+FE --> BE : Pedidos HTTPS/REST
 
 note bottom of FE
-  Detailed flows:
-  - communication-auth-flow
-  - communication-accommodation-flow
-  - communication-suggestions-flow
-  - communication-media-moderation-flow
-  - communication-contact-flow
+  Fluxos detalhados:
+  Figuras A.2 a A.6
 end note
 
 note bottom of BE
-  Main API groups:
+  Grupos de API:
   /auth
+  /auth/admin/handle
   /accounts
   /accommodations
   /comments
