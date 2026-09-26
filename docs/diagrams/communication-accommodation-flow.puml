@@ -1,60 +1,75 @@
-﻿@startuml
-title Stays4Pilgrims - Accommodation browsing and comments communication
+@startuml
 hide footbox
 skinparam defaultFontName Arial
 skinparam defaultFontSize 12
 skinparam dpi 190
-skinparam maxMessageSize 22
+skinparam maxMessageSize 240
 skinparam sequence {
-	ParticipantPadding 18
-	BoxPadding 12
-	MessageAlign center
-	ArrowThickness 1
+  ParticipantPadding 14
+  BoxPadding 8
+  MessageAlign center
+  ArrowThickness 1
 }
 
-actor User
-participant "Frontend" as FE
-participant "Accommodation Ctrl" as AccommodationController
-participant "Accommodation Svc" as AccommodationService
-participant "Comments Ctrl" as CommentsController
-participant "Comments Svc" as CommentsService
+actor Utilizador
+participant "Frontend (Flutter)" as FE
+participant "Backend (NestJS)" as BE
+participant "AccommodationsModule" as AccommodationsModule
+participant "CommentsModule" as CommentsModule
 database "PostgreSQL" as DB
 
-== Accommodation discovery ==
+== Consulta de alojamentos ==
 
-User -> FE : open home / Camino / detail
-FE -> AccommodationController : handle(getall)
-AccommodationController -> AccommodationService : findAll(page, limit)
-AccommodationService -> DB : fetch accommodations
-AccommodationController --> FE : accommodation list
+Utilizador -> FE : consultar lista geral
+FE -> BE : POST /accommodations/handle
+BE -> AccommodationsModule : handle(getall)
+AccommodationsModule -> DB : findAll(page, limit)
+AccommodationsModule --> FE : lista de alojamentos
 
-User -> FE : filter by Camino
-FE -> AccommodationController : handle(getbycamino)
-AccommodationController -> AccommodationService : findByCamino(name)
-AccommodationService -> DB : fetch filtered list
-AccommodationController --> FE : filtered list
+Utilizador -> FE : filtrar por Caminho
+FE -> BE : POST /accommodations/handle
+BE -> AccommodationsModule : handle(getbycamino)
+AccommodationsModule -> DB : findByCamino(name)
+AccommodationsModule --> FE : lista filtrada
 
-User -> FE : open Accommodation detail
-FE -> AccommodationController : handle(getone)
-AccommodationController -> AccommodationService : findOne(id, accountId)
-AccommodationService -> DB : fetch detail + relations
-AccommodationController --> FE : detail + gallery + services
+Utilizador -> FE : abrir detalhe do alojamento
+FE -> BE : POST /accommodations/handle
+BE -> AccommodationsModule : handle(getone)
+AccommodationsModule -> DB : findOne(id, accountId)
+AccommodationsModule --> FE : detalhe + galeria + serviços
 
-== Comments and ratings ==
+note over FE,AccommodationsModule
+  Os comentários são carregados ao abrir o detalhe.
+end note
 
-FE -> CommentsController : handle(list)
-CommentsController -> CommentsService : listByAccommodation\n(id, page, limit)
-CommentsService -> DB : fetch comments
-CommentsController --> FE : comments + pagination
+== Comentários e classificações ==
 
-FE -> CommentsController : handle(exists)
-CommentsController -> CommentsService : exists(accountId, id)
-CommentsService -> DB : check if user already commented
-CommentsController --> FE : { exists: true/false }
+FE -> BE : POST /comments/handle
+BE -> CommentsModule : handle(list)
+CommentsModule -> DB : listByPlace(placeId, page, limit)
+CommentsModule --> FE : comentários + paginação
 
-FE -> CommentsController : handle(getStats)
-CommentsController -> CommentsService : getStats(id)
-CommentsService -> DB : aggregate ratings
-CommentsController --> FE : rating summary
+FE -> BE : POST /comments/handle
+BE -> CommentsModule : handle(exists)
+CommentsModule -> DB : verificar se já comentou
+CommentsModule --> FE : { exists: true/false }
+
+FE -> BE : POST /comments/handle
+BE -> CommentsModule : handle(getStats)
+CommentsModule -> DB : agregar classificações
+CommentsModule --> FE : resumo das classificações
+
+== Pesquisa no mapa ==
+
+Utilizador -> FE : consultar área visível do mapa
+FE -> BE : POST /accommodations/handle
+BE -> AccommodationsModule : handle(getbybounds)
+AccommodationsModule -> DB : getByBounds(bounds)
+AccommodationsModule --> FE : alojamentos no mapa
+
+note over FE,AccommodationsModule
+  A mesma operação cobre pesquisa noutra localização,
+  alterando apenas os limites do mapa enviados.
+end note
 
 @enduml
