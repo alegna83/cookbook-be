@@ -1,80 +1,102 @@
-﻿@startuml
-title Stays4Pilgrims - Media upload, contribution and moderation communication
-scale 0.95
+@startuml
 hide footbox
 skinparam defaultFontName Arial
-skinparam defaultFontSize 11
-skinparam maxMessageSize 52
+skinparam defaultFontSize 12
+skinparam dpi 190
+skinparam maxMessageSize 200
 skinparam sequence {
-  ParticipantPadding 12
-  BoxPadding 10
+  ParticipantPadding 10
+  BoxPadding 6
   MessageAlign center
   ArrowThickness 1
 }
 
-actor User
-participant "Stays4Pilgrims Frontend" as FE
-participant "Backend API" as API
-participant "Upload Service" as UploadSvc
-participant "Moderation Service" as ModSvc
+actor Utilizador
+actor Administrador
+participant "Frontend (Flutter)" as FE
+participant "Backend (NestJS)" as BE
+participant "UploadsModule" as UploadsModule
+participant "ContentModerationModule" as ModerationModule
+participant "AccommodationsModule" as AccommodationsModule
+participant "CommentsModule" as CommentsModule
+participant "AuthModule" as AuthModule
+participant "Serviço de IA (OpenRouter)" as AI
+participant "Serviço de e-mail" as Email
 database "PostgreSQL" as DB
 participant "Cloudinary" as Cloudinary
-participant "Email Service" as Email
 
-group 1) Media upload
-  User -> FE : Select image/file
-  FE -> API : POST /upload
-  API -> UploadSvc : validate and process upload
-  UploadSvc -> Cloudinary : store file
-  Cloudinary --> UploadSvc : public URL
-  UploadSvc --> API : media metadata
-  API --> FE : upload response
+== Carregamento de imagens ==
+
+Utilizador -> FE : carregar imagem
+FE -> BE : POST /upload
+BE -> UploadsModule : uploadMedia(type, files)
+UploadsModule -> ModerationModule : validar imagem
+ModerationModule -> AI : validação automática
+AI --> ModerationModule : permitir / rejeitar
+ModerationModule --> UploadsModule : resultado
+alt imagem aprovada
+  UploadsModule -> Cloudinary : guardar ficheiro
+  Cloudinary --> UploadsModule : URL pública
+  UploadsModule --> FE : imagem carregada
+else imagem rejeitada
+  UploadsModule --> FE : erro de moderação
 end
 
-group 2) Content contribution
-  alt Avatar
-    FE -> API : POST /accounts/update
-    API -> DB : update user avatar
-    API --> FE : account updated
-  else Accommodation photo
-    FE -> API : POST /Accommodations/handle {action:addphotos}
-    API -> ModSvc : create moderation item
-    ModSvc -> DB : state = pending
-    ModSvc -> Email : notify admins
-    API --> FE : contribution accepted
+== Contribuição de conteúdo ==
+
+alt comentários e fotografias
+  Utilizador -> FE : submeter comentário / fotografia
+  FE -> BE : POST /comments/handle ou POST /accommodations/handle
+  alt comentário
+    BE -> CommentsModule : add(...)
+    CommentsModule -> ModerationModule : pedir validação
+    ModerationModule -> AI : validação automática
+    AI --> ModerationModule : permitir / rejeitar
+    ModerationModule --> CommentsModule : resultado
+    CommentsModule -> DB : guardar estado pendente
+    CommentsModule -> Email : notificar administrador
+    CommentsModule --> FE : submissão pendente
+  else fotografia de alojamento
+    BE -> AccommodationsModule : addGalleryPhotos(...)
+    AccommodationsModule -> ModerationModule : pedir validação
+    ModerationModule -> AI : validação automática
+    AI --> ModerationModule : permitir / rejeitar
+    ModerationModule --> AccommodationsModule : resultado
+    AccommodationsModule -> DB : guardar estado pendente
+    AccommodationsModule -> Email : notificar administrador
+    AccommodationsModule --> FE : submissão pendente
   end
+else novo alojamento / edição / remoção
+  Utilizador -> FE : submeter alojamento ou pedido
+  FE -> BE : POST /accommodations/handle
+  BE -> AccommodationsModule : create / requestEdit / requestRemoval
+  AccommodationsModule -> DB : guardar pedido pendente
+  note right of AccommodationsModule
+    Sem validação automática.
+  end note
+  AccommodationsModule -> Email : notificar administrador
+  AccommodationsModule --> FE : pedido pendente
 end
 
-group 3) Moderation queue
-  FE -> API : comments / edit requests
-  API -> ModSvc : validate and enqueue
-  ModSvc -> DB : save pending request
-  ModSvc -> Email : notify moderators
-  API --> FE : pending status
-end
+== Fila de moderação ==
 
-group 4) Review and decision
-  User -> FE : Admin opens moderation queue
-  FE -> API : list pending items
-  API -> DB : load pending items
-  API --> FE : pending list
-  FE -> API : approve or reject
-  API -> ModSvc : apply decision
-  ModSvc -> DB : update final state
-end
+Administrador -> FE : abrir fila de moderação
+FE -> BE : POST /auth/admin/handle
+BE -> AuthModule : getPending...
+AuthModule -> DB : listar itens pendentes
+AuthModule --> FE : fila de moderação
 
-group 5) User notification
-  ModSvc -> Email : send decision result
-  API --> FE : moderation result
-  FE --> User : final feedback
-end
+== Revisão e decisão ==
 
-note over FE,API
-Communication diagram at macro level.
-Technical details in:
-- sequence-upload-moderation
-- sequence-add-comment
-- sequence-add-accommodation
+Administrador -> FE : aprovar ou rejeitar
+FE -> BE : POST /auth/admin/handle
+BE -> AuthModule : approve / reject
+AuthModule -> DB : atualizar estado final
+AuthModule -> Email : notificar utilizador
+AuthModule --> FE : decisão registada
+
+note over FE,BE
+Detalhe técnico nas Figuras A.7, A.9 e A.10.
 end note
 
 @enduml
