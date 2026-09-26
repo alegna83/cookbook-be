@@ -1,10 +1,9 @@
 @startuml
-title Stays4Pilgrims - Authentication and account communication
 hide footbox
 skinparam defaultFontName Arial
 skinparam defaultFontSize 12
 skinparam dpi 190
-skinparam maxMessageSize 24
+skinparam maxMessageSize 200
 skinparam sequence {
 	ParticipantPadding 18
 	BoxPadding 12
@@ -12,55 +11,63 @@ skinparam sequence {
 	ArrowThickness 1
 }
 
-actor User
-participant "Frontend" as FE
-participant "Backend API" as BE
-participant "Auth Ctrl" as AuthController
-participant "Acct Svc" as AccountsService
+actor Utilizador
+participant "Frontend (Flutter)" as FE
+participant "Backend (NestJS)" as BE
+participant "AuthModule" as AuthModule
+participant "AccountsModule" as AccountsModule
 database "PostgreSQL" as DB
-participant "Email Svc" as Email
+participant "Serviço de e-mail" as Email
 
-== Registration and verification ==
+== Registo e verificação ==
 
-User -> FE : register/login/reset
+Utilizador -> FE : registo
 FE -> BE : POST /auth/register
-BE -> AuthController : register(...)
-AuthController -> AccountsService : register(...)
-AccountsService -> DB : create account + hash
-AccountsService -> Email : send verification email
-BE --> FE : 201 Created + account payload
+BE -> AuthModule : register(...)
+AuthModule -> AccountsModule : register(...)
+AccountsModule -> DB : criar conta + hash da palavra-passe
+AccountsModule -> Email : enviar e-mail de verificação
+BE --> FE : 201 Created + dados da conta
 
-User -> FE : verify email token
+Utilizador -> FE : verificar e-mail
 FE -> BE : POST /auth/verify-email
-BE -> AuthController : verifyEmail(token)
-AuthController -> AccountsService : verifyEmail(token)
-AccountsService -> DB : set email_verified
+BE -> AuthModule : verifyEmail(token)
+AuthModule -> AccountsModule : verifyEmail(token)
+AccountsModule -> DB : marcar e-mail verificado
 BE --> FE : 200 OK
 
-== Login ==
+note right of AccountsModule
+	Token de verificação: 24 h
+end note
 
-User -> FE : login
+== Início de sessão ==
+
+Utilizador -> FE : iniciar sessão
 FE -> BE : POST /auth/login
-BE -> AuthController : login(email, password)
-AuthController -> AccountsService : login(...)
-AccountsService -> DB : validate credentials
-BE --> FE : JWT / session data
+BE -> AuthModule : login(email, password)
+AuthModule -> AccountsModule : login(...)
+AccountsModule -> DB : validar credenciais
+BE --> FE : JWT / dados de sessão
 
-== Password reset ==
+== Recuperação de palavra-passe ==
 
-User -> FE : request password reset
+Utilizador -> FE : pedir recuperação de palavra-passe
 FE -> BE : POST /auth/request-password-reset
-BE -> AuthController : requestPasswordReset(email)
-AuthController -> AccountsService : requestReset(email)
-AccountsService -> DB : create reset token
-AccountsService -> Email : send reset email
+BE -> AuthModule : requestPasswordReset(email)
+AuthModule -> AccountsModule : requestPasswordReset(email)
+AccountsModule -> DB : criar token de recuperação
+AccountsModule -> Email : enviar e-mail de recuperação
 BE --> FE : 200 OK
 
-User -> FE : change password
-FE -> BE : POST /auth/change-password
-BE -> AuthController : changePassword(token, dto)
-AuthController -> AccountsService : changePassword(userId, current, new)
-AccountsService -> DB : update password hash
+Utilizador -> FE : definir nova palavra-passe
+FE -> BE : POST /auth/reset-password
+BE -> AuthModule : resetPassword(token, newPassword)
+AuthModule -> AccountsModule : resetPassword(token, newPassword)
+AccountsModule -> DB : atualizar hash da palavra-passe
 BE --> FE : 200 OK
+
+note right of AccountsModule
+  Token de recuperação: 1 h
+end note
 
 @enduml
