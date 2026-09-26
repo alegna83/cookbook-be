@@ -1,59 +1,69 @@
 ﻿@startuml
-title Stays4Pilgrims - Suggestions and recommendation communication
 hide footbox
 skinparam defaultFontName Arial
 skinparam defaultFontSize 12
 skinparam dpi 190
-skinparam maxMessageSize 22
+skinparam maxMessageSize 200
 skinparam sequence {
-  ParticipantPadding 18
-  BoxPadding 12
+  ParticipantPadding 14
+  BoxPadding 8
   MessageAlign center
   ArrowThickness 1
 }
 
-actor User
-participant "Frontend" as FE
-participant "Sug Ctrl" as SuggestionController
-participant "Sug Svc" as SuggestionService
-participant "Accommodation Svc" as AccommodationService
-participant "Com Svc" as CommentsService
+actor Utilizador
+participant "Frontend (Flutter)" as FE
+participant "SuggestionsModule" as SuggestionsModule
+participant "AccommodationsModule" as AccommodationsModule
+participant "CommentsModule" as CommentsModule
+participant "AiChatModule" as AiChatModule
 database "PostgreSQL" as DB
-participant "OpenRouter / OpenAI" as AI
+participant "Serviço de IA (OpenRouter)" as AI
 
-== Nearby text suggestions ==
+== Sugestões de locais próximos ==
 
-User -> FE : open home near location
-FE -> FE : read coordinates + interest
+Utilizador -> FE : abrir a área próxima
+FE -> FE : ler coordenadas + interesse
 
-User -> FE : open nearby suggestions
-FE -> SuggestionController : sugerir(body)
-SuggestionController -> SuggestionService : sugerirLugares(...)
-SuggestionService -> AI : chat completion\n(nearby + interest)
-AI --> SuggestionService : 3 text suggestions
-SuggestionController --> FE : suggestions response
-FE --> User : show suggestions notification and dialog
+Utilizador -> FE : abrir sugestões próximas
+FE -> SuggestionsModule : sugerir(body)
+SuggestionsModule -> AI : pedido ao modelo\n(locais próximos + interesse)
+AI --> SuggestionsModule : 3 sugestões de texto
+SuggestionsModule --> FE : resposta de sugestões
+FE --> Utilizador : mostrar notificação e sugestões
 
-== Best accommodation recommendation ==
+== Recomendação do melhor alojamento ==
 
-User -> FE : request best Accommodation recommendation
+Utilizador -> FE : pedir recomendação do melhor alojamento
 note over FE
-Best accommodation trigger
-is shown only for authenticated users.
+Disponível apenas para utilizadores autenticados.
 end note
-FE -> SuggestionController : bestAccommodation(lat, lon, radius, category)
-SuggestionController -> SuggestionService : suggestBestAccommodation(...)
-SuggestionService -> AccommodationService : getByBounds(bounds)
-AccommodationService -> DB : fetch approved in area
-SuggestionService -> CommentsService : use ratings + counts
-CommentsService -> DB : aggregate comment statistics
-alt enough local rating data
-  SuggestionService -> AI : optional ranking analysis
-  AI --> SuggestionService : recommended option or reasoning
-else fallback to best local option
-  SuggestionService -> SuggestionService : rank by reviews + ratings
+FE -> SuggestionsModule : bestAccommodation(lat, lon, radius, category)
+SuggestionsModule -> AccommodationsModule : getByBounds(bounds)
+AccommodationsModule -> DB : alojamentos aprovados na área
+DB --> AccommodationsModule : alojamentos aprovados na área
+AccommodationsModule --> SuggestionsModule : alojamentos aprovados na área
+SuggestionsModule -> CommentsModule : calcular classificações
+CommentsModule -> DB : agregar classificações
+DB --> CommentsModule : classificações agregadas
+CommentsModule --> SuggestionsModule : classificações agregadas
+alt há alojamentos com avaliações suficientes
+  SuggestionsModule -> AI : análise por IA
+  AI --> SuggestionsModule : opção recomendada ou justificação
+else sem dados suficientes
+  SuggestionsModule -> SuggestionsModule : ordenar localmente por classificações
 end
-SuggestionController --> FE : JSON recommendation payload
-FE --> User : show best Accommodation popup
+SuggestionsModule --> FE : resposta com a recomendação (JSON)
+FE --> Utilizador : mostrar popup do melhor alojamento
+
+== Assistente conversacional ==
+
+Utilizador -> FE : abrir assistente de IA
+FE -> FE : preparar contexto da conversa
+FE -> AiChatModule : POST /ai-chat/ask
+AiChatModule -> AI : pedido ao agente
+AI --> AiChatModule : resposta do assistente
+AiChatModule --> FE : resposta da conversa
+FE --> Utilizador : mostrar assistente conversacional
 
 @enduml
