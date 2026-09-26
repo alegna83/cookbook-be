@@ -13,7 +13,7 @@ skinparam sequence {
 
 actor Utilizador
 participant "Frontend (Flutter)" as FE
-participant "SuggestionsModule" as SuggestionsModule
+participant "SuggestionModule" as SuggestionsModule
 participant "AccommodationsModule" as AccommodationsModule
 participant "CommentsModule" as CommentsModule
 participant "AiChatModule" as AiChatModule
