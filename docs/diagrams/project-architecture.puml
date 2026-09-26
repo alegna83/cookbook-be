@@ -29,6 +29,7 @@ package "Backend (NestJS)" as BACKEND {
 	component "AuthModule\nAccountsModule" as MODULE_D #E5E5E5
 
 	component "SuggestionModule" as MODULE_E #E5E5E5
+	component "AiChatModule" as MODULE_H #E5E5E5
 	component "ContentModerationModule" as MODULE_F #E5E5E5
 	component "ContactModule" as MODULE_G #E5E5E5
 
@@ -37,8 +38,9 @@ package "Backend (NestJS)" as BACKEND {
 	MODULE_C -[hidden]right-> MODULE_D
 
 	MODULE_C -[hidden]down-> MODULE_E
+	MODULE_E -[hidden]right-> MODULE_H
 	MODULE_D -[hidden]down-> MODULE_F
-	MODULE_E -[hidden]right-> MODULE_F
+	MODULE_H -[hidden]right-> MODULE_F
 	MODULE_F -[hidden]right-> MODULE_G
 }
 
@@ -58,12 +60,14 @@ AI -[hidden]down-> EMAIL
 APP --> API : HTTPS/JSON
 API --> BACKEND
 
-BACKEND <--> DB : leitura/escrita via\nTypeORM
+BACKEND <--> DB : TypeORM
 MODULE_A --> CLOUDINARY : carregamento\nde imagens
 MODULE_E --> AI : sugestões
-MODULE_F --> AI : moderação automática\n(comentários/fotos)
+MODULE_H --> AI : assistente\nconversacional
+MODULE_F --> AI : moderação automática
 MODULE_D --> EMAIL : confirmação de\nregisto
-MODULE_F --> EMAIL : notificação de\nmoderação
+MODULE_A --> EMAIL : notificação de\nmoderação
+MODULE_B --> EMAIL : notificação de\nmoderação
 MODULE_G --> EMAIL : mensagens de\ncontacto
 
 @enduml
