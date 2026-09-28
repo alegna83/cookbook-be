@@ -1,51 +1,69 @@
 ﻿@startuml
-title Upload to Moderation sequence
 scale 0.85
 hide footbox
 skinparam defaultFontName Arial
 skinparam defaultFontSize 11
-skinparam maxMessageSize 55
+skinparam maxMessageSize 200
 skinparam sequence {
   ParticipantPadding 10
   BoxPadding 8
   MessageAlign center
   ArrowThickness 1
 }
-actor User
-participant "Stays4Pilgrims Frontend" as FE
-participant "Stays4Pilgrims Backend - UploadController" as API
-participant "UploadService" as UP
-participant "Storage (S3/local)" as STORAGE
-participant "ContentModerationService" as MOD
-participant "GalleryPhotoRepo / DB" as GDB
+actor Utilizador
+participant "Frontend (Flutter)" as FE
+participant "Backend (NestJS)" as API
+participant "UploadModule" as UP
+participant "ContentModerationModule" as MOD
+participant "Serviço de IA (OpenRouter)" as AI
+participant "Cloudinary" as Cloudinary
+database "PostgreSQL" as DB
 
-User -> FE: Select image and submit\n(AccommodationId, accountId)
-FE -> API: POST /upload (multipart)\n{file, AccommodationId, accountId}
+Utilizador -> FE: selecionar imagem e submeter
+FE -> API: POST /upload (multipart)
 activate API
-API -> UP: handleUpload(file, folder='Accommodations/gallery')
+API -> UP: uploadMedia(type, files)
 activate UP
-UP -> STORAGE: store file -> returns public URL/path
-activate STORAGE
-STORAGE --> UP: url
-deactivate STORAGE
-UP -> MOD: moderateImageUrls([url])
+UP -> MOD: moderateImageBuffers(files)
 activate MOD
-MOD --> UP: decision {allow | reject}
+MOD -> AI: validação automática
+activate AI
+AI --> MOD: permitir / rejeitar
+deactivate AI
+MOD --> UP: resultado
 deactivate MOD
-alt allow
-  UP -> GDB: create GalleryPhoto {url, Accommodation, account, status: 'pending'}
-  activate GDB
-  GDB --> UP: saved photo entity
-  deactivate GDB
-  UP --> API: {url, status: 'pending'}
-else reject
-  UP --> API: throw BadRequest (image rejected)
+alt imagem aprovada
+  UP -> Cloudinary: guardar ficheiro
+  Cloudinary --> UP: URL pública
+  UP -> MOD: moderateImageUrls([url])
+  activate MOD
+  MOD -> AI: validação automática
+  activate AI
+  AI --> MOD: permitir / rejeitar
+  deactivate AI
+  MOD --> UP: resultado
+  deactivate MOD
+  alt imagem aprovada
+    UP -> DB: guardar fotografia (pendente)
+    activate DB
+    DB --> UP: fotografia guardada
+    deactivate DB
+    UP --> API: URL pública + estado pendente
+    API --> FE: 200 OK (pendente)
+  else imagem rejeitada
+    UP -> Cloudinary: apagar ficheiro
+    Cloudinary --> UP: ficheiro apagado
+    UP --> API: 400 Bad Request (imagem rejeitada)
+    API --> FE: 400 Bad Request (imagem rejeitada)
+  end
+else imagem rejeitada
+  UP --> API: 400 Bad Request (imagem rejeitada)
+  API --> FE: 400 Bad Request (imagem rejeitada)
 end
 deactivate UP
-API --> FE: 200 OK {url, status} or 400 Bad Request
 deactivate API
 
-note over GDB,MOD: Admin can later approve/reject\nvia Accommodations/handle actions
+note over MOD,DB: Só as fotografias passam pela validação automática; a validação é repetida sobre a URL pública antes de guardar; a decisão do administrador sobre a fotografia é tomada através de /auth/admin/handle (Figura A.5b).
 
 @enduml
 
