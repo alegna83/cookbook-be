@@ -1,10 +1,9 @@
 @startuml
-title Stays4Pilgrims - Contact form communication
-scale 0.82
 hide footbox
 skinparam defaultFontName Arial
-skinparam defaultFontSize 10
-skinparam maxMessageSize 48
+skinparam defaultFontSize 12
+skinparam dpi 190
+skinparam maxMessageSize 200
 skinparam sequence {
   ParticipantPadding 10
   BoxPadding 8
@@ -12,31 +11,29 @@ skinparam sequence {
   ArrowThickness 1
 }
 
-actor User
-participant "Stays4Pilgrims Frontend" as FE
-participant "Stays4Pilgrims Backend" as BE
-participant "ContactController" as ContactController
-participant "ContactService" as ContactService
-participant "Email service" as Email
+actor Utilizador
+participant "Frontend (Flutter)" as FE
+participant "Backend (NestJS)" as BE
+participant "ContactModule" as ContactModule
+participant "Serviço de e-mail" as Email
 
-User -> FE : open Contact Us page and fill form
-FE -> BE : POST /contact/send\n{name, email, phone?, title, message}
-BE -> ContactController : send(dto)
-ContactController -> ContactService : sendContactMessage(dto)
-ContactService -> ContactService : validate required fields + lengths
+Utilizador -> FE : abrir página de contacto e preencher formulário
+FE -> BE : POST /contact/send (dados do formulário)
+BE -> ContactModule : send(dto)
+ContactModule -> ContactModule : validar campos obrigatórios e dimensões
 
-alt email delivery enabled
-  ContactService -> Email : sendCustomEmail\n(receiverEmail, subject, html)
-  Email --> ContactService : delivery result
-  ContactService --> BE : { message: success }
+alt envio de e-mail ativo
+  ContactModule -> Email : sendCustomEmail(receiverEmail, subject, html) para a equipa
+  Email --> ContactModule : resultado do envio
+  ContactModule --> BE : sucesso
   BE --> FE : 200 OK
-else email delivery disabled or noop provider
-  ContactService -> Email : sendCustomEmail(...)
-  Email --> ContactService : noop / disabled configuration
-  ContactService --> BE : throw InternalServerErrorException
-  BE --> FE : 500 Contact email delivery is disabled
+else envio de e-mail desativado
+  ContactModule -> Email : sendCustomEmail(receiverEmail, subject, html) para a equipa
+  Email --> ContactModule : envio de e-mail desativado na configuração
+  ContactModule --> BE : erro: envio indisponível
+  BE --> FE : 500 Internal Server Error
 end
 
-FE --> User : show success or error feedback
+FE --> Utilizador : mostrar mensagem de sucesso ou erro
 
 @enduml
