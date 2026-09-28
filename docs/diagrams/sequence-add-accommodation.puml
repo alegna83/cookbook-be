@@ -1,74 +1,85 @@
 ﻿@startuml
-title Add Accommodation (create) sequence
 scale 0.85
 hide footbox
 skinparam defaultFontName Arial
 skinparam defaultFontSize 11
-skinparam maxMessageSize 55
+skinparam maxMessageSize 200
 skinparam sequence {
   ParticipantPadding 10
   BoxPadding 8
   MessageAlign center
   ArrowThickness 1
 }
-actor User
-participant "Stays4Pilgrims Frontend" as FE
-participant "Stays4Pilgrims Backend - AccommodationController" as API
-participant "AccommodationService" as SVC
-participant "ContentModerationService" as MOD
-participant "CategoryRepo / DB" as CATDB
-participant "AccommodationRepo / DB" as ADB
-participant "GalleryPhotoRepo / DB" as GDB
+actor Utilizador
+participant "Frontend (Flutter)" as FE
+participant "Backend (NestJS)" as API
+participant "AccommodationsModule" as SVC
+participant "ContentModerationModule" as MOD
+participant "Serviço de IA" as AI
+participant "Serviço de e-mail" as EMAIL
+database "PostgreSQL" as DB
 
-User -> FE: Fill "Add Accommodation" form\n(data + main_photo + gallery_photos)
-FE -> API: POST /Accommodations/handle\n{action:'create', payload:CreateAccommodationDto}
+Utilizador -> FE: preencher formulário de novo alojamento
+FE -> API: POST /accommodations/handle (create)
 activate API
-API -> SVC: create(CreateAccommodationDto)
+API -> SVC: create(dto)
 activate SVC
-alt gallery_photos present
+
+opt fotografias
   SVC -> MOD: moderateImageUrls(galleryPhotoUrls)
   activate MOD
-  MOD --> SVC: moderation result (allow/reject)
+  MOD -> AI: pedir validação automática
+  activate AI
+  AI --> MOD: resultado
+  deactivate AI
+  MOD --> SVC: resultado
   deactivate MOD
-  alt moderation rejected
-    SVC --> API: throw BadRequest (images rejected)
+  opt rejeitadas
+    SVC --> API: erro (fotografias rejeitadas)
     deactivate SVC
     API --> FE: 400 Bad Request
     deactivate API
-    return
   end
 end
 
-alt Accommodation_category provided
-  SVC -> CATDB: find category by id or name
-  activate CATDB
-  CATDB --> SVC: category or not found
-  deactivate CATDB
+opt categoria fornecida
+  SVC -> DB: procurar categoria
+  activate DB
+  DB --> SVC: categoria ou nula
+  deactivate DB
+  opt não existe
+    SVC --> API: 404 Not Found (categoria não encontrada)
+    deactivate SVC
+    API --> FE: 404 Not Found
+    deactivate API
+  end
 end
 
-SVC -> ADB: save new Accommodation\n(main_photo normalized)
-activate ADB
-ADB --> SVC: saved Accommodation id
-deactivate ADB
+SVC -> DB: guardar alojamento (pendente)
+activate DB
+DB --> SVC: alojamento guardado
+deactivate DB
 
-alt gallery_photos present
-  SVC -> GDB: save gallery photos as status='pending'
-  activate GDB
-  GDB --> SVC: saved gallery entries
-  deactivate GDB
+opt fotografias
+  SVC -> DB: guardar fotografias (pendentes)
+  activate DB
+  DB --> SVC: fotografias guardadas
+  deactivate DB
 end
 
-SVC -> ADB: findOne with relations\n(gallery_photos, category, prices)
-activate ADB
-ADB --> SVC: full saved entity
-deactivate ADB
+SVC -> DB: obter alojamento completo
+activate DB
+DB --> SVC: alojamento com relações
+deactivate DB
 
-SVC --> API: return created AccommodationDto
+SVC -> EMAIL: notificar administrador
+
+SVC --> API: 201 Created (pendente de aprovação)
 deactivate SVC
-API --> FE: 200 OK {AccommodationDto}
+API --> FE: 201 Created (pendente de aprovação)
 deactivate API
 
-note over FE,GDB: Gallery photos start as pending\nand are approved/rejected later
+note over MOD,DB: Só as fotografias passam pela validação automática; o alojamento e as fotografias ficam pendentes até à decisão do administrador.
 
 @enduml
 
