@@ -1,61 +1,57 @@
 ﻿@startuml
-title Add Comment sequence
-scale 0.85
 hide footbox
 skinparam defaultFontName Arial
-skinparam defaultFontSize 11
-skinparam maxMessageSize 55
+skinparam defaultFontSize 12
+skinparam dpi 190
+skinparam maxMessageSize 200
 skinparam sequence {
   ParticipantPadding 10
   BoxPadding 8
   MessageAlign center
   ArrowThickness 1
 }
-actor User
-participant "Stays4Pilgrims Frontend" as FE
-participant "Stays4Pilgrims Backend - CommentsController" as API
-participant "CommentsService" as SVC
-participant "ContentModerationService" as MOD
-database "CommentsRepo / DB" as DB
 
-User -> FE: Write comment + rating\nand submit
-FE -> API: POST /comments/handle\n{action:'add', payload:{AccommodationId, accountId, comment, rating}}
-activate API
-API -> SVC: add({AccommodationId, accountId, comment, rating})
-activate SVC
-SVC -> MOD: moderateComment(comment)
-activate MOD
-MOD --> SVC: moderation result\n{decision, reason, target:'comment'}
-deactivate MOD
-alt moderation rejected
-  SVC --> API: throw BadRequest (comment rejected)
-  deactivate SVC
-  API --> FE: 400 Bad Request {reason}
-  deactivate API
-  return
+actor Utilizador
+participant "Frontend (Flutter)" as FE
+participant "Backend (NestJS)" as BE
+participant "CommentsModule" as CommentsModule
+participant "ContentModerationModule" as ModerationModule
+participant "Serviço de IA (OpenRouter)" as AI
+participant "Serviço de e-mail" as Email
+database "PostgreSQL" as DB
+
+Utilizador -> FE : escrever comentário e classificação e submeter
+  FE -> BE : POST /comments/handle (add)
+  BE -> CommentsModule : add(accommodationId, accountId, comment, rating)
+
+CommentsModule -> DB : verificar se o alojamento existe
+DB --> CommentsModule : alojamento encontrado / não encontrado
+alt alojamento não encontrado
+  CommentsModule --> BE : erro: alojamento não encontrado
+  BE --> FE : 404 Not Found
+else alojamento encontrado
+  CommentsModule -> ModerationModule : moderar comentário
+  ModerationModule -> AI : validar comentário
+  AI --> ModerationModule : resultado da moderação
+
+  alt moderação rejeitada
+    ModerationModule --> CommentsModule : comentário rejeitado
+    CommentsModule --> BE : erro: comentário rejeitado
+    BE --> FE : 400 Bad Request
+  else moderação aprovada
+    CommentsModule -> DB : guardar comentário (estado pendente)
+    DB --> CommentsModule : comentário guardado
+    CommentsModule -> Email : notificar administrador
+    Email --> CommentsModule : resultado do envio
+    CommentsModule --> BE : comentário guardado
+    BE --> FE : 201 Created (comentário pendente)
+    FE --> Utilizador : mostrar comentário (pendente de aprovação)
+  end
 end
-SVC -> DB: check account exists
-activate DB
-DB --> SVC: account or not found
-deactivate DB
-SVC -> DB: check Accommodation exists & is approved
-activate DB
-DB --> SVC: Accommodation or not found
-DB --> SVC: Accommodation or not found
-DB --> SVC: Accommodation or not found
-deactivate DB
-SVC -> DB: create Comment\n{accountId, AccommodationId, comment, rating, status:'pending'}
-activate DB
-DB --> SVC: saved comment entity
-deactivate DB
-SVC --> API: return created CommentDto
-deactivate SVC
-API --> FE: 201 Created\n{commentId, rating, comment, status:'pending', author}
-deactivate API
-FE --> User: Show comment in list (pending approval)
 
-note over SVC,MOD: Comments are moderated\nfor spam and abusive content
-note over DB: Status flow:\npending -> approved/rejected
+note over DB
+Estados: pendente -> aprovado/rejeitado.
+end note
 
 @enduml
 

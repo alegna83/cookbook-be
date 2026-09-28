@@ -46,7 +46,7 @@ end note
 
 FE -> BE : POST /comments/handle
 BE -> CommentsModule : handle(list)
-CommentsModule -> DB : listByPlace(placeId, page, limit)
+CommentsModule -> DB : listByPlace(accommodationId, page, limit)
 CommentsModule --> FE : comentários + paginação
 
 FE -> BE : POST /comments/handle
