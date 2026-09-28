@@ -15,15 +15,20 @@ actor Utilizador
 actor Administrador
 participant "Frontend (Flutter)" as FE
 participant "Backend (NestJS)" as BE
-participant "UploadsModule" as UploadsModule
+participant "UploadModule" as UploadsModule
 participant "ContentModerationModule" as ModerationModule
+participant "Cloudinary" as Cloudinary
 participant "AccommodationsModule" as AccommodationsModule
 participant "CommentsModule" as CommentsModule
 participant "AuthModule" as AuthModule
 participant "Serviço de IA (OpenRouter)" as AI
 participant "Serviço de e-mail" as Email
 database "PostgreSQL" as DB
-participant "Cloudinary" as Cloudinary
+participant "Módulo de conteúdo" as ContentModule
+
+note left of ContentModule
+Módulo do alojamento, comentário ou imagem.
+end note
 
 == Carregamento de imagens ==
 
@@ -83,7 +88,10 @@ end
 Administrador -> FE : abrir fila de moderação
 FE -> BE : POST /auth/admin/handle
 BE -> AuthModule : getPending...
-AuthModule -> DB : listar itens pendentes
+AuthModule -> ContentModule : getPending...
+ContentModule -> DB : listar itens pendentes
+DB --> ContentModule : itens pendentes
+ContentModule --> AuthModule : fila de moderação
 AuthModule --> FE : fila de moderação
 
 == Revisão e decisão ==
@@ -91,8 +99,10 @@ AuthModule --> FE : fila de moderação
 Administrador -> FE : aprovar ou rejeitar
 FE -> BE : POST /auth/admin/handle
 BE -> AuthModule : approve / reject
-AuthModule -> DB : atualizar estado final
-AuthModule -> Email : notificar utilizador
+AuthModule -> ContentModule : aplicar decisão
+ContentModule -> DB : atualizar estado final
+ContentModule -> Email : notificar utilizador
+ContentModule --> AuthModule : decisão registada
 AuthModule --> FE : decisão registada
 
 note over FE,BE
