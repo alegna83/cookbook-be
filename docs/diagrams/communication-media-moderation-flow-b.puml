@@ -1,0 +1,48 @@
+@startuml
+hide footbox
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam dpi 190
+skinparam maxMessageSize 200
+skinparam sequence {
+  ParticipantPadding 10
+  BoxPadding 6
+  MessageAlign center
+  ArrowThickness 1
+}
+
+actor Administrador
+participant "Frontend (Flutter)" as FE
+participant "Backend (NestJS)" as BE
+participant "AuthModule" as AuthModule
+participant "Módulo de conteúdo" as ContentModule
+database "PostgreSQL" as DB
+participant "Serviço de e-mail" as Email
+
+note left of ContentModule
+Módulo do alojamento, comentário ou imagem.
+end note
+
+== Fila de moderação ==
+
+Administrador -> FE : abrir fila de moderação
+FE -> BE : POST /auth/admin/handle
+BE -> AuthModule : getPending...
+AuthModule -> ContentModule : getPending...
+ContentModule -> DB : listar itens pendentes
+DB --> ContentModule : itens pendentes
+ContentModule --> AuthModule : fila de moderação
+AuthModule --> FE : fila de moderação
+
+== Revisão e decisão ==
+
+Administrador -> FE : aprovar ou rejeitar
+FE -> BE : POST /auth/admin/handle
+BE -> AuthModule : approve / reject
+AuthModule -> ContentModule : aplicar decisão
+ContentModule -> DB : atualizar estado final
+ContentModule -> Email : notificar utilizador
+ContentModule --> AuthModule : decisão registada
+AuthModule --> FE : decisão registada
+
+@enduml
