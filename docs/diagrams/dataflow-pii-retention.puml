@@ -27,7 +27,7 @@ package "Sistema Stays4Pilgrims" {
   }
 
   package "Backend NestJS" as Backend {
-    component "Módulos do backend\nAuthModule, AccountsModule,\nAccommodationsModule, CommentsModule,\nUploadModule, ContactModule" as BACKEND_MODULES
+    component "Módulos do backend\nAuthModule, AccountsModule,\nAccommodationsModule, CommentsModule,\nUploadModule, ContactModule,\nContentModerationModule" as BACKEND_MODULES
   }
 
   package "Serviços externos" {
@@ -37,9 +37,9 @@ package "Sistema Stays4Pilgrims" {
   }
 
   database "PostgreSQL" as DB {
-    entity "Account\n(id, email, password,\nname, isEmailVerified,\nemailVerificationToken,\nemailVerificationTokenExpiry)" as TBL_ACC
+    entity "Account\n(id, email, password,\nname, is_email_verified,\nemail_verification_token,\nemail_verification_token_expiry)" as TBL_ACC
     entity "Accommodation\n(id, accommodation_name, address,\nphone, email, website,\naccount_id, status)" as TBL_PLACES
-    entity "Comment\n(id, text, rating,\naccount_id, accommodation_id,\nstatus, created_at)" as TBL_COMMENTS
+    entity "Comment\n(id, comment, rating,\naccount_id, accommodation_id,\nstatus, created_at)" as TBL_COMMENTS
     entity "GalleryPhoto\n(id, photo_url, account_id,\naccommodation_id, status, created_at)" as TBL_GALLERY
   }
 }
