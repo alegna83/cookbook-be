@@ -18,7 +18,7 @@ FE --> BE : Pedidos HTTPS/REST
 
 note bottom of FE
   Fluxos detalhados:
-  Figuras A.2 a A.6
+  Figuras B.2 a B.6
 end note
 
 note bottom of BE
@@ -26,9 +26,12 @@ note bottom of BE
   /auth
   /auth/admin/handle
   /accounts
+  /caminos
   /accommodations
+  /stages
   /comments
   /favorites
+  /statistics
   /suggestions
   /upload
   /contact
