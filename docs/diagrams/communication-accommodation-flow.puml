@@ -24,19 +24,22 @@ Utilizador -> FE : consultar lista geral
 FE -> BE : POST /accommodations/handle
 BE -> AccommodationsModule : handle(getall)
 AccommodationsModule -> DB : findAll(page, limit)
-AccommodationsModule --> FE : lista de alojamentos
+AccommodationsModule --> BE : lista de alojamentos
+BE --> FE : lista de alojamentos
 
 Utilizador -> FE : filtrar por Caminho
 FE -> BE : POST /accommodations/handle
 BE -> AccommodationsModule : handle(getbycamino)
 AccommodationsModule -> DB : findByCamino(name)
-AccommodationsModule --> FE : lista filtrada
+AccommodationsModule --> BE : lista filtrada
+BE --> FE : lista filtrada
 
 Utilizador -> FE : abrir detalhe do alojamento
 FE -> BE : POST /accommodations/handle
 BE -> AccommodationsModule : handle(getone)
 AccommodationsModule -> DB : findOne(id, accountId)
-AccommodationsModule --> FE : detalhe + galeria + serviços
+AccommodationsModule --> BE : detalhe + galeria + serviços
+BE --> FE : detalhe + galeria + serviços
 
 note over FE,AccommodationsModule
   Os comentários são carregados ao abrir o detalhe.
@@ -47,17 +50,20 @@ end note
 FE -> BE : POST /comments/handle
 BE -> CommentsModule : handle(list)
 CommentsModule -> DB : listByPlace(accommodationId, page, limit)
-CommentsModule --> FE : comentários + paginação
+CommentsModule --> BE : comentários + paginação
+BE --> FE : comentários + paginação
 
 FE -> BE : POST /comments/handle
 BE -> CommentsModule : handle(exists)
 CommentsModule -> DB : verificar se já comentou
-CommentsModule --> FE : { exists: true/false }
+CommentsModule --> BE : { exists: true/false }
+BE --> FE : { exists: true/false }
 
 FE -> BE : POST /comments/handle
 BE -> CommentsModule : handle(getStats)
 CommentsModule -> DB : agregar classificações
-CommentsModule --> FE : resumo das classificações
+CommentsModule --> BE : resumo das classificações
+BE --> FE : resumo das classificações
 
 == Pesquisa no mapa ==
 
@@ -65,7 +71,8 @@ Utilizador -> FE : consultar área visível do mapa
 FE -> BE : POST /accommodations/handle
 BE -> AccommodationsModule : handle(getbybounds)
 AccommodationsModule -> DB : getByBounds(bounds)
-AccommodationsModule --> FE : alojamentos no mapa
+AccommodationsModule --> BE : alojamentos no mapa
+BE --> FE : alojamentos no mapa
 
 note over FE,AccommodationsModule
   A mesma operação cobre pesquisa noutra localização,
