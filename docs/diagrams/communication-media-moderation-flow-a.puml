@@ -38,9 +38,11 @@ ModerationModule --> UploadsModule : resultado
 alt imagem aprovada
   UploadsModule -> Cloudinary : guardar ficheiro
   Cloudinary --> UploadsModule : URL pública
-  UploadsModule --> FE : imagem pendente de aprovação
+  UploadsModule --> BE : imagem pendente de aprovação
+  BE --> FE : imagem pendente de aprovação
 else imagem rejeitada
-  UploadsModule --> FE : erro de moderação
+  UploadsModule --> BE : erro de moderação
+  BE --> FE : erro de moderação
 end
 
 == Contribuição de conteúdo ==
@@ -54,11 +56,13 @@ alt comentários e fotografias
   AI --> ModerationModule : permitir / rejeitar
   ModerationModule --> ContentModule : resultado
   alt rejeitado
-    ContentModule --> FE : erro de moderação
+    ContentModule --> BE : erro de moderação
+    BE --> FE : erro de moderação
   else aprovado
     ContentModule -> DB : guardar estado pendente
     ContentModule -> Email : notificar administrador
-    ContentModule --> FE : submissão pendente
+    ContentModule --> BE : submissão pendente
+    BE --> FE : submissão pendente
   end
 else novo alojamento / edição / remoção
   Utilizador -> FE : submeter alojamento ou pedido
@@ -69,7 +73,8 @@ else novo alojamento / edição / remoção
     Sem validação automática.
   end note
   ContentModule -> Email : notificar administrador
-  ContentModule --> FE : pedido pendente
+  ContentModule --> BE : pedido pendente
+  BE --> FE : pedido pendente
 end
 
 @enduml

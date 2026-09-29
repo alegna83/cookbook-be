@@ -32,7 +32,8 @@ AuthModule -> ContentModule : getPending...
 ContentModule -> DB : listar itens pendentes
 DB --> ContentModule : itens pendentes
 ContentModule --> AuthModule : fila de moderação
-AuthModule --> FE : fila de moderação
+AuthModule --> BE : fila de moderação
+BE --> FE : fila de moderação
 
 == Revisão e decisão ==
 
@@ -43,6 +44,7 @@ AuthModule -> ContentModule : aplicar decisão
 ContentModule -> DB : atualizar estado final
 ContentModule -> Email : notificar utilizador
 ContentModule --> AuthModule : decisão registada
-AuthModule --> FE : decisão registada
+AuthModule --> BE : decisão registada
+BE --> FE : decisão registada
 
 @enduml
