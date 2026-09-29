@@ -27,7 +27,7 @@ Utilizador -> FE : abrir a área próxima
 FE -> FE : ler coordenadas + interesse
 
 Utilizador -> FE : abrir sugestões próximas
-FE -> BE : POST /sugestoes/sugerir
+FE -> BE : POST /suggestions/suggest
 BE -> SuggestionsModule : sugerir(body)
 SuggestionsModule -> AI : pedido ao modelo\n(locais próximos + interesse)
 AI --> SuggestionsModule : 3 sugestões de texto
@@ -41,7 +41,7 @@ Utilizador -> FE : pedir recomendação do melhor alojamento
 note over FE
 Disponível apenas para utilizadores autenticados.
 end note
-FE -> BE : GET /sugestoes/best-accommodation?lat=...&lon=...&radius=...&category=...
+FE -> BE : GET /suggestions/best-accommodation?lat=...&lon=...&radius=...&category=...
 BE -> SuggestionsModule : bestAccommodation(lat, lon, radius, category)
 SuggestionsModule -> AccommodationsModule : getByBounds(bounds)
 AccommodationsModule -> DB : alojamentos aprovados na área
