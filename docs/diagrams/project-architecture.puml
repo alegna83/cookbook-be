@@ -14,7 +14,7 @@ skinparam componentStyle rectangle
 skinparam legendFontSize 8
 skinparam nodesep 24
 skinparam ranksep 62
-skinparam ArrowFontOffset 38
+skinparam ArrowFontOffset 90
 skinparam package {
 	Padding 15
 }
