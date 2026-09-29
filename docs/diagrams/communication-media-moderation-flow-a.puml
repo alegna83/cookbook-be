@@ -38,7 +38,7 @@ ModerationModule --> UploadsModule : resultado
 alt imagem aprovada
   UploadsModule -> Cloudinary : guardar ficheiro
   Cloudinary --> UploadsModule : URL pública
-  UploadsModule --> FE : imagem carregada
+  UploadsModule --> FE : imagem pendente de aprovação
 else imagem rejeitada
   UploadsModule --> FE : erro de moderação
 end
