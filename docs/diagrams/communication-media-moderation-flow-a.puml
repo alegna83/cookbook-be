@@ -38,6 +38,8 @@ ModerationModule --> UploadsModule : resultado
 alt imagem aprovada
   UploadsModule -> Cloudinary : guardar ficheiro
   Cloudinary --> UploadsModule : URL pública
+  UploadsModule -> DB : guardar fotografia (pendente)
+  DB --> UploadsModule : fotografia guardada
   UploadsModule --> BE : imagem pendente de aprovação
   BE --> FE : imagem pendente de aprovação
 else imagem rejeitada
@@ -70,7 +72,7 @@ else novo alojamento / edição / remoção
   BE -> ContentModule : create / requestEdit / requestRemoval
   ContentModule -> DB : guardar pedido pendente
   note left of ContentModule
-    Sem validação automática.
+    Sem validação automática dos dados do alojamento.
   end note
   ContentModule -> Email : notificar administrador
   ContentModule --> BE : pedido pendente
