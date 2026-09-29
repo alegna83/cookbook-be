@@ -18,7 +18,7 @@ participant "AccommodationsModule" as AccommodationsModule
 participant "CommentsModule" as CommentsModule
 participant "AiChatModule" as AiChatModule
 database "PostgreSQL" as DB
-participant "Serviço de IA (OpenRouter)" as AI
+participant "Serviço de IA" as AI
 
 == Sugestões de locais próximos ==
 

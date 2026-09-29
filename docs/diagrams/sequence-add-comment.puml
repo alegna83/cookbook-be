@@ -16,7 +16,7 @@ participant "Frontend (Flutter)" as FE
 participant "Backend (NestJS)" as BE
 participant "CommentsModule" as CommentsModule
 participant "ContentModerationModule" as ModerationModule
-participant "Serviço de IA (OpenRouter)" as AI
+participant "Serviço de IA" as AI
 participant "Serviço de e-mail" as Email
 database "PostgreSQL" as DB
 

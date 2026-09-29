@@ -15,7 +15,7 @@ participant "Frontend (Flutter)" as FE
 participant "Backend (NestJS)" as API
 participant "UploadModule" as UP
 participant "ContentModerationModule" as MOD
-participant "Serviço de IA (OpenRouter)" as AI
+participant "Serviço de IA" as AI
 participant "Cloudinary" as Cloudinary
 database "PostgreSQL" as DB
 

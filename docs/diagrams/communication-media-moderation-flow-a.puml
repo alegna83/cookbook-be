@@ -17,7 +17,7 @@ participant "Backend (NestJS)" as BE
 participant "UploadModule" as UploadsModule
 participant "ContentModerationModule" as ModerationModule
 participant "Cloudinary" as Cloudinary
-participant "Serviço de IA (OpenRouter)" as AI
+participant "Serviço de IA" as AI
 participant "Serviço de e-mail" as Email
 database "PostgreSQL" as DB
 participant "Módulo de conteúdo" as ContentModule
