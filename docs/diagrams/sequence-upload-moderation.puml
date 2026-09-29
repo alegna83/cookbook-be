@@ -63,7 +63,7 @@ end
 deactivate UP
 deactivate API
 
-note over MOD,DB: Só as fotografias passam pela validação automática; a validação é repetida sobre a URL pública antes de guardar; a decisão do administrador sobre a fotografia é tomada através de /auth/admin/handle (Figura A.5b).
+note over MOD,DB: Só as fotografias passam pela validação automática; a validação é repetida sobre a URL pública antes de guardar; a decisão do administrador sobre a fotografia é tomada através de /auth/admin/handle (Figura B.5b).
 
 @enduml
 
