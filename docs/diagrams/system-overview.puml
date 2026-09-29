@@ -14,7 +14,7 @@ skinparam ArrowFontOffset 42
 
 actor "Utilizador" as User
 
-rectangle "Camada de Cliente" as CLIENT {
+rectangle "Camada de Apresentação" as CLIENT {
 	component "Stays4Pilgrims Frontend\n(Flutter Web / Mobile)" as Frontend
 }
 
