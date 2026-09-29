@@ -45,8 +45,12 @@ end note
 Utilizador -> FE : iniciar sessão
 FE -> BE : POST /auth/login
 BE -> AuthModule : login(email, password)
-AuthModule -> AccountsModule : login(...)
-AccountsModule -> DB : validar credenciais
+AuthModule -> AccountsModule : procurar conta por e-mail
+AccountsModule -> DB : procurar conta
+DB --> AccountsModule : conta encontrada
+AccountsModule --> AuthModule : conta
+AuthModule -> AuthModule : verificar palavra-passe
+AuthModule --> BE : JWT / dados de sessão
 BE --> FE : JWT / dados de sessão
 
 == Recuperação de palavra-passe ==
