@@ -65,10 +65,12 @@ FE --> Utilizador : mostrar popup do melhor alojamento
 
 Utilizador -> FE : abrir assistente de IA
 FE -> FE : preparar contexto da conversa
-FE -> AiChatModule : POST /ai-chat/ask
+FE -> BE : POST /ai-chat/ask
+BE -> AiChatModule : ask(dto)
 AiChatModule -> AI : pedido ao agente
 AI --> AiChatModule : resposta do assistente
-AiChatModule --> FE : resposta da conversa
+AiChatModule --> BE : resposta da conversa
+BE --> FE : resposta da conversa
 FE --> Utilizador : mostrar assistente conversacional
 
 @enduml

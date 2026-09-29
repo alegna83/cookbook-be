@@ -30,7 +30,8 @@ Rejeitado --> [*]
 note right of PendenteDeModeracao
   Submissão inicial após criação.
   Aguarda aprovação do administrador.
-  Sem validação automática por IA.
+  Sem validação por IA dos dados do alojamento.
+  As fotografias anexadas são validadas automaticamente (ver Figura B.9).
 end note
 
 note right of AprovadoPublicado

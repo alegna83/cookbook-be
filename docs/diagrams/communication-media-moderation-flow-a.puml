@@ -53,9 +53,13 @@ alt comentários e fotografias
   ModerationModule -> AI : validação automática
   AI --> ModerationModule : permitir / rejeitar
   ModerationModule --> ContentModule : resultado
-  ContentModule -> DB : guardar estado pendente
-  ContentModule -> Email : notificar administrador
-  ContentModule --> FE : submissão pendente
+  alt rejeitado
+    ContentModule --> FE : erro de moderação
+  else aprovado
+    ContentModule -> DB : guardar estado pendente
+    ContentModule -> Email : notificar administrador
+    ContentModule --> FE : submissão pendente
+  end
 else novo alojamento / edição / remoção
   Utilizador -> FE : submeter alojamento ou pedido
   FE -> BE : POST /accommodations/handle
