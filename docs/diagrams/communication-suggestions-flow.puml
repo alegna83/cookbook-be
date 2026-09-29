@@ -13,6 +13,7 @@ skinparam sequence {
 
 actor Utilizador
 participant "Frontend (Flutter)" as FE
+participant "Backend (NestJS)" as BE
 participant "SuggestionModule" as SuggestionsModule
 participant "AccommodationsModule" as AccommodationsModule
 participant "CommentsModule" as CommentsModule
@@ -26,10 +27,12 @@ Utilizador -> FE : abrir a área próxima
 FE -> FE : ler coordenadas + interesse
 
 Utilizador -> FE : abrir sugestões próximas
-FE -> SuggestionsModule : sugerir(body)
+FE -> BE : POST /sugestoes/sugerir
+BE -> SuggestionsModule : sugerir(body)
 SuggestionsModule -> AI : pedido ao modelo\n(locais próximos + interesse)
 AI --> SuggestionsModule : 3 sugestões de texto
-SuggestionsModule --> FE : resposta de sugestões
+SuggestionsModule --> BE : resposta de sugestões
+BE --> FE : resposta de sugestões
 FE --> Utilizador : mostrar notificação e sugestões
 
 == Recomendação do melhor alojamento ==
@@ -38,7 +41,8 @@ Utilizador -> FE : pedir recomendação do melhor alojamento
 note over FE
 Disponível apenas para utilizadores autenticados.
 end note
-FE -> SuggestionsModule : bestAccommodation(lat, lon, radius, category)
+FE -> BE : GET /sugestoes/best-accommodation?lat=...&lon=...&radius=...&category=...
+BE -> SuggestionsModule : bestAccommodation(lat, lon, radius, category)
 SuggestionsModule -> AccommodationsModule : getByBounds(bounds)
 AccommodationsModule -> DB : alojamentos aprovados na área
 DB --> AccommodationsModule : alojamentos aprovados na área
@@ -53,7 +57,8 @@ alt há alojamentos com avaliações suficientes
 else sem dados suficientes
   SuggestionsModule -> SuggestionsModule : ordenar localmente por classificações
 end
-SuggestionsModule --> FE : resposta com a recomendação (JSON)
+SuggestionsModule --> BE : resposta com a recomendação (JSON)
+BE --> FE : resposta com a recomendação (JSON)
 FE --> Utilizador : mostrar popup do melhor alojamento
 
 == Assistente conversacional ==
