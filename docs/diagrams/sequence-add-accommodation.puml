@@ -34,11 +34,12 @@ opt fotografias
   deactivate AI
   MOD --> SVC: resultado
   deactivate MOD
-  opt rejeitadas
+  alt rejeitadas
     SVC --> API: erro (fotografias rejeitadas)
     deactivate SVC
     API --> FE: 400 Bad Request
     deactivate API
+  else aprovadas
   end
 end
 
@@ -47,11 +48,12 @@ opt categoria fornecida
   activate DB
   DB --> SVC: categoria ou nula
   deactivate DB
-  opt não existe
+  alt não existe
     SVC --> API: 404 Not Found (categoria não encontrada)
     deactivate SVC
     API --> FE: 404 Not Found
     deactivate API
+  else existe
   end
 end
 
