@@ -41,7 +41,7 @@ end note
 == Acesso a rota protegida ==
 
 Utilizador -> FE: aceder a rota protegida
-FE -> BE: GET /accommodations
+FE -> BE: POST /accommodations/handle
 BE -> JWT: validar token
 JWT -> JWT: verificar assinatura
 JWT --> BE: token válido
