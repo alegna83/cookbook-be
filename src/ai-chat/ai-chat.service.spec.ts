@@ -31,10 +31,38 @@ describe('AiChatService domain guard', () => {
     expect(result).toBe('pt');
   });
 
+  it('switches the reply language to Portuguese even when the existing session language is English', () => {
+    const session = (service as any).sessions.getOrCreate('lang-switch-test', 'en');
+    session.turns.push({ role: 'user', content: 'Where is the best hostel?' });
+    session.turns.push({ role: 'assistant', content: 'I can help with Camino lodging.' });
+
+    const result = (service as any).resolveLanguage(session, { language: 'en' }, 'qual é o melhor albergue perto da etapa de Sarria?');
+
+    expect(result).toBe('pt');
+  });
+
   it('keeps the Camino scope mode when the request explicitly says it is Camino-specific', () => {
     const result = service.shouldRedirectToPilgrimContext('qual é o melhor albergue na etapa de Sarria?', 'camino');
 
     expect(result.redirect).toBe(false);
     expect(result.reply).toBeNull();
+  });
+
+  it('allows web search in general mode when the user asks for concrete travel information', () => {
+    const session = (service as any).sessions.getOrCreate('general-scope-test', 'pt');
+    const messages = (service as any).buildMessages(session, 'qual é o melhor restaurante em Lisboa?', 'general');
+    const systemPrompt = messages.find((m: any) => m.role === 'system')?.content ?? '';
+
+    expect(systemPrompt).toContain('Current chat scope: general travel');
+    expect(systemPrompt).toContain('use search_web whenever it can improve the answer');
+  });
+
+  it('allows web search in Camino mode for useful practical facts near the route', () => {
+    const session = (service as any).sessions.getOrCreate('camino-scope-test', 'pt');
+    const messages = (service as any).buildMessages(session, 'há transporte público para a próxima etapa?', 'camino');
+    const systemPrompt = messages.find((m: any) => m.role === 'system')?.content ?? '';
+
+    expect(systemPrompt).toContain('Current chat scope: camino');
+    expect(systemPrompt).toContain('use search_web when it adds concrete');
   });
 });

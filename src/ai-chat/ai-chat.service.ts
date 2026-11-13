@@ -242,16 +242,9 @@ export class AiChatService {
     dto: AskChatDto,
     message: string,
   ): string {
-    // The conversation language is decided ONCE and then locked. Re-detecting
-    // per message is what makes the assistant flip between PT and EN on short
-    // turns like "sim" or "quantos kms faltam?", which carry no detectable
-    // markers in any language.
-    if (session.turns.length > 0 && session.language) {
-      return session.language;
-    }
-
-    // Prefer the actual message language over the client locale. Flutter often
-    // reports 'en' by default even when the user writes in Portuguese.
+    // Prefer the actual message language, because the user can switch from one
+    // language to another mid-conversation. The app locale is only a fallback when
+    // the message itself does not contain enough markers to decide.
     const detected = this.detectLanguage(message);
 
     if (detected !== 'en') {
@@ -262,11 +255,15 @@ export class AiChatService {
       return dto.language;
     }
 
+    if (session.turns.length > 0 && session.language && session.language !== 'en') {
+      return session.language;
+    }
+
     if (this.isLikelyEnglish(message)) {
       return 'en';
     }
 
-    return dto.language === 'en' ? 'en' : 'pt';
+    return 'pt';
   }
 
   private isLikelyEnglish(text: string): boolean {
@@ -314,14 +311,25 @@ export class AiChatService {
       .join('\n');
 
     const scopeLabel = scope === 'general' ? 'general travel' : 'camino';
+    const generalModeRule = scope === 'general'
+      ? `  - Current chat scope: ${scopeLabel}. This mode is intentionally broader: answer practical general travel questions, nearby places, logistics, food, transport, and city guidance when the user asks for them. Do not force Camino-only answers when the user explicitly selected general travel.
+  - If the user asks a Camino question while in general mode, you may still answer it, but prioritize the user's actual request rather than locking the conversation to Camino-only content.
+  - For questions that do not require app data, answer directly without inventing facts.
+  - In both general and Camino modes, use search_web whenever it can improve the answer with current, concrete, and specific facts, especially for logistics, opening times, places, transport, and current local information.
+  - If the app database does not contain the needed answer, use search_web as a normal fallback and answer from the best available evidence instead of refusing.
+  - When the answer is not in the app dataset, say so briefly, then provide the most relevant answer supported by web results or general knowledge. Do not block with "I don't know" when you can still give a useful answer.
+  - Never invent accommodation names, distances, prices, or facts that are not grounded in the app dataset, the web results, or clearly stated general knowledge.`
+      : `  - Current chat scope: ${scopeLabel}. Stay within the current scope unless the user explicitly asks to change it.
+  - Do not answer unrelated travel or general-purpose questions about renting cars, flights, generic tourism, commuting, weather, or non-pilgrim topics.
+  - If the user asks for a car, flight, hotel outside the Camino, or unrelated topic, politely redirect back to the Caminho de Santiago and the app's pilgrim use cases.
+  - In Camino mode, still use search_web when it adds concrete, current, or practical information relevant to the question, especially for places, routes, opening hours, transport, and local services near the route.
+  - Keep answers grounded in the Camino context, but do not refuse useful factual answers when web evidence can help.
+  - Never invent accommodation names or facts that are not grounded in the app dataset, the web results, or the known Camino context.`;
+
     const system = `You are a conversational AI assistant for the Caminho de Santiago pilgrim experience. Your scope is limited to the app's data and pilgrim use cases: routes, stages, accommodations, services, nearby places, recommendations, and practical support for walking the Camino.
 
 STRICT SCOPE RULE
-  - Current chat scope: ${scopeLabel}. Stay within the current scope unless the user explicitly asks to change it.
-  - Do not answer unrelated travel or general-purpose questions about renting cars, flights, generic tourism, commuting, weather, or non-pilgrim topics.
-  - If the user asks for a car, flight, hotel outside the Camino, or unrelated topic, politely redirect back to the Caminho de Santiago and the app's pilgrim use cases.
-  - Keep all answers inside the Camino context unless the user explicitly asks for a different topic.
-  - Never invent accommodation names or facts that are not grounded in the app dataset or in the known Camino context.
+${generalModeRule}
 
 LANGUAGE
   - This conversation is in ${languageName}. Write EVERY reply entirely in ${languageName}.
