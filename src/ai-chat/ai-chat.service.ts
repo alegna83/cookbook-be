@@ -99,6 +99,7 @@ export class AiChatService {
       throw new BadRequestException('message is too long');
     }
 
+    const scope = dto.scope ?? 'camino';
     const conversationId = dto.conversationId?.trim() || randomUUID();
     const session = this.sessions.getOrCreate(
       conversationId,
@@ -111,7 +112,7 @@ export class AiChatService {
       parseUserContext(dto.context),
     );
 
-    const outOfScope = this.shouldRedirectToPilgrimContext(message);
+    const outOfScope = this.shouldRedirectToPilgrimContext(message, scope);
     if (outOfScope.redirect) {
       const answer = this.sanitizeAnswer(outOfScope.reply!, session.language);
       session.turns.push({ role: 'user', content: message });
@@ -130,7 +131,7 @@ export class AiChatService {
       };
     }
 
-    const messages = this.buildMessages(session, message);
+    const messages = this.buildMessages(session, message, scope);
     const retrievalContext: RetrievalContext = {
       userContext: session.context,
       language: session.language,
@@ -160,10 +161,17 @@ export class AiChatService {
     };
   }
 
-  shouldRedirectToPilgrimContext(message: string): {
+  shouldRedirectToPilgrimContext(
+    message: string,
+    scope: 'camino' | 'general' = 'camino',
+  ): {
     redirect: boolean;
     reply: string | null;
   } {
+    if (scope === 'general') {
+      return { redirect: false, reply: null };
+    }
+
     const text = message.toLowerCase();
 
     const outOfScopeTerms = [
@@ -242,17 +250,16 @@ export class AiChatService {
       return session.language;
     }
 
-    // First turn only. A client locale of 'en' is not trusted on its own,
-    // because Flutter reports 'en' whenever supportedLocales is not
-    // configured — see the note in ChatAssistantPanel.
+    // Prefer the actual message language over the client locale. Flutter often
+    // reports 'en' by default even when the user writes in Portuguese.
     const detected = this.detectLanguage(message);
-
-    if (dto.language && dto.language !== 'en') {
-      return dto.language;
-    }
 
     if (detected !== 'en') {
       return detected;
+    }
+
+    if (dto.language && dto.language !== 'en') {
+      return dto.language;
     }
 
     if (this.isLikelyEnglish(message)) {
@@ -296,18 +303,25 @@ export class AiChatService {
 
   // ------------------------------------------------------------------ prompt
 
-  private buildMessages(session: ChatSession, message: string): ChatMessage[] {
+  private buildMessages(
+    session: ChatSession,
+    message: string,
+    scope: 'camino' | 'general' = 'camino',
+  ): ChatMessage[] {
     const languageName = LANGUAGE_NAMES[session.language] || 'English';
     const toolList = this.retrievers
       .map((r) => `- ${r.tool.name}: ${r.tool.description}`)
       .join('\n');
 
+    const scopeLabel = scope === 'general' ? 'general travel' : 'camino';
     const system = `You are a conversational AI assistant for the Caminho de Santiago pilgrim experience. Your scope is limited to the app's data and pilgrim use cases: routes, stages, accommodations, services, nearby places, recommendations, and practical support for walking the Camino.
 
 STRICT SCOPE RULE
+  - Current chat scope: ${scopeLabel}. Stay within the current scope unless the user explicitly asks to change it.
   - Do not answer unrelated travel or general-purpose questions about renting cars, flights, generic tourism, commuting, weather, or non-pilgrim topics.
   - If the user asks for a car, flight, hotel outside the Camino, or unrelated topic, politely redirect back to the Caminho de Santiago and the app's pilgrim use cases.
   - Keep all answers inside the Camino context unless the user explicitly asks for a different topic.
+  - Never invent accommodation names or facts that are not grounded in the app dataset or in the known Camino context.
 
 LANGUAGE
   - This conversation is in ${languageName}. Write EVERY reply entirely in ${languageName}.

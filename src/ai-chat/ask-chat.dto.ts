@@ -37,4 +37,15 @@ export class AskChatDto {
     message: 'language must be a valid ISO 639-1 code (pt, en, fr, es, de, it)',
   })
   language?: string;
+
+  /**
+   * Optional chat mode. Default is Camino de Santiago scope, but the UI can
+   * expose a general mode for broader travel questions.
+   */
+  @IsOptional()
+  @IsString()
+  @Matches(/^(camino|general)$/, {
+    message: 'scope must be either camino or general',
+  })
+  scope?: 'camino' | 'general';
 }
