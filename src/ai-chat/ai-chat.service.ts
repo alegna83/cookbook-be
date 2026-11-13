@@ -111,6 +111,25 @@ export class AiChatService {
       parseUserContext(dto.context),
     );
 
+    const outOfScope = this.shouldRedirectToPilgrimContext(message);
+    if (outOfScope.redirect) {
+      const answer = this.sanitizeAnswer(outOfScope.reply!, session.language);
+      session.turns.push({ role: 'user', content: message });
+      session.turns.push({ role: 'assistant', content: answer });
+      this.sessions.save(session);
+
+      return {
+        conversationId,
+        answer,
+        provider: 'openai',
+        model: 'domain-guard',
+        usedFallback: false,
+        language: session.language,
+        usedTools: [],
+        groundedOn: 0,
+      };
+    }
+
     const messages = this.buildMessages(session, message);
     const retrievalContext: RetrievalContext = {
       userContext: session.context,
@@ -138,6 +157,73 @@ export class AiChatService {
       language: session.language,
       usedTools: result.usedTools,
       groundedOn: result.groundedOn,
+    };
+  }
+
+  shouldRedirectToPilgrimContext(message: string): {
+    redirect: boolean;
+    reply: string | null;
+  } {
+    const text = message.toLowerCase();
+
+    const outOfScopeTerms = [
+      'alugar carro',
+      'aluguer de carro',
+      'carro',
+      'car hire',
+      'rental car',
+      'rent a car',
+      'carro para',
+      'combustivel',
+      'combustível',
+      'automóvel',
+      'automovel',
+      'motorhome',
+      'camper',
+      'airport transfer',
+      'voo',
+      'avião',
+      'aviao',
+      'hotel em lisboa',
+      'hotel em porto',
+      'restaurante em',
+      'clima',
+      'tempo',
+    ];
+
+    const caminoTerms = [
+      'caminho de santiago',
+      'caminho',
+      'camino',
+      'santiago',
+      'peregrino',
+      'peregrinação',
+      'albergue',
+      'etapa',
+      'rota',
+      'caminho português',
+      'caminho francès',
+      'caminho prt',
+      'municipio',
+      'acomodação',
+      'alojamento',
+    ];
+
+    const hasOutOfScopeTerms = outOfScopeTerms.some((term) => text.includes(term));
+    const hasCaminoTerms = caminoTerms.some((term) => text.includes(term));
+
+    if (!hasOutOfScopeTerms) {
+      return { redirect: false, reply: null };
+    }
+
+    if (hasCaminoTerms && !['carro', 'car hire', 'rental car', 'rent a car', 'automóvel', 'automovel', 'camper'].some((term) => text.includes(term))) {
+      return { redirect: false, reply: null };
+    }
+
+    return {
+      redirect: true,
+      reply:
+        'Este assistente está orientado para apoiar o Caminho de Santiago: alojamentos, etapas, rotas, serviços e recomendações de peregrino. Se quiser, posso ajudar com albergues, distâncias, etapas e sugestões ao longo do caminho, mas não com aluguer de carros ou assuntos fora do contexto do peregrino.',
     };
   }
 
@@ -216,7 +302,12 @@ export class AiChatService {
       .map((r) => `- ${r.tool.name}: ${r.tool.description}`)
       .join('\n');
 
-    const system = `You are a conversational AI assistant. You are not a search-results page and not a report generator. Your job is to understand the user's latest message in the context of the full conversation, use tools when useful, and answer naturally, concretely, and briefly.
+    const system = `You are a conversational AI assistant for the Caminho de Santiago pilgrim experience. Your scope is limited to the app's data and pilgrim use cases: routes, stages, accommodations, services, nearby places, recommendations, and practical support for walking the Camino.
+
+STRICT SCOPE RULE
+  - Do not answer unrelated travel or general-purpose questions about renting cars, flights, generic tourism, commuting, weather, or non-pilgrim topics.
+  - If the user asks for a car, flight, hotel outside the Camino, or unrelated topic, politely redirect back to the Caminho de Santiago and the app's pilgrim use cases.
+  - Keep all answers inside the Camino context unless the user explicitly asks for a different topic.
 
 LANGUAGE
   - This conversation is in ${languageName}. Write EVERY reply entirely in ${languageName}.
