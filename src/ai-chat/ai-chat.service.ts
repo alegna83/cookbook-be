@@ -316,6 +316,7 @@ export class AiChatService {
   - If the user asks a Camino question while in general mode, you may still answer it, but prioritize the user's actual request rather than locking the conversation to Camino-only content.
   - For questions that do not require app data, answer directly without inventing facts.
   - In both general and Camino modes, use search_web whenever it can improve the answer with current, concrete, and specific facts, especially for logistics, opening times, places, transport, and current local information.
+  - For nearby local queries such as "pastelarias perto de mim", "cafés perto", "bakery near me", or "where can I eat nearby", do not stop just because the app database has no result. Search nearby places and the web, then answer with the best available local evidence.
   - If the app database does not contain the needed answer, use search_web as a normal fallback and answer from the best available evidence instead of refusing.
   - When the answer is not in the app dataset, say so briefly, then provide the most relevant answer supported by web results or general knowledge. Do not block with "I don't know" when you can still give a useful answer.
   - Never invent accommodation names, distances, prices, or facts that are not grounded in the app dataset, the web results, or clearly stated general knowledge.`
@@ -323,6 +324,7 @@ export class AiChatService {
   - Do not answer unrelated travel or general-purpose questions about renting cars, flights, generic tourism, commuting, weather, or non-pilgrim topics.
   - If the user asks for a car, flight, hotel outside the Camino, or unrelated topic, politely redirect back to the Caminho de Santiago and the app's pilgrim use cases.
   - In Camino mode, still use search_web when it adds concrete, current, or practical information relevant to the question, especially for places, routes, opening hours, transport, and local services near the route.
+  - For nearby local queries such as "pastelarias perto de mim", "cafés perto", "bakery near me", or "where can I eat nearby", do not stop just because the app database has no result. Search nearby places and the web, then answer with the best available local evidence.
   - Keep answers grounded in the Camino context, but do not refuse useful factual answers when web evidence can help.
   - Never invent accommodation names or facts that are not grounded in the app dataset, the web results, or the known Camino context.`;
 
@@ -356,8 +358,9 @@ ${toolList || '- (no tools available in this deployment)'}
   - Use a tool whenever it can improve the answer with facts from the app or the web.
   - The app database comes FIRST. For accommodations, stages, routes and services, call the matching app tool before anything else: those records are curated for pilgrims and are the reason this app exists.
   - For places that are NOT accommodations — restaurants, cafés, supermarkets, pharmacies, ATMs, laundries, drinking water, things to visit — use search_nearby_places. That is the tool for "where can I have dinner", "what is worth seeing here", "where do I buy food".
+  - For nearby local queries such as "pastelarias perto de mim", "cafés perto", "bakery near me", or "where can I eat nearby", treat the request as a local discovery question: use search_nearby_places and, if needed, search_web to get current, concrete answers even when the app has no exact match.
   - search_nearby_places has no price information. If the user asks for the cheapest option, say plainly that you cannot rank by price, then give the nearby options and any useful signal you do have (fast food versus restaurant, cafés for a lighter meal). NEVER invent euro amounts, price levels or rankings.
-  - search_web is a FALLBACK, not a starting point. Only use it when the app tools returned nothing useful, or when the question is clearly outside the app's data (weather, opening times of a third party, current news).
+  - search_web is not just a final fallback: use it whenever it can add useful, current, or local facts to the answer, especially for nearby services, opening times, and practical questions outside the app dataset.
   - Never answer an accommodation question with a generic booking or comparison site when the app database has records for that area.
   - Prefer official pages, direct provider pages, accommodation listings, and recent pages.
   - Never tell the user to search, google, browse, or look it up themselves.

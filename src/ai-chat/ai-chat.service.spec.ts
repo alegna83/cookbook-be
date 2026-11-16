@@ -57,6 +57,15 @@ describe('AiChatService domain guard', () => {
     expect(systemPrompt).toContain('use search_web whenever it can improve the answer');
   });
 
+  it('treats nearby pastry-shop queries as local discovery questions that should search the web', () => {
+    const session = (service as any).sessions.getOrCreate('nearby-pastelarias-test', 'pt');
+    const messages = (service as any).buildMessages(session, 'quais pastelarias há perto de mim?', 'general');
+    const systemPrompt = messages.find((m: any) => m.role === 'system')?.content ?? '';
+
+    expect(systemPrompt).toContain('pastelarias perto de mim');
+    expect(systemPrompt).toContain('Search nearby places and the web');
+  });
+
   it('allows web search in Camino mode for useful practical facts near the route', () => {
     const session = (service as any).sessions.getOrCreate('camino-scope-test', 'pt');
     const messages = (service as any).buildMessages(session, 'há transporte público para a próxima etapa?', 'camino');
